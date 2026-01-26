@@ -1,0 +1,45 @@
+/* App */
+"app.title" = "Clarity";
+
+/* Capture */
+"capture.tagline" = "Capture first. Interpret later.";
+"capture.ready" = "Ready";
+"capture.listening" = "Listening…";
+"capture.saving" = "Saving…";
+"capture.transcribing" = "Transcribing…";
+"capture.redacting" = "Redacting…";
+"capture.transcript" = "Transcript";
+"capture.transcript.raw_live" = "Raw (live)";
+"capture.transcript.last_capture" = "Last capture";
+"capture.transcript.expand" = "Expand";
+"capture.transcript.hide" = "Hide";
+"capture.transcript.show" = "Show";
+"capture.tap_to_stop" = "Tap to stop";
+"capture.a11y.start" = "Start recording";
+"capture.a11y.stop" = "Stop recording";
+
+/* Permission alerts */
+"perm.title.generic" = "Permission needed";
+"perm.button.open_settings" = "Open Settings";
+"perm.button.ok" = "OK";
+"perm.mic.title" = "Microphone access needed";
+"perm.mic.message" = "Enable Microphone access in Settings to record.";
+"perm.speech.title" = "Speech Recognition access needed";
+"perm.speech.message" = "Enable Speech Recognition in Settings to transcribe.";
+
+/* Settings */
+"settings.title" = "Settings";
+"settings.local_first" = "Local-first. Redaction runs on-device before anything else.";
+"settings.redaction.header" = "Redaction dictionary";
+"settings.redaction.empty" = "No custom tokens yet.";
+"settings.redaction.add.placeholder" = "Add a name or term (e.g. Louis)";
+"settings.redaction.add" = "Add";
+"settings.redaction.footer" = "Swipe left to delete an item. Items apply only on this device.";
+"settings.redaction.remove_all" = "Remove all redaction items";
+"settings.redaction.remove_all.confirm.title" = "Remove all redaction items?";
+"settings.redaction.remove_all.confirm.ok" = "Remove all";
+"settings.redaction.remove_all.confirm.cancel" = "Cancel";
+"settings.redaction.remove_all.confirm.message" = "This can’t be undone.";
+"settings.privacy.header" = "Privacy & Cloud";
+"settings.privacy.link" = "Privacy / Cloud Tap";
+"settings.privacy.note" = "Cloud access is always explicit. Redacted text only.";
