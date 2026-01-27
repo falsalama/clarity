@@ -393,7 +393,7 @@ private struct TurnLaneBadge: View {
     }
 }
 
-// MARK: - Cloud Tap gating (Phase 2, no network)
+// MARK: - Cloud Tap gating
 
 private enum CloudTool: String, CaseIterable, Identifiable {
     case reflect = "Reflect"
@@ -443,6 +443,10 @@ private struct ConfirmCloudTapSendSheet: View {
     let recordedAt: Date?
     let redactedText: String
 
+    @State private var isSending = false
+    @State private var sendError: String? = nil
+    @State private var responseText: String? = nil
+
     var body: some View {
         NavigationStack {
             List {
@@ -462,14 +466,44 @@ private struct ConfirmCloudTapSendSheet: View {
                 }
 
                 Section {
-                    Button("Send") {
-                        dismiss()
-                    }
-                    .disabled(true)
+                    Button(isSending ? "Sending…" : "Send") {
+                        Task {
+                            isSending = true
+                            sendError = nil
+                            responseText = nil
+                            defer { isSending = false }
 
-                    Text("Cloud Tap calls are not wired yet.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                            do {
+                                let appVersion =
+                                    Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+                                    ?? "0"
+
+                                let req = CloudTapReflectRequest(
+                                    text: redactedText,
+                                    recordedAt: recordedAt?.ISO8601Format(),
+                                    client: "ios",
+                                    appVersion: appVersion
+                                )
+
+                                let res = try await CloudTapService().reflect(req)
+                                responseText = String(describing: res)
+                            } catch {
+                                sendError = String(describing: error)
+                            }
+                        }
+                    }
+                    .disabled(isSending || redactedText.isEmpty)
+
+                    if let sendError {
+                        Text(sendError)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if let responseText {
+                        Text(responseText)
+                            .textSelection(.enabled)
+                    }
                 }
 
                 Section {
