@@ -1,11 +1,10 @@
-// SpeechTranscriber.swift
 import Foundation
 import Speech
 import Combine
 
 @MainActor
 final class SpeechTranscriber: ObservableObject {
-    static let buildMarker = "ST_BUILD_MARKER__2026_01_26__E_LIVE_LONG__SAFE_ROTATE"
+    static let buildMarker = "ST_BUILD_MARKER__2026_01_27__STABLE_TAIL_SEGMENTS__MONOTONIC_GUARDS_V1"
 
     @Published private(set) var isTranscribing: Bool = false
     @Published private(set) var liveTranscript: String = ""
@@ -18,16 +17,31 @@ final class SpeechTranscriber: ObservableObject {
     private var bufferCancellable: AnyCancellable?
 
     private var accumulatedText: String = ""
-    private var segmentLatestText: String = ""
+
+    // For the current recognition task only:
+    private var segmentCommittedText: String = ""     // stable chunk (won’t rewrite / won’t shrink)
+    private var segmentLiveTailText: String = ""      // tentative tail (allowed to rewrite)
     private var segmentStartTime: Date = Date()
 
     private var segmentTimer: Task<Void, Never>?
     private var timeoutTask: Task<Void, Never>?
 
-    private let segmentSeconds: Int = 8
+    private let segmentSeconds: Int = 30
     private let defaultTimeoutSeconds: Int = 60 * 60
 
+    // How far behind "now" we treat words as stable.
+    private let stabilityLagSeconds: TimeInterval = 1.1
+
     private var awaitingFinalContinuation: CheckedContinuation<Void, Never>?
+
+    // Ignore late callbacks from cancelled tasks
+    private var segmentToken: Int = 0
+
+    // Guards against recogniser “rewind/reset”
+    private var lastFullBestText: String = ""
+
+    // If a partial update shrinks a lot, treat as reset and ignore.
+    private let catastrophicShrinkChars: Int = 40
 
     // MARK: - UI-only reset (safe)
 
@@ -39,18 +53,19 @@ final class SpeechTranscriber: ObservableObject {
 
     // MARK: - Session lifecycle
 
-    /// Starts the speech session (auth + recogniser + request/task). Does NOT attach audio buffers.
-    /// Call `attach(to:)` before audio starts flowing.
     func startSession(timeoutSeconds: Int? = nil) async -> Bool {
         stopInternal(resetPublished: false)
 
         lastError = nil
         lastTranscript = nil
-        // Do not clear liveTranscript here; caller decides when to clear UI.
 
         accumulatedText = ""
-        segmentLatestText = ""
+        segmentCommittedText = ""
+        segmentLiveTailText = ""
         segmentStartTime = Date()
+        lastFullBestText = ""
+
+        segmentToken &+= 1
 
         guard await ensureSpeechAuth() else {
             finish(error: "Speech not authorised.")
@@ -73,7 +88,6 @@ final class SpeechTranscriber: ObservableObject {
         return true
     }
 
-    /// Attaches recorder buffers to the current request. Safe to call only after `startSession() == true`.
     func attach(to recorder: AudioRecorder) {
         bufferCancellable?.cancel()
         bufferCancellable = recorder.bufferPublisher
@@ -96,7 +110,7 @@ final class SpeechTranscriber: ObservableObject {
 
             await flushCurrentSegment(waitSeconds: 0.9)
 
-            let combined = joinTranscript(accumulatedText, segmentLatestText)
+            let combined = joinTranscript(accumulatedText, joinTranscript(segmentCommittedText, segmentLiveTailText))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
 
             if combined.isEmpty {
@@ -118,14 +132,21 @@ final class SpeechTranscriber: ObservableObject {
     // MARK: - Segments
 
     private func startNewSegment(recognizer: SFSpeechRecognizer) {
+        segmentToken &+= 1
+        let myToken = segmentToken
+
         let oldTask = task
         let oldRequest = request
 
-        segmentLatestText = ""
+        segmentCommittedText = ""
+        segmentLiveTailText = ""
         segmentStartTime = Date()
+        lastFullBestText = ""
 
         let newReq = SFSpeechAudioBufferRecognitionRequest()
         newReq.shouldReportPartialResults = true
+        newReq.taskHint = .dictation
+
         if recognizer.supportsOnDeviceRecognition {
             newReq.requiresOnDeviceRecognition = true
         }
@@ -135,12 +156,17 @@ final class SpeechTranscriber: ObservableObject {
         task = recognizer.recognitionTask(with: newReq) { [weak self] result, error in
             guard let self else { return }
             Task { @MainActor in
+                guard myToken == self.segmentToken else { return }
+                guard self.isTranscribing else { return }
+
                 if let error {
-                    self.commitCurrentSegmentBestEffort()
+                    self.commitCurrentSegmentBestEffort(finalize: true)
                     self.updateLiveTranscript()
                     self.signalAwaitingFinal()
 
-                    if self.accumulatedText.isEmpty && self.segmentLatestText.isEmpty {
+                    if self.accumulatedText.isEmpty &&
+                        self.segmentCommittedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                        self.segmentLiveTailText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         self.finish(error: "Transcription error: \(error.localizedDescription)")
                     }
                     return
@@ -148,11 +174,17 @@ final class SpeechTranscriber: ObservableObject {
 
                 guard let result else { return }
 
-                self.segmentLatestText = result.bestTranscription.formattedString
-                self.updateLiveTranscript()
+                // Guard: ignore catastrophic rewinds in the recogniser output while recording.
+                let best = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                if self.shouldIgnoreCatastrophicShrink(candidate: best) {
+                    return
+                }
+                self.lastFullBestText = best
+
+                self.updateFromSegments(result.bestTranscription.segments)
 
                 if result.isFinal {
-                    self.commitCurrentSegmentBestEffort()
+                    self.commitCurrentSegmentBestEffort(finalize: true)
                     self.updateLiveTranscript()
                     self.signalAwaitingFinal()
                 }
@@ -161,6 +193,73 @@ final class SpeechTranscriber: ObservableObject {
 
         oldRequest?.endAudio()
         oldTask?.cancel()
+    }
+
+    /// Splits bestTranscription into stable vs tail, reducing “jumping”.
+    /// Also enforces monotonic stable (committed) text so it never shrinks.
+    private func updateFromSegments(_ segments: [SFTranscriptionSegment]) {
+        guard !segments.isEmpty else { return }
+
+        let last = segments[segments.count - 1]
+        let nowEnd = last.timestamp + last.duration
+        let stableCutoff = max(0, nowEnd - stabilityLagSeconds)
+
+        var stableParts: [String] = []
+        var tailParts: [String] = []
+
+        for seg in segments {
+            let end = seg.timestamp + seg.duration
+            if end <= stableCutoff {
+                stableParts.append(seg.substring)
+            } else {
+                tailParts.append(seg.substring)
+            }
+        }
+
+        let candidateStable = stableParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let candidateTail = tailParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Monotonic guard:
+        // - allow stable to grow
+        // - never allow stable to shrink due to recogniser resets/resegmentation
+        if segmentCommittedText.isEmpty {
+            segmentCommittedText = candidateStable
+        } else if candidateStable.isEmpty {
+            // Do nothing: never replace committed stable with empty
+        } else if candidateStable.hasPrefix(segmentCommittedText) {
+            // Grew: accept
+            segmentCommittedText = candidateStable
+        } else if segmentCommittedText.hasPrefix(candidateStable) {
+            // Shrink attempt: ignore stable update (keep existing committed)
+        } else if candidateStable.count >= segmentCommittedText.count {
+            // Different but longer (punctuation/spacing changes). Prefer the longer stable.
+            segmentCommittedText = candidateStable
+        } else {
+            // Different and shorter: treat as reset, ignore stable update.
+        }
+
+        // Tail is always tentative. But if recogniser reset makes tail empty, keep last tail
+        // unless we actually have new tail content.
+        if !candidateTail.isEmpty || segmentLiveTailText.isEmpty {
+            segmentLiveTailText = candidateTail
+        }
+
+        updateLiveTranscript()
+    }
+
+    private func shouldIgnoreCatastrophicShrink(candidate: String) -> Bool {
+        guard isTranscribing else { return false }
+
+        let prev = lastFullBestText
+        if prev.isEmpty { return false }
+        if candidate.isEmpty { return true }
+
+        // If candidate is much shorter than previous, likely a reset. Ignore.
+        if candidate.count + catastrophicShrinkChars < prev.count {
+            return true
+        }
+
+        return false
     }
 
     private func startSegmentTimer() {
@@ -198,7 +297,7 @@ final class SpeechTranscriber: ObservableObject {
                 let nanos = UInt64(max(0.1, waitSeconds) * 1_000_000_000)
                 try? await Task.sleep(nanoseconds: nanos)
                 await MainActor.run {
-                    self.commitCurrentSegmentBestEffort()
+                    self.commitCurrentSegmentBestEffort(finalize: true)
                     self.updateLiveTranscript()
                     self.signalAwaitingFinal()
                 }
@@ -206,16 +305,38 @@ final class SpeechTranscriber: ObservableObject {
         }
     }
 
-    private func commitCurrentSegmentBestEffort() {
-        let text = segmentLatestText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty {
-            accumulatedText = joinTranscript(accumulatedText, text)
+    /// finalize=false: commit only stable text
+    /// finalize=true: commit stable + tail (used on final/flush/stop)
+    private func commitCurrentSegmentBestEffort(finalize: Bool) {
+        let stable = segmentCommittedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tail = segmentLiveTailText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let toCommit: String
+        if finalize {
+            toCommit = joinTranscript(stable, tail)
+        } else {
+            toCommit = stable
         }
-        segmentLatestText = ""
+
+        if !toCommit.isEmpty {
+            accumulatedText = joinTranscript(accumulatedText, toCommit)
+        }
+
+        segmentCommittedText = ""
+        segmentLiveTailText = ""
+        lastFullBestText = ""
     }
 
     private func updateLiveTranscript() {
-        liveTranscript = joinTranscript(accumulatedText, segmentLatestText)
+        let current = joinTranscript(segmentCommittedText, segmentLiveTailText)
+        let combined = joinTranscript(accumulatedText, current)
+
+        // Never allow live transcript to “collapse” to empty mid-session.
+        if isTranscribing, combined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return
+        }
+
+        liveTranscript = combined
     }
 
     private func signalAwaitingFinal() {
@@ -246,6 +367,8 @@ final class SpeechTranscriber: ObservableObject {
 
         bufferCancellable?.cancel()
         bufferCancellable = nil
+
+        segmentToken &+= 1
 
         request?.endAudio()
         request = nil

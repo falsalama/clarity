@@ -27,7 +27,9 @@ struct Tab_CaptureView: View {
             .padding(.top, 10)
 
             statusPill
+
             transcriptCard
+                .layoutPriority(1)
 
             if let e = coordinator.lastError, !e.isEmpty {
                 Text(e)
@@ -56,7 +58,6 @@ struct Tab_CaptureView: View {
         } message: {
             Text(LocalizedStringKey(permissionAlertMessageKey))
         }
-
     }
 
     // MARK: - UI
@@ -75,7 +76,6 @@ struct Tab_CaptureView: View {
     private var statusPill: some View {
         HStack(spacing: 8) {
             Text(LocalizedStringKey(statusTextKey))
-
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -94,47 +94,83 @@ struct Tab_CaptureView: View {
 
     @ViewBuilder
     private var transcriptCard: some View {
-        let text = coordinator.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !text.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(String(localized: "capture.transcript"))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(String(localized: "capture.transcript"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
 
-                    Spacer()
+                Spacer()
 
-                    Text(String(localized: coordinator.phase == .recording ? "capture.transcript.raw_live" : "capture.transcript.last_capture"))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                Text(String(localized: coordinator.phase == .recording
+                            ? "capture.transcript.raw_live"
+                            : "capture.transcript.last_capture"))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
 
-                    Button(String(localized: "capture.transcript.expand")) { showExpandedTranscript = true }
-                        .font(.footnote.weight(.medium))
+                Button(String(localized: "capture.transcript.expand")) { showExpandedTranscript = true }
+                    .font(.footnote.weight(.medium))
+                    .disabled(coordinator.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
-                    Button(String(localized: showTranscript ? "capture.transcript.hide" : "capture.transcript.show")) { showTranscript.toggle() }
-                        .font(.footnote.weight(.medium))
+                Button(String(localized: showTranscript ? "capture.transcript.hide" : "capture.transcript.show")) {
+                    showTranscript.toggle()
                 }
+                .font(.footnote.weight(.medium))
+            }
 
-                if showTranscript {
+            if showTranscript {
+                ScrollViewReader { proxy in
                     ScrollView {
-                        Text(coordinator.liveTranscript)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .textSelection(.enabled)
-                            .font(.body)
+                        VStack(alignment: .leading, spacing: 0) {
+                            let trimmed = coordinator.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if trimmed.isEmpty {
+                                Text(String(localized: "capture.ready"))
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 2)
+                            } else {
+                                Text(coordinator.liveTranscript)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                                    .font(.body)
+                            }
+
+                            Color.clear
+                                .frame(height: 1)
+                                .id("bottom")
+                        }
                     }
-                    .frame(maxHeight: 260)
+                    // Stable presence prevents layout jump when transcript first appears
+                    .frame(minHeight: 120)
+                    // Allow it to use spare space while recording; cap when not recording
+                    .frame(maxHeight: coordinator.phase == .recording ? .infinity : 260)
+
+                    .onChange(of: coordinator.liveTranscript) { _, _ in
+                        guard coordinator.phase == .recording else { return }
+                        DispatchQueue.main.async {
+                            withAnimation(.easeOut(duration: 0.12)) {
+                                proxy.scrollTo("bottom", anchor: .bottom)
+                            }
+                        }
+                    }
+                    .onChange(of: coordinator.phase) { _, newPhase in
+                        guard newPhase == .recording else { return }
+                        DispatchQueue.main.async {
+                            proxy.scrollTo("bottom", anchor: .bottom)
+                        }
+                    }
                 }
             }
-            .padding(14)
-            .background(.thinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .padding(.top, 8)
-            .sheet(isPresented: $showExpandedTranscript) {
-                ExpandedTranscriptView(
-                    title: String(localized: "capture.transcript"),
-                    text: coordinator.liveTranscript
-                )
-            }
+        }
+        .padding(14)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(.top, 8)
+        .sheet(isPresented: $showExpandedTranscript) {
+            ExpandedTranscriptView(
+                title: String(localized: "capture.transcript"),
+                text: coordinator.liveTranscript
+            )
         }
     }
 
@@ -220,7 +256,6 @@ private struct CaptureButton: View {
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.tint)
                     } else {
-
                         Image(systemName: "mic.fill")
                             .font(.system(size: 30, weight: .semibold))
                             .symbolRenderingMode(.hierarchical)

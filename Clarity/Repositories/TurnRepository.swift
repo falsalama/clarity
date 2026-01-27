@@ -1,3 +1,4 @@
+// TurnRepository.swift
 import Foundation
 import SwiftData
 
@@ -25,10 +26,13 @@ final class TurnRepository {
         return try context.fetch(descriptor).first
     }
 
-    // MARK: - Create (Capture)
+    // MARK: - Create (Audio capture)
 
-    /// Creates a new capture Turn and persists it. Returns the new Turn id.
-    func createCaptureTurn(audioPath: String, recordedAt: Date = Date(), captureContext: CaptureContext = .unknown) throws -> UUID {
+    func createCaptureTurn(
+        audioPath: String,
+        recordedAt: Date = Date(),
+        captureContext: CaptureContext = .unknown
+    ) throws -> UUID {
         let id = UUID()
         let turn = TurnEntity(id: id)
 
@@ -36,7 +40,43 @@ final class TurnRepository {
         turn.captureContextRaw = captureContext.rawValue
         turn.recordedAt = recordedAt
         turn.stateRaw = TurnState.queued.rawValue
+
         turn.audioPath = audioPath
+
+        context.insert(turn)
+        try context.save()
+        return id
+    }
+
+    // MARK: - Create (Text capture)
+
+    /// Creates a new Turn from pasted/imported text.
+    /// Stores the redacted text as canonical transcript.
+    func createTextTurn(
+        redactedText: String,
+        recordedAt: Date = Date(),
+        captureContext: CaptureContext = .unknown
+    ) throws -> UUID {
+        let trimmed = redactedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw NSError(domain: "Clarity", code: 400, userInfo: [NSLocalizedDescriptionKey: "Text is empty"])
+        }
+
+        let id = UUID()
+        let turn = TurnEntity(id: id)
+
+        turn.sourceRaw = TurnSource.importedText.rawValue
+        turn.captureContextRaw = captureContext.rawValue
+        turn.recordedAt = recordedAt
+
+        turn.audioPath = nil
+        turn.audioBytes = 0
+
+        // Do not store raw paste
+        turn.transcriptRaw = nil
+        turn.transcriptRedactedActive = trimmed
+
+        turn.stateRaw = TurnState.ready.rawValue
 
         context.insert(turn)
         try context.save()
@@ -45,7 +85,6 @@ final class TurnRepository {
 
     // MARK: - State updates
 
-    /// Marks a Turn as ready and writes transcript fields. Title is written only if provided.
     func markReady(
         id: UUID,
         endedAt: Date = Date(),
@@ -68,7 +107,6 @@ final class TurnRepository {
         turn.redactionVersion = max(turn.redactionVersion, redactionVersion)
 
         if let titleIfAuto, !titleIfAuto.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            // Only set if the user hasn’t manually named it (empty or default).
             let trimmed = turn.title.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty || trimmed.caseInsensitiveCompare("Untitled") == .orderedSame {
                 turn.title = titleIfAuto
@@ -91,11 +129,10 @@ final class TurnRepository {
     func delete(id: UUID) throws {
         guard let entity = try fetch(id: id) else { return }
 
-        // Delete local audio first (best-effort).
+        // Best-effort local audio delete
         FileStore.removeIfExists(atPath: entity.audioPath)
 
         context.delete(entity)
         try context.save()
     }
 }
-

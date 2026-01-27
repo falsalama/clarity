@@ -9,6 +9,9 @@ struct TurnsListView: View {
     @State private var deleteErrorMessage: String?
     @State private var showDeleteError: Bool = false
 
+    @State private var showPasteSheet: Bool = false
+    @State private var navigateToTurnID: UUID?
+
     var body: some View {
         NavigationStack {
             List {
@@ -16,20 +19,60 @@ struct TurnsListView: View {
                     ContentUnavailableView("No captures yet", systemImage: "mic")
                 } else {
                     ForEach(turns) { t in
-                        NavigationLink {
-                            TurnDetailView(turnID: t.id)
-                        } label: {
+                        NavigationLink(value: t.id) {
                             row(t)
+                                .contextMenu {
+                                    if let text = transcriptPreview(for: t), !text.isEmpty {
+                                        Button("Copy") {
+#if os(iOS)
+                                            UIPasteboard.general.string = text
+#endif
+                                        }
+                                    }
+                                }
                         }
                     }
                     .onDelete(perform: delete)
                 }
             }
             .navigationTitle("Captures")
+            .navigationDestination(for: UUID.self) { id in
+                TurnDetailView(turnID: id)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showPasteSheet = true
+                    } label: {
+                        Image(systemName: "doc.on.clipboard")
+                    }
+                    .accessibilityLabel("Paste text")
+                }
+            }
+            .sheet(isPresented: $showPasteSheet) {
+                PasteTextTurnSheet { newID in
+                    // Push to the new capture after creation
+                    navigateToTurnID = newID
+                }
+            }
+            .background(hiddenNavigationLink)
             .alert("Couldn’t delete capture", isPresented: $showDeleteError) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(deleteErrorMessage ?? "Please try again.")
+            }
+        }
+    }
+
+    // Hidden link to trigger navigation reliably after sheet dismissal
+    private var hiddenNavigationLink: some View {
+        Group {
+            if let id = navigateToTurnID {
+                NavigationLink(value: id) { EmptyView() }
+                    .opacity(0)
+                    .onAppear {
+                        DispatchQueue.main.async { navigateToTurnID = nil }
+                    }
             }
         }
     }
@@ -53,6 +96,7 @@ struct TurnsListView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
+                    .textSelection(.enabled)
             }
 
             HStack(spacing: 8) {
@@ -74,7 +118,7 @@ struct TurnsListView: View {
 
         do {
             for id in ids {
-                try repo.delete(id: id) // includes best-effort audio deletion + entity deletion + save
+                try repo.delete(id: id)
             }
         } catch {
             deleteErrorMessage = error.localizedDescription

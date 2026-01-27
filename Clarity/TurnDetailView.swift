@@ -43,6 +43,10 @@ struct TurnDetailView: View {
 
                 Divider()
 
+                outputsSection
+
+                Divider()
+
                 actionsSection
             }
             .padding()
@@ -66,6 +70,7 @@ struct TurnDetailView: View {
                 CloudTapOffSheet()
             case .confirmSend:
                 ConfirmCloudTapSendSheet(
+                    turnID: turnID,
                     tool: pendingTool,
                     recordedAt: turn?.recordedAt,
                     redactedText: transcriptForCloudPayload(from: turn)
@@ -92,10 +97,10 @@ struct TurnDetailView: View {
                 .lineLimit(1)
 
             HStack(spacing: 8) {
-                TurnLaneBadge(text: contextLabel(captureContextRaw: turn?.captureContextRaw))
+                LaneBadge(text: contextLabel(captureContextRaw: turn?.captureContextRaw))
 
                 if cloudTap.isEnabled {
-                    TurnLaneBadge(text: "Cloud Tap armed")
+                    LaneBadge(text: "Cloud Tap armed")
                 }
 
                 Spacer()
@@ -273,6 +278,55 @@ struct TurnDetailView: View {
         return Redactor(tokens: dictionary.tokens).redact(raw).redactedText
     }
 
+    // MARK: - Outputs
+
+    private var outputsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Outputs")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            outputBlock(title: "Reflect", text: turn?.reflectText, prompt: turn?.reflectPromptVersion)
+            outputBlock(title: "Options", text: turn?.optionsText, prompt: turn?.optionsPromptVersion)
+            outputBlock(title: "Questions", text: turn?.questionsText, prompt: turn?.questionsPromptVersion)
+
+            // Talk-it-through will be rendered later from thread JSON
+            if let id = turn?.talkLastResponseID, !id.isEmpty {
+                Text("Talk it through thread active.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func outputBlock(title: String, text: String?, prompt: String?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if let p = prompt, !p.isEmpty {
+                    Text(p)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let t = text, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(t)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            } else {
+                Text("—")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
     // MARK: - Tools
 
     private var actionsSection: some View {
@@ -285,10 +339,10 @@ struct TurnDetailView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            toolButton("Reflect", tool: .reflect, enabled: enabled)
-            toolButton("Options", tool: .options, enabled: enabled)
-            toolButton("Questions", tool: .questions, enabled: enabled)
-            toolButton("Talk it through", tool: .talkItThrough, enabled: enabled)
+            toolButton(title: toolTitle(.reflect), tool: .reflect, enabled: enabled)
+            toolButton(title: toolTitle(.options), tool: .options, enabled: enabled)
+            toolButton(title: toolTitle(.questions), tool: .questions, enabled: enabled)
+            toolButton(title: "Talk it through", tool: .talkItThrough, enabled: enabled)
 
             Text("Cloud actions are explicit and always require confirmation.")
                 .font(.footnote)
@@ -296,7 +350,21 @@ struct TurnDetailView: View {
         }
     }
 
-    private func toolButton(_ title: String, tool: CloudTool, enabled: Bool) -> some View {
+    private func toolTitle(_ tool: CloudTool) -> String {
+        guard let t = turn else { return tool.rawValue }
+        switch tool {
+        case .reflect:
+            return (t.reflectText?.isEmpty == false) ? "Re-run Reflect" : "Reflect"
+        case .options:
+            return (t.optionsText?.isEmpty == false) ? "Re-run Options" : "Options"
+        case .questions:
+            return (t.questionsText?.isEmpty == false) ? "Re-run Questions" : "Questions"
+        case .talkItThrough:
+            return "Talk it through"
+        }
+    }
+
+    private func toolButton(title: String, tool: CloudTool, enabled: Bool) -> some View {
         Button(title) { requestCloudTool(tool) }
             .buttonStyle(.bordered)
             .disabled(!enabled)
@@ -318,7 +386,7 @@ struct TurnDetailView: View {
         sheetRoute = .confirmSend
     }
 
-    // MARK: - Copy
+    // MARK: - Placeholder
 
     private func transcriptPlaceholder(for stateRaw: String?) -> String {
         switch stateRaw {
@@ -379,20 +447,6 @@ private struct StatusPill: View {
     }
 }
 
-private struct TurnLaneBadge: View {
-    let text: String
-
-    var body: some View {
-        Text(text)
-            .font(.caption2)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(.thinMaterial)
-            .clipShape(SwiftUI.Capsule())
-            .foregroundStyle(.secondary)
-    }
-}
-
 // MARK: - Cloud Tap gating
 
 private enum CloudTool: String, CaseIterable, Identifiable {
@@ -438,14 +492,15 @@ private struct CloudTapOffSheet: View {
 
 private struct ConfirmCloudTapSendSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
 
+    let turnID: UUID
     let tool: CloudTool
     let recordedAt: Date?
     let redactedText: String
 
     @State private var isSending = false
     @State private var sendError: String? = nil
-    @State private var responseText: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -470,10 +525,14 @@ private struct ConfirmCloudTapSendSheet: View {
                         Task {
                             isSending = true
                             sendError = nil
-                            responseText = nil
                             defer { isSending = false }
 
                             do {
+                                let service = CloudTapService(
+                                    baseURL: CloudTapConfig.baseURL,
+                                    anonKey: CloudTapConfig.supabaseAnonKey
+                                )
+
                                 let appVersion =
                                     Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
                                     ?? "0"
@@ -485,8 +544,47 @@ private struct ConfirmCloudTapSendSheet: View {
                                     appVersion: appVersion
                                 )
 
-                                let res = try await CloudTapService().reflect(req)
-                                responseText = String(describing: res)
+                                // Call correct function
+                                let resp: CloudTapReflectResponse
+                                switch tool {
+                                case .reflect:
+                                    resp = try await service.reflect(req)
+                                case .options:
+                                    resp = try await service.options(req)
+                                case .questions:
+                                    resp = try await service.questions(req)
+                                case .talkItThrough:
+                                    // For now, treat as single-shot until you wire multi-turn UI.
+                                    resp = try await service.options(req)
+                                }
+
+                                // Persist into TurnEntity
+                                if let t = fetchTurn(turnID) {
+                                    switch tool {
+                                    case .reflect:
+                                        t.reflectText = resp.text
+                                        t.reflectPromptVersion = resp.prompt_version
+                                        t.reflectUpdatedAt = Date()
+                                    case .options:
+                                        t.optionsText = resp.text
+                                        t.optionsPromptVersion = resp.prompt_version
+                                        t.optionsUpdatedAt = Date()
+                                    case .questions:
+                                        t.questionsText = resp.text
+                                        t.questionsPromptVersion = resp.prompt_version
+                                        t.questionsUpdatedAt = Date()
+                                    case .talkItThrough:
+                                        // leave for later
+                                        break
+                                    }
+
+                                    // Legacy
+                                    t.reflectionText = resp.text
+
+                                    try modelContext.save()
+                                }
+
+                                dismiss()
                             } catch {
                                 sendError = String(describing: error)
                             }
@@ -499,11 +597,6 @@ private struct ConfirmCloudTapSendSheet: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
-
-                    if let responseText {
-                        Text(responseText)
-                            .textSelection(.enabled)
-                    }
                 }
 
                 Section {
@@ -515,6 +608,13 @@ private struct ConfirmCloudTapSendSheet: View {
             .navigationBarTitleDisplayMode(.inline)
 #endif
         }
+    }
+
+    private func fetchTurn(_ id: UUID) -> TurnEntity? {
+        let descriptor = FetchDescriptor<TurnEntity>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return (try? modelContext.fetch(descriptor))?.first
     }
 
     private var timestampText: String {

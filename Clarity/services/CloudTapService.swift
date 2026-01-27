@@ -10,8 +10,6 @@ final class CloudTapService {
     private let anonKey: String
     private let session: URLSession
 
-    /// baseURL should be: https://<project-ref>.supabase.co/functions/v1
-    /// anonKey should be your Supabase anon key
     init(
         baseURL: URL = CloudTapConfig.baseURL,
         anonKey: String = CloudTapConfig.supabaseAnonKey,
@@ -22,30 +20,42 @@ final class CloudTapService {
         self.session = session
     }
 
-    func reflect(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
-        // Edge function name: "cloudtap"
-        // Route: "reflect"
-        let url = baseURL.appendingPathComponent("cloudtap-reflect")
-
+    private func postJSON<T: Encodable, U: Decodable>(_ body: T, to path: String) async throws -> U {
+        let url = baseURL.appendingPathComponent(path)
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-        // Supabase Edge Functions auth
         req.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
         req.setValue(anonKey, forHTTPHeaderField: "apikey")
-
-        req.httpBody = try JSONEncoder().encode(reqBody)
+        req.httpBody = try JSONEncoder().encode(body)
 
         let (data, resp) = try await session.data(for: req)
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(code) else { throw CloudTapError.http(code) }
 
         do {
-            return try JSONDecoder().decode(CloudTapReflectResponse.self, from: data)
+            return try JSONDecoder().decode(U.self, from: data)
         } catch {
             throw CloudTapError.decoding
         }
+    }
+
+    // Single-shot
+    func reflect(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-reflect")
+    }
+
+    func options(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-options")
+    }
+
+    func questions(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-questions")
+    }
+
+    // Multi-turn
+    func talkItThrough(_ reqBody: CloudTapTalkRequest) async throws -> CloudTapTalkResponse {
+        try await postJSON(reqBody, to: "cloudtap-talkitthrough")
     }
 }
 

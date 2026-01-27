@@ -1,26 +1,31 @@
 import Foundation
 
-// MARK: - Request
+// MARK: - Single-shot (reflect/options/questions)
 
 struct CloudTapReflectRequest: Codable {
-    /// Redacted transcript text only.
-    /// Audio, raw transcript, and placeholder maps never leave device.
     let text: String
-
-    /// Optional ISO8601 timestamp for audit/debug (non-identifying).
     let recordedAt: String?
-
-    /// Client identifier (e.g. "ios").
     let client: String
-
-    /// App version for compatibility.
     let appVersion: String
 }
 
-// MARK: - Response
-
-struct CloudTapReflectResponse: Codable {
-    /// Plain text reflection response.
+struct CloudTapReflectResponse: Decodable {
     let text: String
+    let prompt_version: String
 }
 
+// MARK: - Multi-turn (talk-it-through)
+
+struct CloudTapTalkRequest: Codable {
+    let text: String
+    let recordedAt: String?
+    let client: String
+    let appVersion: String
+    let previous_response_id: String?
+}
+
+struct CloudTapTalkResponse: Decodable {
+    let text: String
+    let response_id: String
+    let prompt_version: String
+}

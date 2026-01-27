@@ -1,3 +1,4 @@
+// SwiftDataModels.swift
 import Foundation
 import SwiftData
 
@@ -39,11 +40,34 @@ final class TurnEntity {
     /// Canonical display transcript and any cloud payload.
     var transcriptRedactedActive: String
 
-    // MARK: Reflection (assistant output)
+    // MARK: Reflection / tools output (stored locally)
 
-    /// Plain-text reflection output (Cloud Tap / Apple Intelligence).
-    /// Derived only. Stored locally.
+    /// Legacy single-output field (kept for backward compatibility).
+    /// Prefer the per-tool fields below.
     var reflectionText: String
+
+    // Reflect
+    var reflectText: String?
+    var reflectPromptVersion: String?
+    var reflectUpdatedAt: Date?
+
+    // Options
+    var optionsText: String?
+    var optionsPromptVersion: String?
+    var optionsUpdatedAt: Date?
+
+    // Questions
+    var questionsText: String?
+    var questionsPromptVersion: String?
+    var questionsUpdatedAt: Date?
+
+    // Talk it through (multi-turn)
+    /// JSON-encoded array of messages for this turn’s thread (local only).
+    var talkThreadJSON: Data
+    /// Last Responses API response_id (continuation token).
+    var talkLastResponseID: String?
+    var talkPromptVersion: String?
+    var talkUpdatedAt: Date?
 
     // MARK: Redaction
 
@@ -101,6 +125,24 @@ final class TurnEntity {
         self.transcriptRedactedActive = ""
 
         self.reflectionText = ""
+
+        self.reflectText = nil
+        self.reflectPromptVersion = nil
+        self.reflectUpdatedAt = nil
+
+        self.optionsText = nil
+        self.optionsPromptVersion = nil
+        self.optionsUpdatedAt = nil
+
+        self.questionsText = nil
+        self.questionsPromptVersion = nil
+        self.questionsUpdatedAt = nil
+
+        // Use an explicit empty JSON array by default to avoid decode failures later.
+        self.talkThreadJSON = Data("[]".utf8)
+        self.talkLastResponseID = nil
+        self.talkPromptVersion = nil
+        self.talkUpdatedAt = nil
 
         self.redactionVersion = 1
         self.redactionTimestamp = nil
