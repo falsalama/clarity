@@ -29,12 +29,12 @@
 
 /* Settings */
 "settings.title" = "Settings";
-"settings.local_first" = "Local-first. Redaction runs on-device before anything else.";
+"settings.local_first" = "Add words that are always redacted before requests are made.";
 "settings.redaction.header" = "Redaction dictionary";
 "settings.redaction.empty" = "No custom tokens yet.";
 "settings.redaction.add.placeholder" = "Add a name or term (e.g. Louis)";
 "settings.redaction.add" = "Add";
-"settings.redaction.footer" = "Swipe left to delete an item. Items apply only on this device.";
+"settings.redaction.footer" = "Swipe left to delete.";
 "settings.redaction.remove_all" = "Remove all redaction items";
 "settings.redaction.remove_all.confirm.title" = "Remove all redaction items?";
 "settings.redaction.remove_all.confirm.ok" = "Remove all";

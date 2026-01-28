@@ -18,8 +18,7 @@ struct CapsuleView: View {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("""
-Capsule stores only the preferences you choose here to guide how responses are generated.
-Clarity does not access your contacts, calendars, photos, or location.
+Set optional preferences to influence responses.
 """)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -56,7 +55,7 @@ Clarity does not access your contacts, calendars, photos, or location.
     // MARK: - Preferences
 
     private var preferencesSection: some View {
-        Section("Preferences (optional)") {
+        Section("Preferences") {
             let pairs = store.preferenceKeyValues
             if pairs.isEmpty {
                 Text("None yet.")

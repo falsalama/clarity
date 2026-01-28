@@ -9,16 +9,20 @@ struct PrivacyView: View {
     var body: some View {
         Form {
             Section {
-                Text("Local-first. Audio and raw transcripts stay on this device. Redaction runs before anything else.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Audio and raw transcripts stay on this device.")
+                    Text("Redaction is applied before data is sent.")
+                }
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
 
             Section {
                 Toggle(isOn: enableBinding) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Enable Cloud Tap")
-                        Text("Off by default. You still confirm each send.")
+                        Text("You confirm each send.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -34,13 +38,13 @@ struct PrivacyView: View {
                 LabeledContent("Never sent") { Text("Audio, raw transcript") }
                 LabeledContent("Per-call consent") { Text("Always required") }
 
-                NavigationLink("View payload preview") {
+                NavigationLink("View Send Preview") {
                     PayloadPreviewExplainerView()
                 }
             } header: {
                 Text("Data sharing")
             } footer: {
-                Text("The payload preview shows exactly what would be sent if you choose Cloud Tap for a specific action.")
+                Text("Preview exactly what would be sent for a specific action.")
             }
 
             Section {
@@ -58,7 +62,7 @@ struct PrivacyView: View {
 
             Section {
                 LabeledContent("Driving / CarPlay") { Text("Capture only") }
-                Text("Reflection and cloud actions are disabled while driving.")
+                Text("Reflection and cloud actions are unavailable while driving.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {
@@ -99,7 +103,7 @@ private struct PayloadPreviewExplainerView: View {
     var body: some View {
         List {
             Section {
-                Text("Payload preview is local-only. It shows the redacted transcript and minimal metadata that would be sent if you explicitly choose Cloud Tap for a specific action.")
+                Text("Preview what would be sent when you choose Cloud Tap for an action. Includes redacted text, timing, and limited context.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -114,10 +118,9 @@ private struct PayloadPreviewExplainerView: View {
             Section("Excluded") {
                 Text("Audio files")
                 Text("Raw transcript")
-                Text("Contacts / identifiers")
             }
         }
-        .navigationTitle("Payload preview")
+        .navigationTitle("Send Preview")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
