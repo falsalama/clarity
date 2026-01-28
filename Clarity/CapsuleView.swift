@@ -1,3 +1,4 @@
+// CapsuleView.swift
 import SwiftUI
 
 struct CapsuleView: View {
@@ -6,25 +7,32 @@ struct CapsuleView: View {
     @State private var newPrefKey: String = ""
     @State private var newPrefValue: String = ""
 
-    @State private var newCondKey: String = ""
-    @State private var newCondValue: String = ""
+    // Focus to support return-key flow between fields
+    private enum Field: Hashable {
+        case prefKey, prefValue
+    }
+    @FocusState private var focusedField: Field?
 
     var body: some View {
         List {
             Section {
-                Text("Capsule stores abstracted preferences and conditions only. No transcripts, no identities.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("""
+Capsule stores only the preferences you choose here to guide how responses are generated.
+Clarity does not access your contacts, calendars, photos, or location.
+""")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             preferencesSection
-            conditionsSection
 
             Section {
                 HStack {
                     Text("Updated")
                     Spacer()
-                    Text(store.capsule.updatedAt)
+                    Text(store.capsule.updatedAt.formatted(date: .abbreviated, time: .shortened))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
@@ -35,105 +43,121 @@ struct CapsuleView: View {
                     Text("Wipe Capsule")
                 }
                 .accessibilityLabel("Wipe Capsule")
-                .accessibilityHint("Deletes all preferences, conditions, and notes from your Capsule.")
+                .accessibilityHint("Deletes all preferences and notes from your Capsule.")
             }
         }
         .navigationTitle("Capsule")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .toolbar { EditButton() }
     }
+
+    // MARK: - Preferences
 
     private var preferencesSection: some View {
-        Section("Preferences") {
-            if store.capsule.preferences.isEmpty {
+        Section("Preferences (optional)") {
+            let pairs = store.preferenceKeyValues
+            if pairs.isEmpty {
                 Text("None yet.")
                     .foregroundStyle(.secondary)
             } else {
-                let keys = store.capsule.preferences.keys.sorted()
-                ForEach(keys, id: \.self) { k in
+                ForEach(pairs, id: \.key) { kv in
                     HStack {
-                        Text(k)
+                        Text(kv.key)
                         Spacer()
-                        Text(store.capsule.preferences[k] ?? "")
+                        Text(kv.value)
                             .foregroundStyle(.secondary)
                     }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(kv.key), \(kv.value)")
                 }
                 .onDelete { offsets in
-                    let keys = store.capsule.preferences.keys.sorted()
+                    let pairs = store.preferenceKeyValues
                     for i in offsets {
-                        guard keys.indices.contains(i) else { continue }
-                        store.removePreference(key: keys[i])
+                        guard pairs.indices.contains(i) else { continue }
+                        store.removePreference(key: pairs[i].key)
                     }
                 }
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("Key (e.g. tone)", text: $newPrefKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
+            // Add row
+            VStack(alignment: .leading, spacing: 10) {
+                LabeledContent("Label") {
+                    TextField("e.g. style, tone, region", text: $newPrefKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .textContentType(.none)
+                        .keyboardType(.asciiCapable)
+                        .submitLabel(.next)
+                        .focused($focusedField, equals: .prefKey)
+                        .onSubmit { focusedField = .prefValue }
+                }
 
-                TextField("Value (e.g. neutral)", text: $newPrefValue)
+                LabeledContent("Value") {
+                    TextField("e.g. direct, concise, UK, EU", text: $newPrefValue)
+                        .submitLabel(.done)
+                        .focused($focusedField, equals: .prefValue)
+                        .onSubmit { addPreference() }
+                }
 
-                Button("Add preference") { addPreference() }
-                    .disabled(isBlank(newPrefKey) || isBlank(newPrefValue))
+                HStack {
+                    if let validation = prefValidationMessage {
+                        Text(validation)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        addPreference()
+                    } label: {
+                        Text("Add")
+                            .fontWeight(.semibold)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!canAddPref)
+                    .accessibilityHint("Adds a new preference label and value")
+                }
             }
+            .padding(.top, 4)
         }
     }
 
-    private var conditionsSection: some View {
-        Section("Conditions") {
-            if store.capsule.conditions.isEmpty {
-                Text("None yet.")
-                    .foregroundStyle(.secondary)
-            } else {
-                let keys = store.capsule.conditions.keys.sorted()
-                ForEach(keys, id: \.self) { k in
-                    HStack {
-                        Text(k)
-                        Spacer()
-                        Text(store.capsule.conditions[k] ?? "")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .onDelete { offsets in
-                    let keys = store.capsule.conditions.keys.sorted()
-                    for i in offsets {
-                        guard keys.indices.contains(i) else { continue }
-                        store.removeCondition(key: keys[i])
-                    }
-                }
-            }
+    // MARK: - Validation
 
-            VStack(alignment: .leading, spacing: 8) {
-                TextField("Key (e.g. driving_mode)", text: $newCondKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-
-                TextField("Value (e.g. capture_only)", text: $newCondValue)
-
-                Button("Add condition") { addCondition() }
-                    .disabled(isBlank(newCondKey) || isBlank(newCondValue))
-            }
-        }
+    private var canAddPref: Bool {
+        let k = normaliseKey(newPrefKey)
+        let v = newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !k.isEmpty, !v.isEmpty else { return false }
+        // Prevent duplicate keys
+        return store.preferenceKeyValues.contains(where: { $0.key == k }) == false
     }
+
+    private var prefValidationMessage: String? {
+        let rawKey = newPrefKey
+        let k = normaliseKey(rawKey)
+
+        if !rawKey.isEmpty, k.isEmpty {
+            return "Label is invalid."
+        }
+        if store.preferenceKeyValues.contains(where: { $0.key == k }) {
+            return "Label already exists."
+        }
+        return nil
+    }
+
+    // MARK: - Actions
 
     private func addPreference() {
         let k = normaliseKey(newPrefKey)
         let v = newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !k.isEmpty, !v.isEmpty else { return }
+        guard store.preferenceKeyValues.contains(where: { $0.key == k }) == false else { return }
+
         store.setPreference(key: k, value: v)
         newPrefKey = ""
         newPrefValue = ""
-    }
-
-    private func addCondition() {
-        let k = normaliseKey(newCondKey)
-        let v = newCondValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !k.isEmpty, !v.isEmpty else { return }
-        store.setCondition(key: k, value: v)
-        newCondKey = ""
-        newCondValue = ""
+        focusedField = .prefKey
     }
 
     private func normaliseKey(_ input: String) -> String {
@@ -146,10 +170,6 @@ struct CapsuleView: View {
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
 
         return underscored
-    }
-
-    private func isBlank(_ s: String) -> Bool {
-        s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

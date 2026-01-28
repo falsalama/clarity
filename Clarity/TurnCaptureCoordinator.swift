@@ -23,6 +23,10 @@ final class TurnCaptureCoordinator: ObservableObject {
     @Published private(set) var level: Double = 0
     @Published private(set) var lastError: String? = nil
 
+    // NEW: navigation + CarPlay gating
+    @Published var lastCompletedTurnID: UUID? = nil
+    @Published var isCarPlayConnected: Bool = false
+
     // MARK: - Dependencies (bound after SwiftData exists)
 
     private var modelContext: ModelContext?
@@ -153,9 +157,10 @@ final class TurnCaptureCoordinator: ObservableObject {
 
     /// Clears only the on-screen transcript (does not touch stored captures).
     func clearLiveTranscript() {
-        transcriber.resetUI()
+        transcriber.hardResetAll()
         liveTranscript = ""
     }
+
 
     // MARK: - Wiring
 
@@ -272,6 +277,13 @@ final class TurnCaptureCoordinator: ObservableObject {
                 redactionTimestamp: Date(),
                 titleIfAuto: autoTitle
             )
+
+            // NEW: signal completion for UI navigation (iPhone/iPad/Mac)
+            lastCompletedTurnID = id
+
+            // NEW: reset transient capture UI now that the capture has been committed
+            transcriber.resetUI()
+            liveTranscript = ""
         } catch {
             lastError = "Couldn’t save transcript."
             try? repo.markFailed(id: id, debug: "save transcript failed")

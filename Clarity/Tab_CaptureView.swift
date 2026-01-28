@@ -14,49 +14,66 @@ struct Tab_CaptureView: View {
     @State private var permissionAlertTitleKey: String = "perm.title.generic"
     @State private var permissionAlertMessageKey: String = ""
 
+    // NEW: robust navigation path
+    @State private var path: [UUID] = []
+
     var body: some View {
-        VStack(spacing: 18) {
-            header
+        NavigationStack(path: $path) {
+            VStack(spacing: 18) {
+                header
 
-            CaptureButton(
-                phase: coordinator.phase,
-                isEnabled: !primaryButtonDisabled,
-                level: coordinator.level,
-                action: coordinator.toggleCapture
-            )
-            .padding(.top, 10)
+                CaptureButton(
+                    phase: coordinator.phase,
+                    isEnabled: !primaryButtonDisabled,
+                    level: coordinator.level,
+                    action: coordinator.toggleCapture
+                )
+                .padding(.top, 10)
 
-            statusPill
+                statusPill
 
-            transcriptCard
-                .layoutPriority(1)
+                transcriptCard
+                    .layoutPriority(1)
 
-            if let e = coordinator.lastError, !e.isEmpty {
-                Text(e)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .padding(.top, 6)
+                if let e = coordinator.lastError, !e.isEmpty {
+                    Text(e)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 6)
+                }
+
+                Spacer(minLength: 0)
             }
+            .padding()
+            .navigationDestination(for: UUID.self) { id in
+                TurnDetailView(turnID: id)
+            }
+            .onChange(of: coordinator.lastCompletedTurnID) { _, newValue in
+                guard let id = newValue else { return }
+                guard coordinator.isCarPlayConnected == false else { return }
+                coordinator.clearLiveTranscript()
+                showExpandedTranscript = false
+                
+                path.append(id)
+                coordinator.lastCompletedTurnID = nil
+            }
+            .onChange(of: coordinator.lastError) { _, newValue in
+                guard let msg = newValue, !msg.isEmpty else { return }
+                guard let denial = PermissionDenialDetection.from(errorMessage: msg) else { return }
 
-            Spacer(minLength: 0)
-        }
-        .padding()
-        .onChange(of: coordinator.lastError) { _, newValue in
-            guard let msg = newValue, !msg.isEmpty else { return }
-            guard let denial = PermissionDenialDetection.from(errorMessage: msg) else { return }
-
-            permissionAlertTitleKey = denial.titleKey
-            permissionAlertMessageKey = denial.messageKey
-            showPermissionAlert = true
-        }
-        .alert(
-            Text(LocalizedStringKey(permissionAlertTitleKey)),
-            isPresented: $showPermissionAlert
-        ) {
-            Button(String(localized: "perm.button.open_settings")) { openAppSettings() }
-            Button(String(localized: "perm.button.ok"), role: .cancel) {}
-        } message: {
-            Text(LocalizedStringKey(permissionAlertMessageKey))
+                permissionAlertTitleKey = denial.titleKey
+                permissionAlertMessageKey = denial.messageKey
+                showPermissionAlert = true
+            }
+            .alert(
+                Text(LocalizedStringKey(permissionAlertTitleKey)),
+                isPresented: $showPermissionAlert
+            ) {
+                Button(String(localized: "perm.button.open_settings")) { openAppSettings() }
+                Button(String(localized: "perm.button.ok"), role: .cancel) {}
+            } message: {
+                Text(LocalizedStringKey(permissionAlertMessageKey))
+            }
         }
     }
 
@@ -140,9 +157,7 @@ struct Tab_CaptureView: View {
                                 .id("bottom")
                         }
                     }
-                    // Stable presence prevents layout jump when transcript first appears
                     .frame(minHeight: 120)
-                    // Allow it to use spare space while recording; cap when not recording
                     .frame(maxHeight: coordinator.phase == .recording ? .infinity : 260)
 
                     .onChange(of: coordinator.liveTranscript) { _, _ in
@@ -306,9 +321,7 @@ private struct ExpandedTranscriptView: View {
 }
 
 #Preview {
-    NavigationStack {
-        Tab_CaptureView()
-            .environmentObject(TurnCaptureCoordinator())
-    }
+    Tab_CaptureView()
+        .environmentObject(TurnCaptureCoordinator())
 }
 

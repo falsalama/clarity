@@ -1,90 +1,160 @@
 import Foundation
 import Combine
 
-struct ClarityCapsule: Codable {
-    var version: Int = 1
-    var updatedAt: String = ISO8601DateFormatter().string(from: Date())
-
-    // Abstracted only (no transcripts, no identities)
-    var preferences: [String: String] = [:]
-    var conditions: [String: String] = [:]
-    var notes: [String] = []
-}
-
 @MainActor
 final class CapsuleStore: ObservableObject {
-    @Published private(set) var capsule: ClarityCapsule = ClarityCapsule()
+    @Published private(set) var capsule: Capsule = .empty()
 
     private let fm = FileManager.default
+
+    // Bounds for open-ended extras
+    private let extrasMaxItems = 24
+    private let extrasKeyMax = 32
+    private let extrasValueMax = 128
 
     init() {
         do {
             self.capsule = try loadFromDisk()
         } catch {
-            self.capsule = ClarityCapsule()
+            self.capsule = .empty()
         }
     }
 
-    // MARK: - Public API
+    // MARK: - Public API (typed)
 
-    func setPreference(key: String, value: String) {
-        capsule.preferences[key] = value
+    func setPreferences(_ prefs: CapsulePreferences) {
+        capsule.preferences = prefs
+        capsule.updatedAt = Date()
         persist()
     }
 
-    func removePreference(key: String) {
-        capsule.preferences.removeValue(forKey: key)
-        persist()
-    }
-
-    func setCondition(key: String, value: String) {
-        capsule.conditions[key] = value
-        persist()
-    }
-
-    func removeCondition(key: String) {
-        capsule.conditions.removeValue(forKey: key)
-        persist()
-    }
-
-    func addNote(_ note: String) {
-        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        capsule.notes.append(trimmed)
-        persist()
-    }
-
-    func removeNote(at offsets: IndexSet) {
-        // Keep store independent of SwiftUI helpers.
-        for i in offsets.sorted(by: >) {
-            guard capsule.notes.indices.contains(i) else { continue }
-            capsule.notes.remove(at: i)
-        }
+    func setLearningEnabled(_ enabled: Bool) {
+        capsule.learningEnabled = enabled
+        capsule.updatedAt = Date()
         persist()
     }
 
     func wipe() {
-        capsule = ClarityCapsule()
-        do { try wipeFromDisk() } catch { /* do not crash */ }
+        capsule = .empty()
+        do { try wipeFromDisk() } catch { }
+    }
+
+    // MARK: - Public API (compat key/value for your current UI)
+
+    func setPreference(key: String, value: String) {
+        let k = normaliseKey(key)
+        let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !k.isEmpty else { return }
+
+        var p = capsule.preferences
+
+        // Typed keys first
+        switch k {
+        case "output_style":
+            p.outputStyle = v.isEmpty ? nil : String(v.prefix(extrasValueMax))
+
+        case "options_before_questions":
+            p.optionsBeforeQuestions = parseBool(v)
+
+        case "no_therapy_framing":
+            p.noTherapyFraming = parseBool(v)
+
+        case "no_persona":
+            p.noPersona = parseBool(v)
+
+        default:
+            // Open-ended extras (bounded)
+            guard isAllowedExtraKey(k) else { return }
+
+            let kk = String(k.prefix(extrasKeyMax))
+            let vv = String(v.prefix(extrasValueMax))
+
+            if vv.isEmpty {
+                p.extras.removeValue(forKey: kk)
+            } else {
+                if p.extras[kk] == nil, p.extras.count >= extrasMaxItems {
+                    // At cap, ignore new keys (simple, predictable)
+                    return
+                }
+                p.extras[kk] = vv
+            }
+        }
+
+        capsule.preferences = p
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    func removePreference(key: String) {
+        let k = normaliseKey(key)
+        guard !k.isEmpty else { return }
+
+        var p = capsule.preferences
+
+        switch k {
+        case "output_style":
+            p.outputStyle = nil
+        case "options_before_questions":
+            p.optionsBeforeQuestions = nil
+        case "no_therapy_framing":
+            p.noTherapyFraming = nil
+        case "no_persona":
+            p.noPersona = nil
+        default:
+            p.extras.removeValue(forKey: String(k.prefix(extrasKeyMax)))
+        }
+
+        capsule.preferences = p
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    /// For your existing UI list rendering.
+    var preferenceKeyValues: [(key: String, value: String)] {
+        var out: [(key: String, value: String)] = []
+        let p = capsule.preferences
+
+        if let v = p.outputStyle, !v.isEmpty {
+            out.append((key: "output_style", value: v))
+        }
+        if let b = p.optionsBeforeQuestions {
+            out.append((key: "options_before_questions", value: b ? "true" : "false"))
+        }
+        if let b = p.noTherapyFraming {
+            out.append((key: "no_therapy_framing", value: b ? "true" : "false"))
+        }
+        if let b = p.noPersona {
+            out.append((key: "no_persona", value: b ? "true" : "false"))
+        }
+
+        // Extras
+        let extrasPairs = p.extras
+            .map { (key: $0.key, value: $0.value) }
+            .sorted { $0.key < $1.key }
+
+        out.append(contentsOf: extrasPairs)
+
+        return out
     }
 
     // MARK: - Disk
 
     private func persist() {
-        do { try saveToDisk(capsule) } catch { /* do not crash */ }
+        do { try saveToDisk(capsule) } catch { }
     }
 
-    private func loadFromDisk() throws -> ClarityCapsule {
+    private func loadFromDisk() throws -> Capsule {
         let url = try capsuleURL()
-        guard fm.fileExists(atPath: url.path) else { return ClarityCapsule() }
+        guard fm.fileExists(atPath: url.path) else { return .empty() }
         let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode(ClarityCapsule.self, from: data)
+        return try JSONDecoder().decode(Capsule.self, from: data)
     }
 
-    private func saveToDisk(_ capsule: ClarityCapsule) throws {
+    private func saveToDisk(_ capsule: Capsule) throws {
         let url = try capsuleURL()
         var c = capsule
-        c.updatedAt = ISO8601DateFormatter().string(from: Date())
+        c.updatedAt = Date()
         let data = try JSONEncoder().encode(c)
         try data.write(to: url, options: [.atomic])
     }
@@ -106,6 +176,33 @@ final class CapsuleStore: ObservableObject {
         let dir = base.appendingPathComponent("Clarity", isDirectory: true)
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("capsule.json")
+    }
+
+    // MARK: - Helpers
+
+    private func normaliseKey(_ input: String) -> String {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return "" }
+
+        let underscored = trimmed
+            .replacingOccurrences(of: #"[\s\-]+"#, with: "_", options: .regularExpression)
+            .replacingOccurrences(of: #"_{2,}"#, with: "_", options: .regularExpression)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+
+        return underscored
+    }
+
+    private func parseBool(_ s: String) -> Bool? {
+        let v = s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if v.isEmpty { return nil }
+        if ["true", "1", "yes", "y", "on"].contains(v) { return true }
+        if ["false", "0", "no", "n", "off"].contains(v) { return false }
+        return nil
+    }
+
+    private func isAllowedExtraKey(_ k: String) -> Bool {
+        // after normaliseKey, only allow [a-z0-9_]
+        k.range(of: #"^[a-z0-9_]+$"#, options: .regularExpression) != nil
     }
 }
 

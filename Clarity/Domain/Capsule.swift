@@ -1,15 +1,19 @@
 import Foundation
 
 struct CapsulePreferences: Codable, Sendable, Equatable {
-    var outputStyle: String?          // e.g. "bullets"
+    // Typed core (stable keys)
+    var outputStyle: String?              // e.g. "bullets"
     var optionsBeforeQuestions: Bool?
     var noTherapyFraming: Bool?
     var noPersona: Bool?
+
+    // Open-ended extras (bounded, safe)
+    var extras: [String: String] = [:]
 }
 
 struct CapsuleTendency: Codable, Sendable, Equatable, Identifiable {
     var id: UUID = UUID()
-    var statement: String             // always “tends to … when …”
+    var statement: String                 // “tends to … when …”
     var evidenceCount: Int
     var firstSeenAt: Date
     var lastSeenAt: Date

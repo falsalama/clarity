@@ -43,12 +43,55 @@ final class SpeechTranscriber: ObservableObject {
     // If a partial update shrinks a lot, treat as reset and ignore.
     private let catastrophicShrinkChars: Int = 40
 
-    // MARK: - UI-only reset (safe)
+    // MARK: - UI reset (published only)
 
     func resetUI() {
         lastError = nil
         lastTranscript = nil
         liveTranscript = ""
+    }
+
+    // MARK: - Hard reset (published + internal buffers + invalidate callbacks)
+
+    /// Use this when you want the capture screen to be guaranteed empty after a completed turn,
+    /// and to prevent any late segment callbacks from re-populating the transcript.
+    func hardResetAll() {
+        // Invalidate any in-flight callbacks immediately.
+        segmentToken &+= 1
+
+        // Cancel timers/tasks.
+        timeoutTask?.cancel(); timeoutTask = nil
+        segmentTimer?.cancel(); segmentTimer = nil
+
+        // Stop feeding audio buffers.
+        bufferCancellable?.cancel()
+        bufferCancellable = nil
+
+        // Kill recognition pipeline.
+        request?.endAudio()
+        request = nil
+
+        task?.cancel()
+        task = nil
+
+        recognizer = nil
+
+        // Unblock any waiting continuations.
+        awaitingFinalContinuation?.resume()
+        awaitingFinalContinuation = nil
+
+        // Clear internal buffers.
+        accumulatedText = ""
+        segmentCommittedText = ""
+        segmentLiveTailText = ""
+        lastFullBestText = ""
+        segmentStartTime = Date()
+
+        // Clear published state.
+        lastError = nil
+        lastTranscript = nil
+        liveTranscript = ""
+        isTranscribing = false
     }
 
     // MARK: - Session lifecycle
@@ -110,8 +153,11 @@ final class SpeechTranscriber: ObservableObject {
 
             await flushCurrentSegment(waitSeconds: 0.9)
 
-            let combined = joinTranscript(accumulatedText, joinTranscript(segmentCommittedText, segmentLiveTailText))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let combined = joinTranscript(
+                accumulatedText,
+                joinTranscript(segmentCommittedText, segmentLiveTailText)
+            )
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
             if combined.isEmpty {
                 finish(error: "No transcript captured.")
@@ -174,8 +220,9 @@ final class SpeechTranscriber: ObservableObject {
 
                 guard let result else { return }
 
-                // Guard: ignore catastrophic rewinds in the recogniser output while recording.
-                let best = result.bestTranscription.formattedString.trimmingCharacters(in: .whitespacesAndNewlines)
+                let best = result.bestTranscription.formattedString
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+
                 if self.shouldIgnoreCatastrophicShrink(candidate: best) {
                     return
                 }
@@ -220,26 +267,21 @@ final class SpeechTranscriber: ObservableObject {
         let candidateTail = tailParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Monotonic guard:
-        // - allow stable to grow
-        // - never allow stable to shrink due to recogniser resets/resegmentation
         if segmentCommittedText.isEmpty {
             segmentCommittedText = candidateStable
         } else if candidateStable.isEmpty {
-            // Do nothing: never replace committed stable with empty
+            // never replace committed stable with empty
         } else if candidateStable.hasPrefix(segmentCommittedText) {
-            // Grew: accept
             segmentCommittedText = candidateStable
         } else if segmentCommittedText.hasPrefix(candidateStable) {
-            // Shrink attempt: ignore stable update (keep existing committed)
+            // shrink attempt: ignore
         } else if candidateStable.count >= segmentCommittedText.count {
-            // Different but longer (punctuation/spacing changes). Prefer the longer stable.
             segmentCommittedText = candidateStable
         } else {
-            // Different and shorter: treat as reset, ignore stable update.
+            // different and shorter: ignore
         }
 
-        // Tail is always tentative. But if recogniser reset makes tail empty, keep last tail
-        // unless we actually have new tail content.
+        // Tail is tentative; allow rewrite, but avoid wiping a non-empty tail to empty.
         if !candidateTail.isEmpty || segmentLiveTailText.isEmpty {
             segmentLiveTailText = candidateTail
         }
@@ -254,7 +296,6 @@ final class SpeechTranscriber: ObservableObject {
         if prev.isEmpty { return false }
         if candidate.isEmpty { return true }
 
-        // If candidate is much shorter than previous, likely a reset. Ignore.
         if candidate.count + catastrophicShrinkChars < prev.count {
             return true
         }
@@ -311,12 +352,7 @@ final class SpeechTranscriber: ObservableObject {
         let stable = segmentCommittedText.trimmingCharacters(in: .whitespacesAndNewlines)
         let tail = segmentLiveTailText.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let toCommit: String
-        if finalize {
-            toCommit = joinTranscript(stable, tail)
-        } else {
-            toCommit = stable
-        }
+        let toCommit: String = finalize ? joinTranscript(stable, tail) : stable
 
         if !toCommit.isEmpty {
             accumulatedText = joinTranscript(accumulatedText, toCommit)

@@ -1,5 +1,55 @@
 import Foundation
 
+// MARK: - Capsule snapshot (bounded, safe)
+
+struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
+    let version: Int
+    let updatedAt: String
+    let preferences: [String: String]
+
+    static func fromCapsule(_ capsule: Capsule) -> CloudTapCapsuleSnapshot {
+        CloudTapCapsuleSnapshot(
+            version: capsule.version,
+            updatedAt: ISO8601DateFormatter().string(from: capsule.updatedAt),
+            preferences: boundPreferences(capsule.preferences)
+        )
+    }
+
+    private static func boundPreferences(_ p: CapsulePreferences) -> [String: String] {
+        var out: [String: String] = [:]
+
+        // Typed core
+        if let s = p.outputStyle, !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            out["output_style"] = String(s.prefix(128))
+        }
+        if let b = p.optionsBeforeQuestions {
+            out["options_before_questions"] = b ? "true" : "false"
+        }
+        if let b = p.noTherapyFraming {
+            out["no_therapy_framing"] = b ? "true" : "false"
+        }
+        if let b = p.noPersona {
+            out["no_persona"] = b ? "true" : "false"
+        }
+
+        // Extras (already bounded in store, but bound again defensively)
+        let maxItems = 24
+        let keyMax = 32
+        let valueMax = 128
+
+        let keys = p.extras.keys.sorted().prefix(maxItems)
+        for k in keys {
+            let kk = String(k.prefix(keyMax))
+            let vv = String((p.extras[k] ?? "").prefix(valueMax))
+            if !vv.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                out[kk] = vv
+            }
+        }
+
+        return out
+    }
+}
+
 // MARK: - Single-shot (reflect/options/questions)
 
 struct CloudTapReflectRequest: Codable {
@@ -7,6 +57,7 @@ struct CloudTapReflectRequest: Codable {
     let recordedAt: String?
     let client: String
     let appVersion: String
+    let capsule: CloudTapCapsuleSnapshot?
 }
 
 struct CloudTapReflectResponse: Decodable {
@@ -22,6 +73,7 @@ struct CloudTapTalkRequest: Codable {
     let client: String
     let appVersion: String
     let previous_response_id: String?
+    let capsule: CloudTapCapsuleSnapshot?
 }
 
 struct CloudTapTalkResponse: Decodable {
@@ -29,3 +81,4 @@ struct CloudTapTalkResponse: Decodable {
     let response_id: String
     let prompt_version: String
 }
+

@@ -14,10 +14,9 @@ struct AppShellView: View {
 
     var body: some View {
         TabView {
-            NavigationStack {
-                Tab_CaptureView()
-            }
-            .tabItem { Label("Capture", systemImage: "mic") }
+            Tab_CaptureView()
+                .tabItem { Label("Capture", systemImage: "mic") }
+
 
             NavigationStack {
                 TurnsListView()
