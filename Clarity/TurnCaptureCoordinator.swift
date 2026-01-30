@@ -296,6 +296,15 @@ final class TurnCaptureCoordinator: ObservableObject {
         lastError = message
         if let id = activeTurnID, let repo {
             try? repo.markFailed(id: id, debug: message)
+
+            // Navigate only when mic was allowed/working, audio actually recorded,
+            // but no speech was recognized (protects against pocket presses and permission errors).
+            if message == "No transcript captured." {
+                let dur = recorder.lastDurationSeconds
+                if dur >= 0.5 {
+                    lastCompletedTurnID = id
+                }
+            }
         }
         phase = .idle
     }
@@ -315,4 +324,3 @@ final class TurnCaptureCoordinator: ObservableObject {
         return capped.isEmpty ? nil : capped
     }
 }
-

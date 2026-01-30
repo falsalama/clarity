@@ -7,53 +7,99 @@ import UIKit
 struct Tab_CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
 
-    @State private var showTranscript: Bool = true
-    @State private var showExpandedTranscript: Bool = false
-
     @State private var showPermissionAlert: Bool = false
     @State private var permissionAlertTitleKey: String = "perm.title.generic"
     @State private var permissionAlertMessageKey: String = ""
 
-    // NEW: robust navigation path
+    // Robust navigation path
     @State private var path: [UUID] = []
+
+    // Sheet toggle for typing text
+    @State private var showPasteSheet: Bool = false
 
     var body: some View {
         NavigationStack(path: $path) {
-            VStack(spacing: 18) {
-                header
+            ZStack {
+                Image("CaptureBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(0.57)          // tweak
+                    .offset(x: -48, y: -6)       // tweak (negative moves up)
+                    .ignoresSafeArea()
+                    .clipped()
+                    .accessibilityHidden(true)
+                    .opacity(0.35) // try 0.25–0.45
 
-                CaptureButton(
-                    phase: coordinator.phase,
-                    isEnabled: !primaryButtonDisabled,
-                    level: coordinator.level,
-                    action: coordinator.toggleCapture
-                )
-                .padding(.top, 10)
+                VStack(spacing: 18) {
+                    header
 
-                statusPill
+                    // NEW: extra space to push mic button down slightly
+                    Spacer(minLength: 18)
 
-                transcriptCard
-                    .layoutPriority(1)
+                    ZStack {
+                        // Covers the mic icon baked into the background image.
+                        // Uses dynamic system background so it matches Light/Dark mode.
+                        Circle()
+                            .fill(Color(.systemBackground))
+                            .frame(width: 120, height: 120)
 
-                if let e = coordinator.lastError, !e.isEmpty {
-                    Text(e)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 6)
+                        CaptureButton(
+                            phase: coordinator.phase,
+                            isEnabled: !primaryButtonDisabled,
+                            level: coordinator.level,
+                            action: coordinator.toggleCapture
+                        )
+                    }
+
+                    // Keep sizes stable: show status pill without affecting layout
+                    // (presents for non-idle states, but doesn’t push the mic button around)
+                    ZStack {
+                        if coordinator.phase != .idle {
+                            statusPill
+                                .transition(.opacity)
+                        }
+                    }
+                    .frame(height: 0)
+                    .overlay {
+                        if coordinator.phase != .idle {
+                            statusPill
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.15), value: coordinator.phase)
+
+                    Spacer(minLength: 8)
+
+                    Button {
+                        showPasteSheet = true
+                    } label: {
+                        Text("Type text")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color(red: 0.08, green: 0.24, blue: 0.60))
+                            .clipShape(SwiftUI.Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Type text")
+
+                    if let e = coordinator.lastError, !e.isEmpty {
+                        Text(e)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
+                    }
                 }
-
-                Spacer(minLength: 0)
+                .padding()
             }
-            .padding()
             .navigationDestination(for: UUID.self) { id in
                 TurnDetailView(turnID: id)
             }
             .onChange(of: coordinator.lastCompletedTurnID) { _, newValue in
                 guard let id = newValue else { return }
                 guard coordinator.isCarPlayConnected == false else { return }
+
                 coordinator.clearLiveTranscript()
-                showExpandedTranscript = false
-                
                 path.append(id)
                 coordinator.lastCompletedTurnID = nil
             }
@@ -73,6 +119,11 @@ struct Tab_CaptureView: View {
                 Button(String(localized: "perm.button.ok"), role: .cancel) {}
             } message: {
                 Text(LocalizedStringKey(permissionAlertMessageKey))
+            }
+            .sheet(isPresented: $showPasteSheet) {
+                PasteTextTurnSheet { newID in
+                    path.append(newID)
+                }
             }
         }
     }
@@ -107,86 +158,6 @@ struct Tab_CaptureView: View {
         .padding(.vertical, 8)
         .background(.thinMaterial)
         .clipShape(SwiftUI.Capsule())
-    }
-
-    @ViewBuilder
-    private var transcriptCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(String(localized: "capture.transcript"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text(String(localized: coordinator.phase == .recording
-                            ? "capture.transcript.raw_live"
-                            : "capture.transcript.last_capture"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                Button(String(localized: "capture.transcript.expand")) { showExpandedTranscript = true }
-                    .font(.footnote.weight(.medium))
-                    .disabled(coordinator.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                Button(String(localized: showTranscript ? "capture.transcript.hide" : "capture.transcript.show")) {
-                    showTranscript.toggle()
-                }
-                .font(.footnote.weight(.medium))
-            }
-
-            if showTranscript {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            let trimmed = coordinator.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if trimmed.isEmpty {
-                                Text(String(localized: "capture.ready"))
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .padding(.vertical, 2)
-                            } else {
-                                Text(coordinator.liveTranscript)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                                    .font(.body)
-                            }
-
-                            Color.clear
-                                .frame(height: 1)
-                                .id("bottom")
-                        }
-                    }
-                    .frame(minHeight: 120)
-                    .frame(maxHeight: coordinator.phase == .recording ? .infinity : 260)
-
-                    .onChange(of: coordinator.liveTranscript) { _, _ in
-                        guard coordinator.phase == .recording else { return }
-                        DispatchQueue.main.async {
-                            withAnimation(.easeOut(duration: 0.12)) {
-                                proxy.scrollTo("bottom", anchor: .bottom)
-                            }
-                        }
-                    }
-                    .onChange(of: coordinator.phase) { _, newPhase in
-                        guard newPhase == .recording else { return }
-                        DispatchQueue.main.async {
-                            proxy.scrollTo("bottom", anchor: .bottom)
-                        }
-                    }
-                }
-            }
-        }
-        .padding(14)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .padding(.top, 8)
-        .sheet(isPresented: $showExpandedTranscript) {
-            ExpandedTranscriptView(
-                title: String(localized: "capture.transcript"),
-                text: coordinator.liveTranscript
-            )
-        }
     }
 
     private var statusTextKey: String {
@@ -239,84 +210,6 @@ private enum PermissionDenialDetection {
         }
 
         return nil
-    }
-}
-
-// MARK: - Local UI
-
-private struct CaptureButton: View {
-    let phase: TurnCaptureCoordinator.Phase
-    let isEnabled: Bool
-    let level: Double
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(.thinMaterial)
-
-                    if phase == .recording {
-                        Circle()
-                            .strokeBorder(.tint, lineWidth: 2)
-                            .scaleEffect(1.02 + (0.18 * level))
-                            .opacity(0.12 + (0.18 * level))
-                            .animation(.easeOut(duration: 0.10), value: level)
-                    }
-
-                    if phase == .recording {
-                        Image(systemName: "stop.circle.fill")
-                            .font(.system(size: 40, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.tint)
-                    } else {
-                        Image(systemName: "mic.fill")
-                            .font(.system(size: 30, weight: .semibold))
-                            .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(.primary)
-                    }
-                }
-                .frame(width: 132, height: 132)
-                .contentShape(Circle())
-
-                if phase == .recording {
-                    Text(String(localized: "capture.tap_to_stop"))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(!isEnabled)
-        .opacity(isEnabled ? 1.0 : 0.55)
-        .tint(phase == .recording ? .red : .primary)
-        .accessibilityLabel(String(localized: phase == .recording ? "capture.a11y.stop" : "capture.a11y.start"))
-    }
-}
-
-private struct ExpandedTranscriptView: View {
-    let title: String
-    let text: String
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                Text(text)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-                    .padding()
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(String(localized: "perm.button.ok")) { dismiss() }
-                }
-            }
-        }
     }
 }
 

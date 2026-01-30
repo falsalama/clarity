@@ -190,3 +190,8 @@ Technically auditable
 Ethically conservative without being timid
 Innovative without being extractive
 Everything else is implementation.
+
+AMENDMENT (Editorial Clarification)
+User-facing language may differ from internal terminology to meet platform conventions and clarity standards.
+Internal terms (e.g. payload, local-first) may appear in this canon, while user interfaces use descriptive outcomes (e.g. Send Preview, on-device) without altering guarantees or data boundaries defined above.
+Status: Informational. No change to invariants or contracts.

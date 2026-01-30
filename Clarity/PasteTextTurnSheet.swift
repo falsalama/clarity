@@ -2,9 +2,9 @@
 import SwiftUI
 import SwiftData
 
-/// Creates a new "text capture" Turn from pasted text.
+/// Creates a new "text capture" Turn from pasted or typed text.
 /// - Redaction-first: stores the redacted result as `transcriptRedactedActive`.
-/// - Raw pasted input is NOT stored (equivalent to transcriptRaw local-only, but here we choose nil).
+/// - Raw input is NOT stored (equivalent to `transcriptRaw` local-only, but here we choose nil).
 struct PasteTextTurnSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -14,12 +14,16 @@ struct PasteTextTurnSheet: View {
     @State private var errorMessage: String?
     @State private var isSaving: Bool = false
 
+    // Auto-focus keyboard
+    @FocusState private var isEditorFocused: Bool
+
     let onCreated: (UUID) -> Void
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
                 TextEditor(text: $text)
+                    .focused($isEditorFocused)
                     .scrollContentBackground(.hidden)
                     .padding(10)
                     .background(.thinMaterial)
@@ -35,8 +39,10 @@ struct PasteTextTurnSheet: View {
                 }
             }
             .padding()
-            .navigationTitle("Paste text")
+            .navigationTitle("Type text")
+#if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+#endif
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
@@ -45,6 +51,12 @@ struct PasteTextTurnSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(isSaving ? "Saving…" : "Save") { save() }
                         .disabled(isSaving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+            .onAppear {
+                // Delay focus slightly to ensure TextEditor is in hierarchy
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isEditorFocused = true
                 }
             }
         }
@@ -80,4 +92,3 @@ struct PasteTextTurnSheet: View {
         isSaving = false
     }
 }
-

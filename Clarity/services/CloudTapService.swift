@@ -1,32 +1,63 @@
 import Foundation
 
-enum CloudTapError: Error {
+enum CloudTapError: Error, Equatable {
+    case unavailable
     case http(Int)
     case decoding
 }
 
 final class CloudTapService {
-    private let baseURL: URL
-    private let anonKey: String
     private let session: URLSession
 
+    // Optional overrides (lets existing call sites keep working)
+    private let overrideBaseURL: URL?
+    private let overrideAnonKey: String?
+
+    // Backwards-compatible
     init(
-        baseURL: URL = CloudTapConfig.baseURL,
-        anonKey: String = CloudTapConfig.supabaseAnonKey,
+        baseURL: URL? = nil,
+        anonKey: String? = nil,
         session: URLSession = .shared
     ) {
-        self.baseURL = baseURL
-        self.anonKey = anonKey
+        self.overrideBaseURL = baseURL
+        self.overrideAnonKey = anonKey
         self.session = session
     }
 
-    private func postJSON<T: Encodable, U: Decodable>(_ body: T, to path: String) async throws -> U {
-        let url = baseURL.appendingPathComponent(path)
+    // MARK: - Public API
+
+    func reflect(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-reflect")
+    }
+
+    func options(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-options")
+    }
+
+    func questions(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-questions")
+    }
+
+    func clarityView(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-clarity-view")
+    }
+
+
+    func talkItThrough(_ reqBody: CloudTapTalkRequest) async throws -> CloudTapTalkResponse {
+        try await postJSON(reqBody, to: "cloudtap-talkitthrough")
+    }
+
+    // MARK: - Core
+
+    private func postJSON<T: Encodable, U: Decodable>(_ body: T, to endpoint: String) async throws -> U {
+        let cfg = try resolveConfig()
+        let url = resolveURL(base: cfg.baseURL, endpoint: endpoint)
+
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(cfg.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
+        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
         req.httpBody = try JSONEncoder().encode(body)
 
         let (data, resp) = try await session.data(for: req)
@@ -40,22 +71,28 @@ final class CloudTapService {
         }
     }
 
-    // Single-shot
-    func reflect(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
-        try await postJSON(reqBody, to: "cloudtap-reflect")
+    private func resolveConfig() throws -> CloudTapConfig.Config {
+        // If call site passed explicit config, use it (no behaviour change).
+        if let url = overrideBaseURL, let key = overrideAnonKey, !key.isEmpty {
+            return CloudTapConfig.Config(baseURL: url, supabaseURL: nil, supabaseAnonKey: key)
+        }
+
+        // Otherwise, require runtime config (fail-closed).
+        guard case .available(let cfg) = CloudTapConfig.availability() else {
+            throw CloudTapError.unavailable
+        }
+        return cfg
     }
 
-    func options(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
-        try await postJSON(reqBody, to: "cloudtap-options")
-    }
-
-    func questions(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
-        try await postJSON(reqBody, to: "cloudtap-questions")
-    }
-
-    // Multi-turn
-    func talkItThrough(_ reqBody: CloudTapTalkRequest) async throws -> CloudTapTalkResponse {
-        try await postJSON(reqBody, to: "cloudtap-talkitthrough")
+    /// Supports both:
+    /// A) base = .../functions/v1      -> appends /<endpoint>
+    /// B) base = .../functions/v1/cloudtap-reflect -> replaces last component with <endpoint>
+    private func resolveURL(base: URL, endpoint: String) -> URL {
+        let last = base.lastPathComponent
+        if last.hasPrefix("cloudtap-") {
+            return base.deletingLastPathComponent().appendingPathComponent(endpoint)
+        }
+        return base.appendingPathComponent(endpoint)
     }
 }
 

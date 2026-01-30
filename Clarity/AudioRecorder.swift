@@ -11,6 +11,9 @@ final class AudioRecorder: ObservableObject {
     /// 0.0 ... 1.0 (live mic level while recording). 0 when idle.
     @Published private(set) var level: Double = 0
 
+    /// Duration of the *most recent* recording (seconds). Updated on stop.
+    @Published private(set) var lastDurationSeconds: TimeInterval = 0
+
     /// Live audio buffers for streaming transcription (local-only).
     nonisolated let bufferPublisher = PassthroughSubject<AVAudioPCMBuffer, Never>()
 
@@ -18,10 +21,14 @@ final class AudioRecorder: ObservableObject {
     private var audioFile: AVAudioFile?
     private var meterTask: Task<Void, Never>?
 
+    private var recordingStartedAt: Date? = nil
+
     // MARK: - Public
 
     func start() {
         lastError = nil
+        lastDurationSeconds = 0
+        recordingStartedAt = nil
 
 #if os(iOS)
         if #available(iOS 17.0, *) {
@@ -86,6 +93,14 @@ final class AudioRecorder: ObservableObject {
 
         stopMetering()
 
+        // duration
+        if let started = recordingStartedAt {
+            lastDurationSeconds = Date().timeIntervalSince(started)
+        } else {
+            lastDurationSeconds = 0
+        }
+        recordingStartedAt = nil
+
         let input = engine.inputNode
         input.removeTap(onBus: 0)
 
@@ -107,8 +122,8 @@ final class AudioRecorder: ObservableObject {
         do {
 #if os(iOS)
             let session = AVAudioSession.sharedInstance()
-            // Voice isolation / speech-friendly capture.
-            try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            // Speech-friendly capture. Avoids gating/chunking seen with .spokenAudio.
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .allowBluetoothHFP])
             try session.setActive(true)
 #endif
             let url = try makeNewRecordingURL(extension: "caf")
@@ -117,7 +132,7 @@ final class AudioRecorder: ObservableObject {
             let inputNode = engine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
 
-            // Create CAF writer (lossless PCM). Reliable and simplest.
+            // CAF writer (lossless PCM).
             let file = try AVAudioFile(
                 forWriting: url,
                 settings: format.settings,
@@ -128,13 +143,14 @@ final class AudioRecorder: ObservableObject {
 
             inputNode.removeTap(onBus: 0)
 
-            inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
+            // Keep the tap realtime-safe: no allocations/copies, no async hops.
+            inputNode.installTap(onBus: 0, bufferSize: 2048, format: format) { [weak self] buffer, _ in
                 guard let self else { return }
 
                 // Publish for speech recognition
                 self.bufferPublisher.send(buffer)
 
-                // Write to disk
+                // Write directly
                 do {
                     try self.audioFile?.write(from: buffer)
                 } catch {
@@ -153,13 +169,19 @@ final class AudioRecorder: ObservableObject {
             engine.prepare()
             try engine.start()
 
+            // Mark started only once engine is actually running
             isRecording = true
+            recordingStartedAt = Date()
+            lastDurationSeconds = 0
+
             startMeteringFallback()
         } catch {
             lastError = "Recording error: \(error.localizedDescription)"
             isRecording = false
             level = 0
             audioFile = nil
+            recordingStartedAt = nil
+            lastDurationSeconds = 0
         }
     }
 
@@ -192,7 +214,6 @@ final class AudioRecorder: ObservableObject {
             sum += x * x
         }
         let rms = sqrt(sum / Float(n))
-        // Map RMS to a visually useful 0..1
         return min(1.0, max(0.0, Double(rms) * 8.0))
     }
 

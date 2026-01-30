@@ -1,4 +1,3 @@
-// CloudTapSettings.swift
 import Foundation
 import Combine
 

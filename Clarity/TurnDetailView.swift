@@ -17,6 +17,11 @@ struct TurnDetailView: View {
     @State private var isSendingCloud: Bool = false
     @State private var cloudSendError: String? = nil
 
+    // Chat composer state
+    @State private var chatInput: String = ""
+    @State private var isSendingChat: Bool = false
+    @FocusState private var isChatFocused: Bool
+
     @StateObject private var player = LocalAudioPlayer()
 
     @Query private var matches: [TurnEntity]
@@ -33,6 +38,21 @@ struct TurnDetailView: View {
         return URL(fileURLWithPath: path)
     }
 
+    // Talk composer visibility gate: becomes true after first assistant reply or a continuation id exists
+    private var isTalkActive: Bool {
+        guard let t = turn else { return false }
+        if let id = t.talkLastResponseID, !id.isEmpty { return true }
+        let thread = loadTalkThread(from: t)
+        return thread.contains(where: { $0.role == .assistant })
+    }
+
+    // Strict “show talk section” gate: only after an assistant message exists
+    private var hasTalkContent: Bool {
+        guard let t = turn else { return false }
+        let thread = loadTalkThread(from: t)
+        return thread.contains(where: { $0.role == .assistant })
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -41,8 +61,19 @@ struct TurnDetailView: View {
                 playbackSection
                 Divider()
                 transcriptSection
-                Divider()
-                outputsSection
+
+                // Outputs section only when there’s content
+                if hasAnyOutputs {
+                    Divider()
+                    outputsSection
+                }
+
+                // Talk-it-through section only after an assistant response exists
+                if hasTalkContent {
+                    Divider()
+                    talkSection
+                }
+
                 Divider()
                 actionsSection
             }
@@ -88,7 +119,7 @@ struct TurnDetailView: View {
             Text(cloudSendError ?? "")
         }
         .overlay {
-            if isSendingCloud {
+            if isSendingCloud || isSendingChat {
                 ZStack {
                     Rectangle()
                         .fill(.black.opacity(0.08))
@@ -96,7 +127,7 @@ struct TurnDetailView: View {
 
                     VStack(spacing: 12) {
                         ProgressView()
-                        Text("Sending…")
+                        Text(isSendingChat ? "Sending message…" : "Sending…")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -108,7 +139,16 @@ struct TurnDetailView: View {
             }
         }
         .animation(.easeOut(duration: 0.15), value: isSendingCloud)
-        .allowsHitTesting(!isSendingCloud)
+        .animation(.easeOut(duration: 0.15), value: isSendingChat)
+        .allowsHitTesting(!(isSendingCloud || isSendingChat))
+        .onChange(of: isTalkActive) { _, becameActive in
+            if becameActive {
+                // Auto-focus the composer when it first becomes visible
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    isChatFocused = true
+                }
+            }
+        }
     }
 
     private var cloudConfirmTitle: String { "Send to Cloud Tap?" }
@@ -142,54 +182,69 @@ struct TurnDetailView: View {
 
             let snapshot = capsuleSnapshotOrNil()
 
-#if DEBUG
-            if let snapshot {
-                print("CloudTap capsule snapshot keys:", snapshot.preferences.keys.sorted())
-            } else {
-                print("CloudTap capsule snapshot: nil (empty capsule)")
-            }
-#endif
-
-            let req = CloudTapReflectRequest(
-                text: redactedText,
-                recordedAt: t.recordedAt.ISO8601Format(),
-                client: "ios",
-                appVersion: appVersion,
-                capsule: snapshot
-            )
-
-            let resp: CloudTapReflectResponse
             switch pendingTool {
-            case .reflect:
-                resp = try await service.reflect(req)
-            case .options:
-                resp = try await service.options(req)
-            case .questions:
-                resp = try await service.questions(req)
-            case .talkItThrough:
-                // For now, treat as single-shot until you wire multi-turn UI.
-                resp = try await service.options(req)
-            }
+            case .reflect, .options, .questions, .clarityView:
+                let req = CloudTapReflectRequest(
+                    text: redactedText,
+                    recordedAt: t.recordedAt.ISO8601Format(),
+                    client: "ios",
+                    appVersion: appVersion,
+                    capsule: snapshot
+                )
 
-            switch pendingTool {
-            case .reflect:
-                t.reflectText = resp.text
-                t.reflectPromptVersion = resp.prompt_version
-                t.reflectUpdatedAt = Date()
-            case .options:
-                t.optionsText = resp.text
-                t.optionsPromptVersion = resp.prompt_version
-                t.optionsUpdatedAt = Date()
-            case .questions:
-                t.questionsText = resp.text
-                t.questionsPromptVersion = resp.prompt_version
-                t.questionsUpdatedAt = Date()
-            case .talkItThrough:
-                break
-            }
+                let resp: CloudTapReflectResponse
+                switch pendingTool {
+                case .reflect:
+                    resp = try await service.reflect(req)
+                    t.reflectText = resp.text
+                    t.reflectPromptVersion = resp.prompt_version
+                    t.reflectUpdatedAt = Date()
+                case .options:
+                    resp = try await service.options(req)
+                    t.optionsText = resp.text
+                    t.optionsPromptVersion = resp.prompt_version
+                    t.optionsUpdatedAt = Date()
+                case .questions:
+                    resp = try await service.questions(req)
+                    t.questionsText = resp.text
+                    t.questionsPromptVersion = resp.prompt_version
+                    t.questionsUpdatedAt = Date()
+                case .clarityView:
+                    resp = try await service.clarityView(req)
+                    t.clarityViewText = resp.text
+                    t.clarityViewPromptVersion = resp.prompt_version
+                    t.clarityViewUpdatedAt = Date()
+                default:
+                    fatalError("Unexpected tool branch")
+                }
 
-            // Legacy field kept for now
-            t.reflectionText = resp.text
+                // Legacy mirror
+                t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.clarityViewText) ?? ""
+
+            case .talkItThrough:
+                // This path is now handled by the chat composer; keep here as a fallback single-shot send.
+                let talkReq = CloudTapTalkRequest(
+                    text: redactedText,
+                    recordedAt: t.recordedAt.ISO8601Format(),
+                    client: "ios",
+                    appVersion: appVersion,
+                    previous_response_id: t.talkLastResponseID,
+                    capsule: snapshot
+                )
+
+                let talkResp: CloudTapTalkResponse = try await service.talkItThrough(talkReq)
+
+                var thread = loadTalkThread(from: t)
+                thread.append(TalkMessage(role: .user, text: redactedText))
+                thread.append(TalkMessage(role: .assistant, text: talkResp.text))
+                saveTalkThread(thread, into: t)
+
+                t.talkLastResponseID = talkResp.response_id
+                t.talkPromptVersion = talkResp.prompt_version
+                t.talkUpdatedAt = Date()
+
+                t.reflectionText = talkResp.text
+            }
 
             try modelContext.save()
         } catch {
@@ -198,7 +253,6 @@ struct TurnDetailView: View {
     }
 
     private func capsuleSnapshotOrNil() -> CloudTapCapsuleSnapshot? {
-        // Don’t send capsule if it’s empty (makes server-side verification easy).
         let c = capsuleStore.capsule
         let p = c.preferences
 
@@ -212,6 +266,20 @@ struct TurnDetailView: View {
 
         guard hasTyped || hasExtras else { return nil }
         return CloudTapCapsuleSnapshot.fromCapsule(c)
+    }
+
+    // MARK: - Talk thread helpers
+
+    private func loadTalkThread(from t: TurnEntity) -> [TalkMessage] {
+        let data = t.talkThreadJSON
+        guard !data.isEmpty else { return [] }
+        return (try? JSONDecoder().decode([TalkMessage].self, from: data)) ?? []
+    }
+
+    private func saveTalkThread(_ messages: [TalkMessage], into t: TurnEntity) {
+        if let data = try? JSONEncoder().encode(messages) {
+            t.talkThreadJSON = data
+        }
     }
 
     // MARK: - Header
@@ -423,6 +491,10 @@ struct TurnDetailView: View {
                 outputBlock(title: "Reflect", text: turn?.reflectText, prompt: turn?.reflectPromptVersion)
             }
 
+            if hasContent(turn?.clarityViewText) {
+                outputBlock(title: "Clarity - View", text: turn?.clarityViewText, prompt: turn?.clarityViewPromptVersion)
+            }
+
             if hasContent(turn?.optionsText) {
                 outputBlock(title: "Options", text: turn?.optionsText, prompt: turn?.optionsPromptVersion)
             }
@@ -430,18 +502,137 @@ struct TurnDetailView: View {
             if hasContent(turn?.questionsText) {
                 outputBlock(title: "Questions", text: turn?.questionsText, prompt: turn?.questionsPromptVersion)
             }
+        }
+    }
 
-            if !hasAnyOutputs {
-                Text("No outputs yet. Use Tools below to generate Reflect, Options, or Questions.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+    // MARK: - Talk thread UI
+
+    private var talkSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Talk it through")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            // Thread list
+            if let t = turn {
+                let thread = loadTalkThread(from: t)
+                if !thread.isEmpty {
+                    VStack(spacing: 8) {
+                        ForEach(thread) { msg in
+                            HStack {
+                                if msg.role == .assistant {
+                                    Spacer(minLength: 20)
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(msg.role == .user ? "You" : "Clarity")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(msg.text)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                .padding(10)
+                                .background(msg.role == .user ? Color.blue.opacity(0.08) : Color.gray.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                if msg.role == .user {
+                                    Spacer(minLength: 20)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Composer (only after first assistant response / active thread)
+            if isTalkActive {
+                HStack(spacing: 8) {
+                    TextField("Type a message…", text: $chatInput, axis: .vertical)
+                        .textInputAutocapitalization(.sentences)
+                        .disableAutocorrection(false)
+                        .lineLimit(1...3)
+                        .padding(10)
+                        .background(.thinMaterial)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .focused($isChatFocused)
+
+                    Button(isSendingChat ? "Sending…" : "Send") {
+                        Task { await sendChatMessage() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSendingChat || chatInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (turn == nil))
+                }
             }
 
             if let id = turn?.talkLastResponseID, !id.isEmpty {
-                Text("Talk it through thread active.")
+                Text("Thread active")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func sendChatMessage() async {
+        guard !isSendingChat else { return }
+        guard let t = turn else { return }
+
+        // Redact user-entered text before sending
+        let input = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else { return }
+        let redacted = Redactor(tokens: dictionary.tokens).redact(input).redactedText
+        guard !redacted.isEmpty else { return }
+
+        isSendingChat = true
+        defer { isSendingChat = false }
+
+        let service = CloudTapService(
+            baseURL: CloudTapConfig.baseURL,
+            anonKey: CloudTapConfig.supabaseAnonKey
+        )
+
+        let appVersion =
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "0"
+
+        let snapshot = capsuleSnapshotOrNil()
+
+        // Optimistically append the user message locally
+        var thread = loadTalkThread(from: t)
+        let optimisticUser = TalkMessage(role: .user, text: redacted)
+        thread.append(optimisticUser)
+        saveTalkThread(thread, into: t)
+        chatInput = ""
+
+        do {
+            let req = CloudTapTalkRequest(
+                text: redacted,
+                recordedAt: t.recordedAt.ISO8601Format(),
+                client: "ios",
+                appVersion: appVersion,
+                previous_response_id: t.talkLastResponseID,
+                capsule: snapshot
+            )
+
+            let resp: CloudTapTalkResponse = try await service.talkItThrough(req)
+
+            // Append assistant response and update continuation
+            thread.append(TalkMessage(role: .assistant, text: resp.text))
+            saveTalkThread(thread, into: t)
+
+            t.talkLastResponseID = resp.response_id
+            t.talkPromptVersion = resp.prompt_version
+            t.talkUpdatedAt = Date()
+
+            // Optional mirror for quick visibility
+            t.reflectionText = resp.text
+
+            try modelContext.save()
+        } catch {
+            // Roll back optimistic user append on failure
+            var rolled = loadTalkThread(from: t)
+            if let idx = rolled.lastIndex(where: { $0.id == optimisticUser.id }) {
+                rolled.remove(at: idx)
+                saveTalkThread(rolled, into: t)
+            }
+            cloudSendError = String(describing: error)
         }
     }
 
@@ -451,7 +642,10 @@ struct TurnDetailView: View {
     }
 
     private var hasAnyOutputs: Bool {
-        hasContent(turn?.reflectText) || hasContent(turn?.optionsText) || hasContent(turn?.questionsText)
+        hasContent(turn?.reflectText)
+        || hasContent(turn?.clarityViewText)
+        || hasContent(turn?.optionsText)
+        || hasContent(turn?.questionsText)
     }
 
     @ViewBuilder
@@ -492,6 +686,7 @@ struct TurnDetailView: View {
                 .foregroundStyle(.secondary)
 
             toolButton(title: toolTitle(.reflect), tool: .reflect, enabled: enabled)
+            toolButton(title: toolTitle(.clarityView), tool: .clarityView, enabled: enabled)
             toolButton(title: toolTitle(.options), tool: .options, enabled: enabled)
             toolButton(title: toolTitle(.questions), tool: .questions, enabled: enabled)
             toolButton(title: "Talk it through", tool: .talkItThrough, enabled: enabled)
@@ -507,6 +702,8 @@ struct TurnDetailView: View {
         switch tool {
         case .reflect:
             return (t.reflectText?.isEmpty == false) ? "Re-run Reflect" : "Reflect"
+        case .clarityView:
+            return (t.clarityViewText?.isEmpty == false) ? "Re-run Clarity - View" : "Clarity - View"
         case .options:
             return (t.optionsText?.isEmpty == false) ? "Re-run Options" : "Options"
         case .questions:
@@ -601,67 +798,10 @@ private struct StatusPill: View {
 
 private enum CloudTool: String, CaseIterable, Identifiable {
     case reflect = "Reflect"
+    case clarityView = "Clarity - View"
     case options = "Options"
     case questions = "Questions"
     case talkItThrough = "Talk it through"
     var id: String { rawValue }
-}
-
-private struct CloudTapOffSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Text("Cloud Tap is off")
-                        .font(.headline)
-                    Text("This tool uses Cloud Tap. Nothing leaves this device unless you enable Cloud Tap and confirm each send.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    NavigationLink("Review Cloud Tap settings") {
-                        PrivacyView()
-                    }
-                }
-
-                Section {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .navigationTitle("Cloud Tap")
-#if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-#endif
-        }
-    }
-}
-
-private struct MissingCaptureSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Text("Capture unavailable")
-                        .font(.headline)
-                    Text("This capture could not be loaded. Return to the timeline and try again.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section {
-                    Button("Done") { dismiss() }
-                }
-            }
-            .navigationTitle("Capture")
-#if os(iOS)
-            .navigationBarTitleDisplayMode(.inline)
-#endif
-        }
-    }
 }
 

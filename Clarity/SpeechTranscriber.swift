@@ -4,7 +4,7 @@ import Combine
 
 @MainActor
 final class SpeechTranscriber: ObservableObject {
-    static let buildMarker = "ST_BUILD_MARKER__2026_01_27__STABLE_TAIL_SEGMENTS__MONOTONIC_GUARDS_V1"
+    static let buildMarker = "ST_BUILD_MARKER__2026_01_28__FINALISE_ONCE__FLUSH_WAIT_FINAL_V1"
 
     @Published private(set) var isTranscribing: Bool = false
     @Published private(set) var liveTranscript: String = ""
@@ -43,6 +43,9 @@ final class SpeechTranscriber: ObservableObject {
     // If a partial update shrinks a lot, treat as reset and ignore.
     private let catastrophicShrinkChars: Int = 40
 
+    // NEW: ensure a segment is finalised (committed) at most once per token
+    private var finalisedToken: Int = -1
+
     // MARK: - UI reset (published only)
 
     func resetUI() {
@@ -53,21 +56,16 @@ final class SpeechTranscriber: ObservableObject {
 
     // MARK: - Hard reset (published + internal buffers + invalidate callbacks)
 
-    /// Use this when you want the capture screen to be guaranteed empty after a completed turn,
-    /// and to prevent any late segment callbacks from re-populating the transcript.
     func hardResetAll() {
-        // Invalidate any in-flight callbacks immediately.
         segmentToken &+= 1
+        finalisedToken = -1
 
-        // Cancel timers/tasks.
         timeoutTask?.cancel(); timeoutTask = nil
         segmentTimer?.cancel(); segmentTimer = nil
 
-        // Stop feeding audio buffers.
         bufferCancellable?.cancel()
         bufferCancellable = nil
 
-        // Kill recognition pipeline.
         request?.endAudio()
         request = nil
 
@@ -76,18 +74,15 @@ final class SpeechTranscriber: ObservableObject {
 
         recognizer = nil
 
-        // Unblock any waiting continuations.
         awaitingFinalContinuation?.resume()
         awaitingFinalContinuation = nil
 
-        // Clear internal buffers.
         accumulatedText = ""
         segmentCommittedText = ""
         segmentLiveTailText = ""
         lastFullBestText = ""
         segmentStartTime = Date()
 
-        // Clear published state.
         lastError = nil
         lastTranscript = nil
         liveTranscript = ""
@@ -107,6 +102,7 @@ final class SpeechTranscriber: ObservableObject {
         segmentLiveTailText = ""
         segmentStartTime = Date()
         lastFullBestText = ""
+        finalisedToken = -1
 
         segmentToken &+= 1
 
@@ -151,7 +147,7 @@ final class SpeechTranscriber: ObservableObject {
             bufferCancellable?.cancel()
             bufferCancellable = nil
 
-            await flushCurrentSegment(waitSeconds: 0.9)
+            await flushCurrentSegment(waitSeconds: 1.0)
 
             let combined = joinTranscript(
                 accumulatedText,
@@ -181,13 +177,15 @@ final class SpeechTranscriber: ObservableObject {
         segmentToken &+= 1
         let myToken = segmentToken
 
-        let oldTask = task
-        let oldRequest = request
-
+        // NEW: allow finalise once per token
+        // (finalisedToken remains whatever it was; we compare against myToken)
         segmentCommittedText = ""
         segmentLiveTailText = ""
         segmentStartTime = Date()
         lastFullBestText = ""
+
+        let oldTask = task
+        let oldRequest = request
 
         let newReq = SFSpeechAudioBufferRecognitionRequest()
         newReq.shouldReportPartialResults = true
@@ -206,7 +204,7 @@ final class SpeechTranscriber: ObservableObject {
                 guard self.isTranscribing else { return }
 
                 if let error {
-                    self.commitCurrentSegmentBestEffort(finalize: true)
+                    self.finaliseSegmentOnce(token: myToken, finalize: true)
                     self.updateLiveTranscript()
                     self.signalAwaitingFinal()
 
@@ -231,7 +229,7 @@ final class SpeechTranscriber: ObservableObject {
                 self.updateFromSegments(result.bestTranscription.segments)
 
                 if result.isFinal {
-                    self.commitCurrentSegmentBestEffort(finalize: true)
+                    self.finaliseSegmentOnce(token: myToken, finalize: true)
                     self.updateLiveTranscript()
                     self.signalAwaitingFinal()
                 }
@@ -243,7 +241,6 @@ final class SpeechTranscriber: ObservableObject {
     }
 
     /// Splits bestTranscription into stable vs tail, reducing “jumping”.
-    /// Also enforces monotonic stable (committed) text so it never shrinks.
     private func updateFromSegments(_ segments: [SFTranscriptionSegment]) {
         guard !segments.isEmpty else { return }
 
@@ -266,7 +263,7 @@ final class SpeechTranscriber: ObservableObject {
         let candidateStable = stableParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         let candidateTail = tailParts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
 
-        // Monotonic guard:
+        // Monotonic guard for committed stable:
         if segmentCommittedText.isEmpty {
             segmentCommittedText = candidateStable
         } else if candidateStable.isEmpty {
@@ -321,16 +318,20 @@ final class SpeechTranscriber: ObservableObject {
     }
 
     private func rotateSegment() {
-        guard isTranscribing, let rec = recognizer else { return }
+        guard isTranscribing, recognizer != nil else { return }
         Task { @MainActor in
-            await flushCurrentSegment(waitSeconds: 0.6)
-            self.startNewSegment(recognizer: rec)
+            await flushCurrentSegment(waitSeconds: 0.8)
+            if let rec = self.recognizer {
+                self.startNewSegment(recognizer: rec)
+            }
         }
     }
 
     private func flushCurrentSegment(waitSeconds: Double) async {
+        // Ask the recogniser to finalise this segment.
         request?.endAudio()
 
+        // Wait for the recogniser to deliver a final result (or timeout).
         await withCheckedContinuation { cont in
             awaitingFinalContinuation = cont
             Task { [weak self] in
@@ -338,12 +339,19 @@ final class SpeechTranscriber: ObservableObject {
                 let nanos = UInt64(max(0.1, waitSeconds) * 1_000_000_000)
                 try? await Task.sleep(nanoseconds: nanos)
                 await MainActor.run {
-                    self.commitCurrentSegmentBestEffort(finalize: true)
+                    // If final never arrived, commit best effort ONCE.
+                    self.finaliseSegmentOnce(token: self.segmentToken, finalize: true)
                     self.updateLiveTranscript()
                     self.signalAwaitingFinal()
                 }
             }
         }
+    }
+
+    private func finaliseSegmentOnce(token: Int, finalize: Bool) {
+        guard finalisedToken != token else { return }
+        finalisedToken = token
+        commitCurrentSegmentBestEffort(finalize: finalize)
     }
 
     /// finalize=false: commit only stable text
@@ -367,7 +375,6 @@ final class SpeechTranscriber: ObservableObject {
         let current = joinTranscript(segmentCommittedText, segmentLiveTailText)
         let combined = joinTranscript(accumulatedText, current)
 
-        // Never allow live transcript to “collapse” to empty mid-session.
         if isTranscribing, combined.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return
         }
@@ -405,6 +412,7 @@ final class SpeechTranscriber: ObservableObject {
         bufferCancellable = nil
 
         segmentToken &+= 1
+        finalisedToken = -1
 
         request?.endAudio()
         request = nil

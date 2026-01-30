@@ -32,7 +32,7 @@ struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
             out["no_persona"] = b ? "true" : "false"
         }
 
-        // Extras (already bounded in store, but bound again defensively)
+        // Extras (bounded again defensively)
         let maxItems = 24
         let keyMax = 32
         let valueMax = 128
@@ -50,7 +50,7 @@ struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
     }
 }
 
-// MARK: - Single-shot (reflect/options/questions)
+// MARK: - Single-shot (reflect/options/questions/clarity-view)
 
 struct CloudTapReflectRequest: Codable {
     let text: String
