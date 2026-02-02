@@ -1,4 +1,3 @@
-// Tab_CaptureView.swift
 import SwiftUI
 #if os(iOS)
 import UIKit
@@ -11,37 +10,39 @@ struct Tab_CaptureView: View {
     @State private var permissionAlertTitleKey: String = "perm.title.generic"
     @State private var permissionAlertMessageKey: String = ""
 
-    // Robust navigation path
     @State private var path: [UUID] = []
-
-    // Sheet toggle for typing text
     @State private var showPasteSheet: Bool = false
+
+    private enum Layout {
+        static let vStackSpacing: CGFloat = 18
+        static let headerSpacing: CGFloat = 6
+        static let headerTopPadding: CGFloat = 6
+        static let micCoverSize: CGFloat = 120
+        static let micDownSpacerMin: CGFloat = 18
+        static let belowStatusSpacerMin: CGFloat = 8
+        static let typeButtonVerticalPadding: CGFloat = 12
+        static let errorTopPadding: CGFloat = 6
+        static let statusDotSize: CGFloat = 6
+        static let statusPillSpacing: CGFloat = 8
+        static let statusPillHPadding: CGFloat = 12
+        static let statusPillVPadding: CGFloat = 8
+        static let statusAnimDuration: Double = 0.15
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             ZStack {
-                Image("CaptureBackground")
-                    .resizable()
-                    .scaledToFill()
-                    .scaleEffect(0.57)          // tweak
-                    .offset(x: -48, y: -6)       // tweak (negative moves up)
-                    .ignoresSafeArea()
-                    .clipped()
-                    .accessibilityHidden(true)
-                    .opacity(0.35) // try 0.25–0.45
+                Color.clear.ignoresSafeArea()
 
-                VStack(spacing: 18) {
+                VStack(spacing: Layout.vStackSpacing) {
                     header
 
-                    // NEW: extra space to push mic button down slightly
-                    Spacer(minLength: 18)
+                    Spacer(minLength: Layout.micDownSpacerMin)
 
                     ZStack {
-                        // Covers the mic icon baked into the background image.
-                        // Uses dynamic system background so it matches Light/Dark mode.
                         Circle()
                             .fill(Color(.systemBackground))
-                            .frame(width: 120, height: 120)
+                            .frame(width: Layout.micCoverSize, height: Layout.micCoverSize)
 
                         CaptureButton(
                             phase: coordinator.phase,
@@ -51,8 +52,7 @@ struct Tab_CaptureView: View {
                         )
                     }
 
-                    // Keep sizes stable: show status pill without affecting layout
-                    // (presents for non-idle states, but doesn’t push the mic button around)
+                    // Status pill without layout shift
                     ZStack {
                         if coordinator.phase != .idle {
                             statusPill
@@ -65,29 +65,31 @@ struct Tab_CaptureView: View {
                             statusPill
                         }
                     }
-                    .animation(.easeInOut(duration: 0.15), value: coordinator.phase)
+                    .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
 
-                    Spacer(minLength: 8)
+                    Spacer(minLength: Layout.belowStatusSpacerMin)
 
                     Button {
                         showPasteSheet = true
                     } label: {
-                        Text("Type text")
+                        Text("capture.type_text")
                             .font(.headline)
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, Layout.typeButtonVerticalPadding)
                             .background(Color(red: 0.08, green: 0.24, blue: 0.60))
-                            .clipShape(SwiftUI.Capsule())
+                            .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Type text")
+                    .accessibilityLabel(Text("capture.type_text.a11y.label"))
+                    .accessibilityHint(Text("capture.type_text.a11y.hint"))
 
-                    if let e = coordinator.lastError, !e.isEmpty {
-                        Text(e)
+                    if let uiErrorKey = userFacingErrorKey {
+                        Text(LocalizedStringKey(uiErrorKey))
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                            .padding(.top, 6)
+                            .padding(.top, Layout.errorTopPadding)
+                            .multilineTextAlignment(.center)
                     }
                 }
                 .padding()
@@ -103,13 +105,23 @@ struct Tab_CaptureView: View {
                 path.append(id)
                 coordinator.lastCompletedTurnID = nil
             }
-            .onChange(of: coordinator.lastError) { _, newValue in
-                guard let msg = newValue, !msg.isEmpty else { return }
-                guard let denial = PermissionDenialDetection.from(errorMessage: msg) else { return }
+            .onChange(of: coordinator.uiError) { _, newValue in
+                guard let err = newValue else { return }
 
-                permissionAlertTitleKey = denial.titleKey
-                permissionAlertMessageKey = denial.messageKey
-                showPermissionAlert = true
+                switch err {
+                case .micDenied, .micNotGranted:
+                    permissionAlertTitleKey = "perm.mic.title"
+                    permissionAlertMessageKey = "perm.mic.message"
+                    showPermissionAlert = true
+
+                case .speechDeniedOrNotAuthorised, .speechUnavailable:
+                    permissionAlertTitleKey = "perm.speech.title"
+                    permissionAlertMessageKey = "perm.speech.message"
+                    showPermissionAlert = true
+
+                default:
+                    break
+                }
             }
             .alert(
                 Text(LocalizedStringKey(permissionAlertTitleKey)),
@@ -128,36 +140,34 @@ struct Tab_CaptureView: View {
         }
     }
 
-    // MARK: - UI
-
     private var header: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Layout.headerSpacing) {
             Text(String(localized: "app.title"))
                 .font(.title2.weight(.semibold))
             Text(String(localized: "capture.tagline"))
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
-        .padding(.top, 6)
+        .padding(.top, Layout.headerTopPadding)
     }
 
     private var statusPill: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Layout.statusPillSpacing) {
             Text(LocalizedStringKey(statusTextKey))
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
             if coordinator.phase == .recording {
                 Circle()
-                    .frame(width: 6, height: 6)
+                    .frame(width: Layout.statusDotSize, height: Layout.statusDotSize)
                     .foregroundStyle(.secondary)
                     .opacity(0.85)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, Layout.statusPillHPadding)
+        .padding(.vertical, Layout.statusPillVPadding)
         .background(.thinMaterial)
-        .clipShape(SwiftUI.Capsule())
+        .clipShape(Capsule())
     }
 
     private var statusTextKey: String {
@@ -174,8 +184,25 @@ struct Tab_CaptureView: View {
         switch coordinator.phase {
         case .idle, .recording:
             return false
-        case .finalising, .transcribing, .redacting:
+        default:
             return true
+        }
+    }
+
+    private var userFacingErrorKey: String? {
+        guard let err = coordinator.uiError else { return nil }
+
+        switch err {
+        case .notReady:
+            return "error.capture.not_ready"
+        case .couldntStartCapture:
+            return "error.capture.start_failed"
+        case .couldntSaveTranscript:
+            return "error.capture.save_failed"
+        case .noTranscriptCaptured:
+            return "error.capture.no_speech"
+        default:
+            return nil
         }
     }
 
@@ -187,34 +214,7 @@ struct Tab_CaptureView: View {
     }
 }
 
-// MARK: - Local permission detection
-
-private enum PermissionDenialDetection {
-    struct Denial {
-        let titleKey: String
-        let messageKey: String
-    }
-
-    static func from(errorMessage: String) -> Denial? {
-        let msg = errorMessage.lowercased()
-
-        if msg.contains("microphone permission denied") || msg.contains("microphone permission not granted") {
-            return Denial(titleKey: "perm.mic.title", messageKey: "perm.mic.message")
-        }
-
-        if msg.contains("speech not authorised")
-            || msg.contains("speech not authorized")
-            || msg.contains("speech recogniser unavailable")
-            || msg.contains("speech recognizer unavailable") {
-            return Denial(titleKey: "perm.speech.title", messageKey: "perm.speech.message")
-        }
-
-        return nil
-    }
-}
-
 #Preview {
     Tab_CaptureView()
         .environmentObject(TurnCaptureCoordinator())
 }
-

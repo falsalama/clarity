@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct SettingsView: View {
     @EnvironmentObject private var dictionary: RedactionDictionary
@@ -10,14 +13,14 @@ struct SettingsView: View {
     var body: some View {
         List {
             Section {
-                Text(String(localized: "settings.local_first"))
+                Text(LocalizedStringKey("settings.local_first"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
 
             Section {
                 if dictionary.tokens.isEmpty {
-                    Text(String(localized: "settings.redaction.empty"))
+                    Text(LocalizedStringKey("settings.redaction.empty"))
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(dictionary.tokens, id: \.self) { token in
@@ -29,55 +32,72 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    TextField(String(localized: "settings.redaction.add.placeholder"), text: $newToken)
+                    TextField(LocalizedStringKey("settings.redaction.add.placeholder"), text: $newToken)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled(true)
+                        .submitLabel(.done)
+                        .onSubmit { addToken() }
 
-                    Button(String(localized: "settings.redaction.add")) { addToken() }
+                    HStack(spacing: 10) {
+                        Button {
+                            addToken()
+                        } label: {
+                            Text(LocalizedStringKey("settings.redaction.add"))
+                        }
                         .buttonStyle(.borderedProminent)
                         .disabled(newTokenTrimmed.isEmpty)
+
+                        Button("Done") {
+                            hideKeyboard()
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
                 .padding(.vertical, 4)
 
             } header: {
-                Text(String(localized: "settings.redaction.header"))
+                Text(LocalizedStringKey("settings.redaction.header"))
             } footer: {
-                Text(String(localized: "settings.redaction.footer"))
+                Text(LocalizedStringKey("settings.redaction.footer"))
             }
 
             if !dictionary.tokens.isEmpty {
                 Section {
                     Button(role: .destructive) {
+                        hideKeyboard()
                         confirmRemoveAll = true
                     } label: {
-                        Text(String(localized: "settings.redaction.remove_all"))
+                        Text(LocalizedStringKey("settings.redaction.remove_all"))
                     }
                 }
             }
 
             Section {
-                NavigationLink(String(localized: "settings.privacy.link")) { PrivacyView() }
+                NavigationLink {
+                    PrivacyView()
+                } label: {
+                    Text(LocalizedStringKey("settings.privacy.link"))
+                }
 
-                Text(String(localized: "settings.privacy.note"))
+                Text(LocalizedStringKey("settings.privacy.note"))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {
-                Text(String(localized: "settings.privacy.header"))
+                Text(LocalizedStringKey("settings.privacy.header"))
             }
         }
-        .navigationTitle(String(localized: "settings.title"))
-        .toolbar { EditButton() }
+        .navigationTitle(Text(LocalizedStringKey("settings.title")))
         .confirmationDialog(
-            String(localized: "settings.redaction.remove_all.confirm.title"),
+            Text(LocalizedStringKey("settings.redaction.remove_all.confirm.title")),
             isPresented: $confirmRemoveAll,
             titleVisibility: .visible
         ) {
-            Button(String(localized: "settings.redaction.remove_all.confirm.ok"), role: .destructive) {
+            Button(LocalizedStringKey("settings.redaction.remove_all.confirm.ok"), role: .destructive) {
                 dictionary.wipe()
             }
-            Button(String(localized: "settings.redaction.remove_all.confirm.cancel"), role: .cancel) { }
+            Button(LocalizedStringKey("settings.redaction.remove_all.confirm.cancel"), role: .cancel) { }
         } message: {
-            Text(String(localized: "settings.redaction.remove_all.confirm.message"))
+            Text(LocalizedStringKey("settings.redaction.remove_all.confirm.message"))
         }
     }
 
@@ -90,6 +110,14 @@ struct SettingsView: View {
         guard !t.isEmpty else { return }
         dictionary.add(t)
         newToken = ""
+        hideKeyboard()
+    }
+
+    private func hideKeyboard() {
+#if os(iOS)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil)
+#endif
     }
 }
 

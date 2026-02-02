@@ -1,5 +1,7 @@
-// CapsuleView.swift
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct CapsuleView: View {
     @EnvironmentObject private var store: CapsuleStore
@@ -7,19 +9,11 @@ struct CapsuleView: View {
     @State private var newPrefKey: String = ""
     @State private var newPrefValue: String = ""
 
-    // Focus to support return-key flow between fields
-    private enum Field: Hashable {
-        case prefKey, prefValue
-    }
-    @FocusState private var focusedField: Field?
-
     var body: some View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("""
-Set optional preferences to influence responses.
-""")
+                    Text("Set optional preferences to influence responses.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -38,7 +32,10 @@ Set optional preferences to influence responses.
             }
 
             Section {
-                Button(role: .destructive) { store.wipe() } label: {
+                Button(role: .destructive) {
+                    hideKeyboard()
+                    store.wipe()
+                } label: {
                     Text("Wipe Capsule")
                 }
                 .accessibilityLabel("Wipe Capsule")
@@ -49,7 +46,6 @@ Set optional preferences to influence responses.
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .toolbar { EditButton() }
     }
 
     // MARK: - Preferences
@@ -88,16 +84,16 @@ Set optional preferences to influence responses.
                         .autocorrectionDisabled(true)
                         .textContentType(.none)
                         .keyboardType(.asciiCapable)
-                        .submitLabel(.next)
-                        .focused($focusedField, equals: .prefKey)
-                        .onSubmit { focusedField = .prefValue }
+                        .submitLabel(.done)               // <- blue tick
+                        .onSubmit { hideKeyboard() }      // <- dismiss
                 }
 
                 LabeledContent("Value") {
                     TextField("e.g. direct, concise, UK, EU", text: $newPrefValue)
-                        .submitLabel(.done)
-                        .focused($focusedField, equals: .prefValue)
-                        .onSubmit { addPreference() }
+                        .textInputAutocapitalization(.sentences)
+                        .autocorrectionDisabled(false)
+                        .submitLabel(.done)               // <- blue tick
+                        .onSubmit { addPreference() }     // <- add + dismiss
                 }
 
                 HStack {
@@ -128,7 +124,6 @@ Set optional preferences to influence responses.
         let k = normaliseKey(newPrefKey)
         let v = newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !k.isEmpty, !v.isEmpty else { return false }
-        // Prevent duplicate keys
         return store.preferenceKeyValues.contains(where: { $0.key == k }) == false
     }
 
@@ -136,12 +131,8 @@ Set optional preferences to influence responses.
         let rawKey = newPrefKey
         let k = normaliseKey(rawKey)
 
-        if !rawKey.isEmpty, k.isEmpty {
-            return "Label is invalid."
-        }
-        if store.preferenceKeyValues.contains(where: { $0.key == k }) {
-            return "Label already exists."
-        }
+        if !rawKey.isEmpty, k.isEmpty { return "Label is invalid." }
+        if store.preferenceKeyValues.contains(where: { $0.key == k }) { return "Label already exists." }
         return nil
     }
 
@@ -156,7 +147,7 @@ Set optional preferences to influence responses.
         store.setPreference(key: k, value: v)
         newPrefKey = ""
         newPrefValue = ""
-        focusedField = .prefKey
+        hideKeyboard()
     }
 
     private func normaliseKey(_ input: String) -> String {
@@ -169,6 +160,13 @@ Set optional preferences to influence responses.
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
 
         return underscored
+    }
+
+    private func hideKeyboard() {
+#if os(iOS)
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                        to: nil, from: nil, for: nil)
+#endif
     }
 }
 

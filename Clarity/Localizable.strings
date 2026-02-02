@@ -15,8 +15,23 @@
 "capture.transcript.hide" = "Hide";
 "capture.transcript.show" = "Show";
 "capture.tap_to_stop" = "Tap to stop";
+
+/* Capture – Primary actions */
+"capture.type_text" = "Type text";
+
+/* Capture – Accessibility */
 "capture.a11y.start" = "Start recording";
 "capture.a11y.stop" = "Stop recording";
+"capture.a11y.hint.start" = "Double-tap to start recording.";
+"capture.a11y.hint.stop" = "Double-tap to stop recording.";
+"capture.type_text.a11y.label" = "Type text";
+"capture.type_text.a11y.hint" = "Open text capture.";
+
+/* Errors – Capture */
+"error.capture.not_ready" = "Not ready yet.";
+"error.capture.start_failed" = "Couldn’t start capture.";
+"error.capture.save_failed" = "Couldn’t save transcript.";
+"error.capture.no_speech" = "No speech detected.";
 
 /* Permission alerts */
 "perm.title.generic" = "Permission needed";

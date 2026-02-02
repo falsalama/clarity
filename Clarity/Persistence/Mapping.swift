@@ -81,7 +81,7 @@ extension RedactionRecordEntity {
 }
 
 extension CapsuleEntity {
-    @MainActor func toDomain() throws -> Capsule {
+    @MainActor func toDomain() throws -> CapsuleModel {
         let decoder = JSONDecoder()
 
         let prefs = (preferencesJSON.isEmpty) ? CapsulePreferences() :
@@ -90,7 +90,7 @@ extension CapsuleEntity {
         let learned = (learnedJSON.isEmpty) ? [] :
             (try decoder.decode([CapsuleTendency].self, from: learnedJSON))
 
-        return Capsule(
+        return CapsuleModel(
             version: version,
             learningEnabled: learningEnabled,
             updatedAt: updatedAt,
@@ -99,7 +99,7 @@ extension CapsuleEntity {
         )
     }
 
-    @MainActor func apply(domain c: Capsule) throws {
+    @MainActor func apply(domain c: CapsuleModel) throws {
         let encoder = JSONEncoder()
         version = c.version
         learningEnabled = c.learningEnabled

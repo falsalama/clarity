@@ -20,7 +20,7 @@ struct CapsuleTendency: Codable, Sendable, Equatable, Identifiable {
     var isOverridden: Bool
 }
 
-struct Capsule: Codable, Sendable, Equatable {
+struct CapsuleModel: Codable, Sendable, Equatable {
     var version: Int
     var learningEnabled: Bool
     var updatedAt: Date
@@ -28,8 +28,8 @@ struct Capsule: Codable, Sendable, Equatable {
     var preferences: CapsulePreferences
     var learnedTendencies: [CapsuleTendency]
 
-    static func empty() -> Capsule {
-        Capsule(
+    static func empty() -> CapsuleModel {
+        CapsuleModel(
             version: 1,
             learningEnabled: true,
             updatedAt: Date(),

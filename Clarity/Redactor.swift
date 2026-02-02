@@ -9,6 +9,10 @@ struct RedactionResult: Equatable {
 struct Redactor {
     private let tokens: [String]
 
+    /// If true, redact bare domains like "yahoo .com" even without "@"
+    /// Default: false (only redact actual email-like forms).
+    private let redactDomainsWithoutAt: Bool = false
+
     init(tokens: [String] = []) {
         self.tokens = tokens
     }
@@ -104,6 +108,29 @@ struct Redactor {
             options: [.caseInsensitive]
         ).map { RedactionMatch(range: $0, kind: .email) }
 
+        // EMAIL (spaced / transcription-tolerant)
+        out += emailSpacedMatches(in: input).map { RedactionMatch(range: $0, kind: .email) }
+
+        // EMAIL (tolerant "at"/"dot") – catches "john at yahoo dot com"
+        out += ranges(
+            input,
+            pattern: #"\b[A-Z0-9._%+-]+(?:\s+at\s+)[A-Z0-9.-]+(?:\s+dot\s+)[A-Z]{2,}\b"#,
+            options: [.caseInsensitive]
+        ).map { RedactionMatch(range: $0, kind: .email) }
+
+        // EMAIL (tolerant, allow multi-token local part for common mail domains)
+        // "johnny smith @gmail .com" -> still gets caught (local part limited to 3 tokens)
+        out += ranges(
+            input,
+            pattern: #"\b[A-Z0-9._%+-]+(?:\s+[A-Z0-9._%+-]+){0,2}\s*(?:@\s*|\s+at\s+)(?:gmail|yahoo|hotmail|outlook|icloud)\s*(?:\.\s*|\s+dot\s+)(?:com|net|org|co\.uk)\b"#,
+            options: [.caseInsensitive]
+        ).map { RedactionMatch(range: $0, kind: .email) }
+
+        // Optional: redact domains even without "@"
+        if redactDomainsWithoutAt {
+            out += domainOnlyMatches(in: input).map { RedactionMatch(range: $0, kind: .email) }
+        }
+
         // PHONE (international-ish, conservative)
         out += ranges(
             input,
@@ -133,8 +160,6 @@ struct Redactor {
         ).map { RedactionMatch(range: $0, kind: .iban) }
 
         // IBAN (spaced) – tolerate transcription spaces/hyphens.
-        // Require it to start like an IBAN (CCdd) and then 11+ alnum total when spaces removed.
-        // Example: "GB29 NWBK 6016 1331 9268 19"
         let ibanSpaced = ranges(
             input,
             pattern: #"\b[A-Z]{2}\d{2}(?:[\s-]?[A-Z0-9]){11,40}\b"#,
@@ -143,7 +168,6 @@ struct Redactor {
         for r in ibanSpaced {
             let snippet = substring(input, nsRange: r)
             let cleaned = snippet.filter { $0.isLetter || $0.isNumber }.uppercased()
-            // Must still look like IBAN and be plausible length.
             if cleaned.count >= 15, cleaned.count <= 34,
                cleaned.prefix(2).allSatisfy({ $0.isLetter }),
                cleaned.dropFirst(2).prefix(2).allSatisfy({ $0.isNumber }) {
@@ -166,9 +190,11 @@ struct Redactor {
             options: [.caseInsensitive]
         ).map { RedactionMatch(range: $0, kind: .sortcode) }
 
+        // SORT CODE (fuzzy) – catches transcription variants like:
+        // "206518", "20 6518", "2 065 1 8", "20-65 18"
+        out += sortCodeFuzzyMatches(in: input).map { RedactionMatch(range: $0, kind: .sortcode) }
+
         // ACCOUNT NUMBER (labelled):
-        // - allow "account is ..." as well as "account number is ..."
-        // - capture a bounded number-ish span and then digit-count validate
         let acctGroupRanges = groupRanges(
             input,
             pattern: #"\b((?:bank\s*)?account(?:\s*(?:number|no\.?|#))?|acc(?:ount)?(?:\s*(?:number|no\.?|#))?|acct(?:\.|ount)?(?:\s*(?:number|no\.?|#))?|a\/c)\s*(?:is|:)?\s*([0-9](?:[0-9\s-]{3,}[0-9])?)\b"#,
@@ -208,7 +234,6 @@ struct Redactor {
         ).map { RedactionMatch(range: $0, kind: .vat) }
 
         // BIC/SWIFT – CONTEXTUAL ONLY to avoid false positives on random words.
-        // We only redact codes when near "BIC" or "SWIFT".
         out += bicMatchesContextual(in: input)
 
         // CARD detection (careful)
@@ -217,9 +242,94 @@ struct Redactor {
         return out
     }
 
+    // MARK: - Email helpers
+
+    /// Matches email-like patterns where transcription inserted spaces around @ and dots.
+    /// Examples:
+    /// - "john @ yahoo . com"
+    /// - "john@ yahoo.com"
+    /// - "john@gmail . com"
+    private func emailSpacedMatches(in input: String) -> [NSRange] {
+        let pattern =
+        #"\b[A-Z0-9._%+-]+\s*@\s*[A-Z0-9-]+(?:\s*\.\s*[A-Z0-9-]+)*\s*\.\s*[A-Z]{2,}\b"#
+
+        return ranges(input, pattern: pattern, options: [.caseInsensitive])
+    }
+
+    /// Optional: matches bare domains with optional spaced dots.
+    /// Example: "yahoo .com", "example . co . uk"
+    private func domainOnlyMatches(in input: String) -> [NSRange] {
+        let pattern =
+        #"\b[A-Z0-9-]+(?:\s*\.\s*[A-Z0-9-]+)*\s*\.\s*[A-Z]{2,}\b"#
+
+        return ranges(input, pattern: pattern, options: [.caseInsensitive])
+    }
+
+    // MARK: - Sort code fuzzy
+
+    private func sortCodeFuzzyMatches(in input: String) -> [NSRange] {
+        // Candidate: 6 digits with any mixture of spaces/hyphens between them.
+        // Examples: "20-65 18", "2 065 1 8", "20 6518", "206518"
+        let candidates = ranges(
+            input,
+            pattern: #"\b(?:\d[\s-]*){6}\b"#,
+            options: []
+        )
+
+        var out: [NSRange] = []
+        for r in candidates {
+            let snippet = substring(input, nsRange: r)
+            let digits = snippet.filter { $0.isNumber }
+            guard digits.count == 6 else { continue }
+
+            // Reduce false positives:
+            // Accept if it already has separators OR near banking context OR near an 8-digit account number.
+            let hasSeparators = snippet.contains(" ") || snippet.contains("-")
+
+            let hasContext = hasNearbyKeywords(
+                around: r,
+                in: input,
+                window: 28,
+                keywords: ["sort", "s/c", "sortcode", "bank", "branch", "account", "a/c", "transfer", "payment"]
+            )
+
+            let nearAccount = hasNearbyAccountNumber(around: r, in: input, window: 28)
+
+            if hasSeparators || hasContext || nearAccount {
+                out.append(r)
+            }
+        }
+        return out
+    }
+
+    private func hasNearbyAccountNumber(around range: NSRange, in input: String, window: Int) -> Bool {
+        let ns = input as NSString
+        let start = max(0, range.location - window)
+        let end = min(ns.length, range.location + range.length + window)
+        let ctxRange = NSRange(location: start, length: max(0, end - start))
+        let context = ns.substring(with: ctxRange)
+
+        // Look for 8 digits allowing spaces/hyphens (typical UK account number length).
+        let hits = ranges(context, pattern: #"\b(?:\d[\s-]*){8}\b"#, options: [])
+        for h in hits {
+            let snip = (context as NSString).substring(with: h)
+            if snip.filter({ $0.isNumber }).count == 8 { return true }
+        }
+        return false
+    }
+
+    private func hasNearbyKeywords(around range: NSRange, in input: String, window: Int, keywords: [String]) -> Bool {
+        let ns = input as NSString
+        let start = max(0, range.location - window)
+        let end = min(ns.length, range.location + range.length + window)
+        let ctxRange = NSRange(location: start, length: max(0, end - start))
+        let context = ns.substring(with: ctxRange).lowercased()
+        return keywords.contains(where: { context.contains($0) })
+    }
+
+    // MARK: - BIC / card
+
     private func bicMatchesContextual(in input: String) -> [RedactionMatch] {
-        // Look for "BIC" / "SWIFT" labels and capture the code next to them.
-        // Accept spaced codes by allowing optional separators and validating after cleanup.
         let codeRanges = groupRanges(
             input,
             pattern: #"\b(?:bic|swift)(?:\s*code)?\s*(?:is|:)?\s*([A-Z0-9](?:[A-Z0-9\s-]{6,}[A-Z0-9])?)\b"#,
@@ -233,7 +343,6 @@ struct Redactor {
             let cleaned = snippet.filter { $0.isLetter || $0.isNumber }.uppercased()
             // BIC is 8 or 11 characters: AAAABBCC(DDD)
             if cleaned.count == 8 || cleaned.count == 11 {
-                // Validate basic BIC structure to reduce false positives.
                 let chars = Array(cleaned)
                 let first4 = chars.prefix(4)
                 let next2 = chars.dropFirst(4).prefix(2)

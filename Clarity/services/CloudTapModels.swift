@@ -7,7 +7,7 @@ struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
     let updatedAt: String
     let preferences: [String: String]
 
-    static func fromCapsule(_ capsule: Capsule) -> CloudTapCapsuleSnapshot {
+    static func fromCapsule(_ capsule: CapsuleModel) -> CloudTapCapsuleSnapshot {
         CloudTapCapsuleSnapshot(
             version: capsule.version,
             updatedAt: ISO8601DateFormatter().string(from: capsule.updatedAt),

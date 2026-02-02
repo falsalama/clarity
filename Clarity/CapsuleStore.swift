@@ -3,7 +3,7 @@ import Combine
 
 @MainActor
 final class CapsuleStore: ObservableObject {
-    @Published private(set) var capsule: Capsule = .empty()
+    @Published private(set) var capsule: CapsuleModel = .empty()
 
     private let fm = FileManager.default
 
@@ -144,14 +144,14 @@ final class CapsuleStore: ObservableObject {
         do { try saveToDisk(capsule) } catch { }
     }
 
-    private func loadFromDisk() throws -> Capsule {
+    private func loadFromDisk() throws -> CapsuleModel {
         let url = try capsuleURL()
         guard fm.fileExists(atPath: url.path) else { return .empty() }
         let data = try Data(contentsOf: url)
-        return try JSONDecoder().decode(Capsule.self, from: data)
+        return try JSONDecoder().decode(CapsuleModel.self, from: data)
     }
 
-    private func saveToDisk(_ capsule: Capsule) throws {
+    private func saveToDisk(_ capsule: CapsuleModel) throws {
         let url = try capsuleURL()
         var c = capsule
         c.updatedAt = Date()
