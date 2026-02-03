@@ -183,7 +183,7 @@ struct TurnDetailView: View {
             let snapshot = capsuleSnapshotOrNil()
 
             switch pendingTool {
-            case .reflect, .options, .questions, .clarityView:
+            case .reflect, .options, .questions, .perspective:
                 let req = CloudTapReflectRequest(
                     text: redactedText,
                     recordedAt: t.recordedAt.ISO8601Format(),
@@ -209,17 +209,17 @@ struct TurnDetailView: View {
                     t.questionsText = resp.text
                     t.questionsPromptVersion = resp.prompt_version
                     t.questionsUpdatedAt = Date()
-                case .clarityView:
-                    resp = try await service.clarityView(req)
-                    t.clarityViewText = resp.text
-                    t.clarityViewPromptVersion = resp.prompt_version
-                    t.clarityViewUpdatedAt = Date()
+                case .perspective:
+                    resp = try await service.perspective(req)
+                    t.perspectiveText = resp.text
+                    t.perspectivePromptVersion = resp.prompt_version
+                    t.perspectiveUpdatedAt = Date()
                 default:
                     fatalError("Unexpected tool branch")
                 }
 
                 // Legacy mirror
-                t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.clarityViewText) ?? ""
+                t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.perspectiveText) ?? ""
 
             case .talkItThrough:
                 // This path is now handled by the chat composer; keep here as a fallback single-shot send.
@@ -491,8 +491,8 @@ struct TurnDetailView: View {
                 outputBlock(title: "Reflect", text: turn?.reflectText, prompt: turn?.reflectPromptVersion)
             }
 
-            if hasContent(turn?.clarityViewText) {
-                outputBlock(title: "Clarity - View", text: turn?.clarityViewText, prompt: turn?.clarityViewPromptVersion)
+            if hasContent(turn?.perspectiveText) {
+                outputBlock(title: "Perspective", text: turn?.perspectiveText, prompt: turn?.perspectivePromptVersion)
             }
 
             if hasContent(turn?.optionsText) {
@@ -643,7 +643,7 @@ struct TurnDetailView: View {
 
     private var hasAnyOutputs: Bool {
         hasContent(turn?.reflectText)
-        || hasContent(turn?.clarityViewText)
+        || hasContent(turn?.perspectiveText)
         || hasContent(turn?.optionsText)
         || hasContent(turn?.questionsText)
     }
@@ -686,7 +686,7 @@ struct TurnDetailView: View {
                 .foregroundStyle(.secondary)
 
             toolButton(title: toolTitle(.reflect), tool: .reflect, enabled: enabled)
-            toolButton(title: toolTitle(.clarityView), tool: .clarityView, enabled: enabled)
+            toolButton(title: toolTitle(.perspective), tool: .perspective, enabled: enabled)
             toolButton(title: toolTitle(.options), tool: .options, enabled: enabled)
             toolButton(title: toolTitle(.questions), tool: .questions, enabled: enabled)
             toolButton(title: "Talk it through", tool: .talkItThrough, enabled: enabled)
@@ -702,8 +702,8 @@ struct TurnDetailView: View {
         switch tool {
         case .reflect:
             return (t.reflectText?.isEmpty == false) ? "Re-run Reflect" : "Reflect"
-        case .clarityView:
-            return (t.clarityViewText?.isEmpty == false) ? "Re-run Clarity - View" : "Clarity - View"
+        case .perspective:
+            return (t.perspectiveText?.isEmpty == false) ? "Re-run Clarity - View" : "Clarity - View"
         case .options:
             return (t.optionsText?.isEmpty == false) ? "Re-run Options" : "Options"
         case .questions:
@@ -798,10 +798,9 @@ private struct StatusPill: View {
 
 private enum CloudTool: String, CaseIterable, Identifiable {
     case reflect = "Reflect"
-    case clarityView = "Clarity - View"
+    case perspective = "Perspective"
     case options = "Options"
     case questions = "Questions"
     case talkItThrough = "Talk it through"
     var id: String { rawValue }
 }
-

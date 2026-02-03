@@ -37,8 +37,8 @@ final class CloudTapService {
         try await postJSON(reqBody, to: "cloudtap-questions")
     }
 
-    func clarityView(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
-        try await postJSON(reqBody, to: "cloudtap-clarity-view")
+    func perspective(_ reqBody: CloudTapReflectRequest) async throws -> CloudTapReflectResponse {
+        try await postJSON(reqBody, to: "cloudtap-clarity-perspective")
     }
 
     func talkItThrough(_ reqBody: CloudTapTalkRequest) async throws -> CloudTapTalkResponse {

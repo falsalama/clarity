@@ -50,7 +50,7 @@ struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
     }
 }
 
-// MARK: - Single-shot (reflect/options/questions/clarity-view)
+// MARK: - Single-shot (reflect/options/questions/perspective)
 
 struct CloudTapReflectRequest: Codable {
     let text: String

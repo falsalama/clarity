@@ -52,9 +52,9 @@ final class TurnEntity {
     var reflectUpdatedAt: Date?
 
     // Clarity - View
-    var clarityViewText: String?
-    var clarityViewPromptVersion: String?
-    var clarityViewUpdatedAt: Date?
+    var perspectiveText: String?
+    var perspectivePromptVersion: String?
+    var perspectiveUpdatedAt: Date?
 
     // Options
     var optionsText: String?
@@ -135,9 +135,9 @@ final class TurnEntity {
         self.reflectPromptVersion = nil
         self.reflectUpdatedAt = nil
 
-        self.clarityViewText = nil
-        self.clarityViewPromptVersion = nil
-        self.clarityViewUpdatedAt = nil
+        self.perspectiveText = nil
+        self.perspectivePromptVersion = nil
+        self.perspectiveUpdatedAt = nil
 
         self.optionsText = nil
         self.optionsPromptVersion = nil
