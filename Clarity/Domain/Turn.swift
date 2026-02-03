@@ -1,3 +1,4 @@
+// Turn.swift
 import Foundation
 
 struct Turn: Identifiable, Codable, Equatable, Sendable {
@@ -20,11 +21,58 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
     // Canonical display + any cloud payload
     var transcriptRedactedActive: String
 
+    // MARK: - Tool outputs (local only)
+
+    // Legacy single-output field (kept for backward compatibility).
+    // Prefer the per-tool fields below.
+    var reflectionText: String = ""
+
+    // Reflect
+    var reflectText: String?
+    var reflectPromptVersion: String?
+    var reflectUpdatedAt: Date?
+
+    // Perspective
+    var perspectiveText: String?
+    var perspectivePromptVersion: String?
+    var perspectiveUpdatedAt: Date?
+
+    // Options
+    var optionsText: String?
+    var optionsPromptVersion: String?
+    var optionsUpdatedAt: Date?
+
+    // Questions
+    var questionsText: String?
+    var questionsPromptVersion: String?
+    var questionsUpdatedAt: Date?
+
+    // Talk it through (multi-turn)
+    /// JSON-encoded array of messages for this turn’s thread (local only).
+    var talkThreadJSON: Data
+    /// Last Responses API response_id (continuation token).
+    var talkLastResponseID: String?
+    var talkPromptVersion: String?
+    var talkUpdatedAt: Date?
+
+    // MARK: - WAL (local only)
+
+    /// JSON-encoded WAL snapshot (local only). Keep this small.
+    var walJSON: Data
+    var walUpdatedAt: Date?
+    var walVersion: Int
+
+    // MARK: - Redaction
+
     var redactionVersion: Int
     var redactionTimestamp: Date?
     var redactionInputHash: String?
 
+    // MARK: - State
+
     var state: TurnState
+
+    // MARK: - Providers / tooling
 
     var transcriptionProvider: TranscriptionProvider
     var transcriptionLocale: String?
@@ -34,8 +82,12 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
     var toolchainVersion: String?
     var capsuleSnapshotHash: String?
 
+    // MARK: - Processing lifecycle
+
     var processingStartedAt: Date?
     var processingFinishedAt: Date?
+
+    // MARK: - Error
 
     var error: TurnError?
 
@@ -52,6 +104,36 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
         audioBytes: Int64? = nil,
         transcriptRaw: String? = nil,
         transcriptRedactedActive: String = "",
+
+        // Tool outputs
+        reflectionText: String = "",
+        reflectText: String? = nil,
+        reflectPromptVersion: String? = nil,
+        reflectUpdatedAt: Date? = nil,
+
+        perspectiveText: String? = nil,
+        perspectivePromptVersion: String? = nil,
+        perspectiveUpdatedAt: Date? = nil,
+
+        optionsText: String? = nil,
+        optionsPromptVersion: String? = nil,
+        optionsUpdatedAt: Date? = nil,
+
+        questionsText: String? = nil,
+        questionsPromptVersion: String? = nil,
+        questionsUpdatedAt: Date? = nil,
+
+        talkThreadJSON: Data = Data("[]".utf8),
+        talkLastResponseID: String? = nil,
+        talkPromptVersion: String? = nil,
+        talkUpdatedAt: Date? = nil,
+
+        // WAL
+        walJSON: Data = Data("{}".utf8),
+        walUpdatedAt: Date? = nil,
+        walVersion: Int = 1,
+
+        // Redaction / state / tooling
         redactionVersion: Int = 1,
         redactionTimestamp: Date? = nil,
         redactionInputHash: String? = nil,
@@ -73,23 +155,59 @@ struct Turn: Identifiable, Codable, Equatable, Sendable {
         self.durationSeconds = durationSeconds
         self.sourceOriginalDate = sourceOriginalDate
         self.captureContext = captureContext
+
         self.title = title
+
         self.audioPath = audioPath
         self.audioBytes = audioBytes
+
         self.transcriptRaw = transcriptRaw
         self.transcriptRedactedActive = transcriptRedactedActive
+
+        self.reflectionText = reflectionText
+
+        self.reflectText = reflectText
+        self.reflectPromptVersion = reflectPromptVersion
+        self.reflectUpdatedAt = reflectUpdatedAt
+
+        self.perspectiveText = perspectiveText
+        self.perspectivePromptVersion = perspectivePromptVersion
+        self.perspectiveUpdatedAt = perspectiveUpdatedAt
+
+        self.optionsText = optionsText
+        self.optionsPromptVersion = optionsPromptVersion
+        self.optionsUpdatedAt = optionsUpdatedAt
+
+        self.questionsText = questionsText
+        self.questionsPromptVersion = questionsPromptVersion
+        self.questionsUpdatedAt = questionsUpdatedAt
+
+        self.talkThreadJSON = talkThreadJSON
+        self.talkLastResponseID = talkLastResponseID
+        self.talkPromptVersion = talkPromptVersion
+        self.talkUpdatedAt = talkUpdatedAt
+
+        self.walJSON = walJSON
+        self.walUpdatedAt = walUpdatedAt
+        self.walVersion = walVersion
+
         self.redactionVersion = redactionVersion
         self.redactionTimestamp = redactionTimestamp
         self.redactionInputHash = redactionInputHash
+
         self.state = state
+
         self.transcriptionProvider = transcriptionProvider
         self.transcriptionLocale = transcriptionLocale
+
         self.reflectProvider = reflectProvider
         self.promptVersion = promptVersion
         self.toolchainVersion = toolchainVersion
         self.capsuleSnapshotHash = capsuleSnapshotHash
+
         self.processingStartedAt = processingStartedAt
         self.processingFinishedAt = processingFinishedAt
+
         self.error = error
     }
 }

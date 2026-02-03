@@ -9,7 +9,7 @@ struct CloudTapOffSheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Cloud Tap is disabled")
                         .font(.headline)
-                    Text("Enable Cloud Tap to run Reflect, Clarity - View, Options, Questions, or Talk it through. You always confirm each send, and only redacted text is shared.")
+                    Text("Enable Cloud Tap to run Reflect, perspective, Options, Questions, or Talk it through. You always confirm each send, and only redacted text is shared.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

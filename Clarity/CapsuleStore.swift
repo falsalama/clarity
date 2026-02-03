@@ -19,6 +19,15 @@ final class CapsuleStore: ObservableObject {
             self.capsule = .empty()
         }
     }
+    
+    @MainActor
+    func setPseudonym(_ value: String) {
+        let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        capsule.preferences.pseudonym = v.isEmpty ? nil : v
+        capsule.updatedAt = Date()
+        persist()
+    }
+
 
     // MARK: - Public API (typed)
 

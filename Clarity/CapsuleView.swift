@@ -8,18 +8,31 @@ struct CapsuleView: View {
 
     @State private var newPrefKey: String = ""
     @State private var newPrefValue: String = ""
+    @State private var pseudonymDraft: String = ""
 
-    private enum Field: Hashable { case label, value }
+    private enum Field: Hashable { case label, value, pseudonym }
     @FocusState private var focusedField: Field?
+
+    // Treat any focused field as “editing” to lift the footer above the keyboard accessory.
+    private var isEditing: Bool { focusedField != nil }
 
     var body: some View {
         List {
             Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Set optional preferences to influence responses.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
+                // Intentionally empty (kept for spacing if you want later copy)
+                EmptyView()
+            }
+
+            Section("Pseudonym") {
+                TextField("Optional Pseudonym", text: $pseudonymDraft)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled(true)
+                    .textContentType(.nickname)
+                    .submitLabel(.done)
+                    .focused($focusedField, equals: .pseudonym)
+                    .onChange(of: pseudonymDraft) { _, newValue in
+                        store.setPseudonym(newValue)
+                    }
             }
 
             preferencesSection
@@ -48,7 +61,7 @@ struct CapsuleView: View {
         }
         .navigationTitle("Capsule")
 #if os(iOS)
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
 #endif
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -59,6 +72,20 @@ struct CapsuleView: View {
                 }
             }
         }
+        // Add bottom inset only while editing so the footer isn't covered by the keyboard accessory.
+        .safeAreaInset(edge: .bottom) {
+            if isEditing {
+                Color.clear
+                    .frame(height: 56) // adjust if your accessory bar is taller/shorter
+                    .allowsHitTesting(false)
+            }
+        }
+        // Initialise drafts once per appearance without clobbering active edits.
+        .onAppear {
+            if pseudonymDraft.isEmpty {
+                pseudonymDraft = store.capsule.preferences.pseudonym ?? ""
+            }
+        }
     }
 
     // MARK: - Preferences
@@ -66,6 +93,7 @@ struct CapsuleView: View {
     private var preferencesSection: some View {
         Section("Preferences") {
             let pairs = store.preferenceKeyValues
+
             if pairs.isEmpty {
                 Text("None yet.")
                     .foregroundStyle(.secondary)
@@ -89,7 +117,6 @@ struct CapsuleView: View {
                 }
             }
 
-            // Add row
             VStack(alignment: .leading, spacing: 10) {
                 LabeledContent("Label") {
                     TextField("e.g. style, tone, region", text: $newPrefKey)
@@ -117,7 +144,9 @@ struct CapsuleView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
+
                     Spacer()
+
                     Button {
                         addPreference()
                     } label: {
@@ -180,8 +209,12 @@ struct CapsuleView: View {
 
     private func hideKeyboard() {
 #if os(iOS)
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
-                                        to: nil, from: nil, for: nil)
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
 #endif
     }
 }
@@ -192,4 +225,3 @@ struct CapsuleView: View {
             .environmentObject(CapsuleStore())
     }
 }
-

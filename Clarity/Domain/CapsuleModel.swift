@@ -6,6 +6,7 @@ struct CapsulePreferences: Codable, Sendable, Equatable {
     var optionsBeforeQuestions: Bool?
     var noTherapyFraming: Bool?
     var noPersona: Bool?
+    var pseudonym: String? = nil
 
     // Open-ended extras (bounded, safe)
     var extras: [String: String] = [:]

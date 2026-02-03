@@ -1,32 +1,63 @@
+// Tab_CaptureView.swift
+
 import SwiftUI
+import SwiftData
 #if os(iOS)
 import UIKit
 #endif
 
 struct Tab_CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
+    @Environment(\.modelContext) private var modelContext
 
     @State private var showPermissionAlert: Bool = false
     @State private var permissionAlertTitleKey: String = "perm.title.generic"
     @State private var permissionAlertMessageKey: String = ""
 
+    // Robust navigation path
     @State private var path: [UUID] = []
+
+    // Sheet toggle for typing text
     @State private var showPasteSheet: Bool = false
 
+    // MARK: - Turn count query (completed turns: has redacted text)
+    @Query private var completedTurns: [TurnEntity]
+
+    init() {
+        _completedTurns = Query(
+            filter: #Predicate<TurnEntity> { turn in
+                !turn.transcriptRedactedActive.isEmpty
+            },
+            sort: [SortDescriptor(\TurnEntity.recordedAt, order: .reverse)]
+        )
+    }
+
     private enum Layout {
-        static let vStackSpacing: CGFloat = 18
-        static let headerSpacing: CGFloat = 6
-        static let headerTopPadding: CGFloat = 6
+        static let vStackSpacing: CGFloat = 16          // was 18
+        static let headerSpacing: CGFloat = 4           // was 6
+        static let headerTopPadding: CGFloat = 4        // was 6
+
         static let micCoverSize: CGFloat = 120
-        static let micDownSpacerMin: CGFloat = 18
-        static let belowStatusSpacerMin: CGFloat = 8
+        static let micDownSpacerMin: CGFloat = 12       // was 18
+        static let belowStatusSpacerMin: CGFloat = 6    // was 8
+
         static let typeButtonVerticalPadding: CGFloat = 12
         static let errorTopPadding: CGFloat = 6
+
         static let statusDotSize: CGFloat = 6
         static let statusPillSpacing: CGFloat = 8
         static let statusPillHPadding: CGFloat = 12
         static let statusPillVPadding: CGFloat = 8
         static let statusAnimDuration: Double = 0.15
+
+        static let chipsTopPadding: CGFloat = 4         // was 8
+        static let chipsSpacing: CGFloat = 8            // was 10
+        static let chipHPadding: CGFloat = 12           // was 14
+        static let chipVPadding: CGFloat = 8            // was 10
+
+        // Badge placement
+        static let badgeTopPadding: CGFloat = 10
+        static let badgeTrailingPadding: CGFloat = 14
     }
 
     var body: some View {
@@ -36,6 +67,8 @@ struct Tab_CaptureView: View {
 
                 VStack(spacing: Layout.vStackSpacing) {
                     header
+
+                    promptChips
 
                     Spacer(minLength: Layout.micDownSpacerMin)
 
@@ -94,6 +127,13 @@ struct Tab_CaptureView: View {
                 }
                 .padding()
             }
+            // Overlay badge so it doesn't affect layout
+            .overlay(alignment: .topTrailing) {
+                turnCountBadge(count: completedTurns.count)
+                    .padding(.top, Layout.badgeTopPadding)
+                    .padding(.trailing, Layout.badgeTrailingPadding)
+                    .accessibilityLabel(Text("Completed turns: \(completedTurns.count)"))
+            }
             .navigationDestination(for: UUID.self) { id in
                 TurnDetailView(turnID: id)
             }
@@ -140,16 +180,52 @@ struct Tab_CaptureView: View {
         }
     }
 
+    // MARK: - Header (kept centred)
+
     private var header: some View {
         VStack(spacing: Layout.headerSpacing) {
             Text(String(localized: "app.title"))
                 .font(.title2.weight(.semibold))
-            Text(String(localized: "capture.tagline"))
+                .multilineTextAlignment(.center)
+
+            Text("Tap to speak or type a problem you want clarity on.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
+        .frame(maxWidth: .infinity)
         .padding(.top, Layout.headerTopPadding)
     }
+
+    // MARK: - Prompt chips
+
+    private var promptChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Layout.chipsSpacing) {
+                chip("I can’t tell if…")
+                chip("I’m stuck choosing…")
+                chip("I feel tension with…")
+            }
+            .padding(.top, Layout.chipsTopPadding)
+        }
+    }
+
+    private func chip(_ text: String) -> some View {
+        Text(text)
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .padding(.horizontal, Layout.chipHPadding)
+            .padding(.vertical, Layout.chipVPadding)
+            .background(.thinMaterial)
+            .clipShape(Capsule())
+            .onTapGesture {
+                showPasteSheet = true
+            }
+            .accessibilityLabel(Text(text))
+    }
+
+    // MARK: - Status pill
 
     private var statusPill: some View {
         HStack(spacing: Layout.statusPillSpacing) {
@@ -206,6 +282,23 @@ struct Tab_CaptureView: View {
         }
     }
 
+    // MARK: - Top-right badge (overlay; no layout impact)
+
+    private func turnCountBadge(count: Int) -> some View {
+        let shown = min(max(count, 0), 999)
+
+        // Warmer yellow-gold (less green)
+        let goldFill = Color(red: 0.96, green: 0.82, blue: 0.26)
+
+        return Text("\(shown)")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.black)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(goldFill.opacity(0.90))
+            .clipShape(Capsule())
+    }
+
     private func openAppSettings() {
 #if os(iOS)
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
@@ -218,3 +311,4 @@ struct Tab_CaptureView: View {
     Tab_CaptureView()
         .environmentObject(TurnCaptureCoordinator())
 }
+

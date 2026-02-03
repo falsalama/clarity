@@ -15,6 +15,34 @@ extension TurnEntity {
             audioBytes: audioBytes,
             transcriptRaw: transcriptRaw,
             transcriptRedactedActive: transcriptRedactedActive,
+
+            reflectionText: reflectionText,
+
+            reflectText: reflectText,
+            reflectPromptVersion: reflectPromptVersion,
+            reflectUpdatedAt: reflectUpdatedAt,
+
+            perspectiveText: perspectiveText,
+            perspectivePromptVersion: perspectivePromptVersion,
+            perspectiveUpdatedAt: perspectiveUpdatedAt,
+
+            optionsText: optionsText,
+            optionsPromptVersion: optionsPromptVersion,
+            optionsUpdatedAt: optionsUpdatedAt,
+
+            questionsText: questionsText,
+            questionsPromptVersion: questionsPromptVersion,
+            questionsUpdatedAt: questionsUpdatedAt,
+
+            talkThreadJSON: talkThreadJSON,
+            talkLastResponseID: talkLastResponseID,
+            talkPromptVersion: talkPromptVersion,
+            talkUpdatedAt: talkUpdatedAt,
+
+            walJSON: walJSON,
+            walUpdatedAt: walUpdatedAt,
+            walVersion: walVersion,
+
             redactionVersion: redactionVersion,
             redactionTimestamp: redactionTimestamp,
             redactionInputHash: redactionInputHash,
@@ -48,6 +76,34 @@ extension TurnEntity {
         audioBytes = t.audioBytes ?? 0
         transcriptRaw = t.transcriptRaw
         transcriptRedactedActive = t.transcriptRedactedActive
+
+        reflectionText = t.reflectionText
+
+        reflectText = t.reflectText
+        reflectPromptVersion = t.reflectPromptVersion
+        reflectUpdatedAt = t.reflectUpdatedAt
+
+        perspectiveText = t.perspectiveText
+        perspectivePromptVersion = t.perspectivePromptVersion
+        perspectiveUpdatedAt = t.perspectiveUpdatedAt
+
+        optionsText = t.optionsText
+        optionsPromptVersion = t.optionsPromptVersion
+        optionsUpdatedAt = t.optionsUpdatedAt
+
+        questionsText = t.questionsText
+        questionsPromptVersion = t.questionsPromptVersion
+        questionsUpdatedAt = t.questionsUpdatedAt
+
+        talkThreadJSON = t.talkThreadJSON
+        talkLastResponseID = t.talkLastResponseID
+        talkPromptVersion = t.talkPromptVersion
+        talkUpdatedAt = t.talkUpdatedAt
+
+        walJSON = t.walJSON
+        walUpdatedAt = t.walUpdatedAt
+        walVersion = t.walVersion
+
         redactionVersion = t.redactionVersion
         redactionTimestamp = t.redactionTimestamp
         redactionInputHash = t.redactionInputHash

@@ -703,7 +703,7 @@ struct TurnDetailView: View {
         case .reflect:
             return (t.reflectText?.isEmpty == false) ? "Re-run Reflect" : "Reflect"
         case .perspective:
-            return (t.perspectiveText?.isEmpty == false) ? "Re-run Clarity - View" : "Clarity - View"
+            return (t.perspectiveText?.isEmpty == false) ? "Re-run perspective" : "Perspective"
         case .options:
             return (t.optionsText?.isEmpty == false) ? "Re-run Options" : "Options"
         case .questions:
