@@ -9,6 +9,9 @@ struct CapsuleView: View {
     @State private var newPrefKey: String = ""
     @State private var newPrefValue: String = ""
 
+    private enum Field: Hashable { case label, value }
+    @FocusState private var focusedField: Field?
+
     var body: some View {
         List {
             Section {
@@ -33,6 +36,7 @@ struct CapsuleView: View {
 
             Section {
                 Button(role: .destructive) {
+                    focusedField = nil
                     hideKeyboard()
                     store.wipe()
                 } label: {
@@ -46,6 +50,15 @@ struct CapsuleView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    focusedField = nil
+                    hideKeyboard()
+                }
+            }
+        }
     }
 
     // MARK: - Preferences
@@ -84,16 +97,18 @@ struct CapsuleView: View {
                         .autocorrectionDisabled(true)
                         .textContentType(.none)
                         .keyboardType(.asciiCapable)
-                        .submitLabel(.done)               // <- blue tick
-                        .onSubmit { hideKeyboard() }      // <- dismiss
+                        .submitLabel(.next)
+                        .focused($focusedField, equals: .label)
+                        .onSubmit { focusedField = .value }
                 }
 
                 LabeledContent("Value") {
                     TextField("e.g. direct, concise, UK, EU", text: $newPrefValue)
                         .textInputAutocapitalization(.sentences)
                         .autocorrectionDisabled(false)
-                        .submitLabel(.done)               // <- blue tick
-                        .onSubmit { addPreference() }     // <- add + dismiss
+                        .submitLabel(.done)
+                        .focused($focusedField, equals: .value)
+                        .onSubmit { addPreference() }
                 }
 
                 HStack {
@@ -147,6 +162,7 @@ struct CapsuleView: View {
         store.setPreference(key: k, value: v)
         newPrefKey = ""
         newPrefValue = ""
+        focusedField = nil
         hideKeyboard()
     }
 
