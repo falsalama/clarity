@@ -58,6 +58,12 @@ final class TurnCaptureCoordinator: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
 
+    // Ignore late/duplicate simulator errors
+    private var lastCompletionAt: Date?
+
+    // NEW: hold URL until we know recording really started
+    private var pendingCaptureURL: URL?
+
     init() {}
 
     func bind(modelContext: ModelContext, dictionary: RedactionDictionary) {
@@ -120,8 +126,9 @@ final class TurnCaptureCoordinator: ObservableObject {
         activeTurnID = nil
         lastHandledFilePath = nil
         isHandlingFileURL = false
+        lastCompletionAt = nil
+        pendingCaptureURL = nil
 
-        // Keep transcript visible until session actually starts.
         if transcriber.isTranscribing { transcriber.cancel() }
 
         phase = .recording
@@ -145,12 +152,16 @@ final class TurnCaptureCoordinator: ObservableObject {
         phase = .finalising
         recorder.stop()
 
-        // Let recorder.$isRecording drive the phase to .transcribing (avoids skipping states)
         if transcriber.isTranscribing {
             phase = .transcribing
             transcriber.stop()
         } else {
             phase = .idle
+        }
+
+        // If we never created a turn (recording never truly started), clear pending URL.
+        if activeTurnID == nil {
+            pendingCaptureURL = nil
         }
     }
 
@@ -238,35 +249,46 @@ final class TurnCaptureCoordinator: ObservableObject {
     }
 
     private func handleRecorderFileURL(_ url: URL) {
-        guard activeTurnID == nil else { return }
+        // Do NOT create a Turn yet. Just hold onto the URL.
         guard !isHandlingFileURL else { return }
 
         let path = url.path
         guard lastHandledFilePath != path else { return }
         lastHandledFilePath = path
 
-        guard let repo else { return }
+        pendingCaptureURL = url
+    }
 
-        isHandlingFileURL = true
-        defer { isHandlingFileURL = false }
+    private func handleRecorderRecordingChanged(_ isRecording: Bool) {
+        if isRecording {
+            // Now we know the engine actually started.
+            if phase != .recording { phase = .recording }
+            createTurnIfNeededNowThatRecordingIsLive()
+            return
+        }
+
+        // Recording stopped. Move to transcribing (unless already finished)
+        if phase == .finalising || phase == .recording {
+            phase = .transcribing
+        }
+    }
+
+    private func createTurnIfNeededNowThatRecordingIsLive() {
+        guard activeTurnID == nil else { return }
+        guard let repo else { return }
+        guard let url = pendingCaptureURL else { return }
+
+        let path = url.path
+        guard FileManager.default.fileExists(atPath: path) else {
+            // If the file still doesn't exist, don't create a Turn yet.
+            return
+        }
 
         do {
             activeTurnID = try repo.createCaptureTurn(audioPath: path)
         } catch {
             setError(.couldntStartCapture, debug: "createCaptureTurn failed: \(error.localizedDescription)")
             activeTurnID = nil
-        }
-    }
-
-    private func handleRecorderRecordingChanged(_ isRecording: Bool) {
-        if isRecording {
-            if phase != .recording { phase = .recording }
-            return
-        }
-
-        // If recording stops, we should now be transcribing (unless we already finished)
-        if phase == .finalising || phase == .recording {
-            phase = .transcribing
         }
     }
 
@@ -294,6 +316,8 @@ final class TurnCaptureCoordinator: ObservableObject {
             )
 
             lastCompletedTurnID = id
+            lastCompletionAt = Date()
+
             clearErrors()
 
             transcriber.resetUI()
@@ -307,6 +331,13 @@ final class TurnCaptureCoordinator: ObservableObject {
     }
 
     private func handleTranscriptionError(_ message: String) {
+        if message == "No transcript captured.",
+           let t = lastCompletionAt,
+           Date().timeIntervalSince(t) < 3.0 {
+            phase = .idle
+            return
+        }
+
         lastError = message
 
         let m = message.lowercased()
@@ -322,12 +353,6 @@ final class TurnCaptureCoordinator: ObservableObject {
 
         if let id = activeTurnID, let repo {
             try? repo.markFailed(id: id, debug: message)
-
-            if message == "No transcript captured." {
-                if recorder.lastDurationSeconds >= 0.5 {
-                    lastCompletedTurnID = id
-                }
-            }
         }
 
         phase = .idle

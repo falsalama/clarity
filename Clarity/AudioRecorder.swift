@@ -204,18 +204,29 @@ final class AudioRecorder: ObservableObject {
     }
 
     private static func normalisedLevel(from buffer: AVAudioPCMBuffer) -> Double {
-        guard let channelData = buffer.floatChannelData?[0] else { return 0 }
         let n = Int(buffer.frameLength)
-        if n == 0 { return 0 }
+        guard n > 0 else { return 0 }
 
-        var sum: Float = 0
-        for i in 0..<n {
-            let x = channelData[i]
-            sum += x * x
+        if let f = buffer.floatChannelData?[0] {
+            var sum: Float = 0
+            for i in 0..<n { sum += f[i] * f[i] }
+            let rms = sqrt(sum / Float(n))
+            return min(1.0, max(0.0, Double(rms) * 8.0))
         }
-        let rms = sqrt(sum / Float(n))
-        return min(1.0, max(0.0, Double(rms) * 8.0))
+
+        if let i16 = buffer.int16ChannelData?[0] {
+            var sum: Double = 0
+            for i in 0..<n {
+                let x = Double(i16[i]) / 32768.0
+                sum += x * x
+            }
+            let rms = sqrt(sum / Double(n))
+            return min(1.0, max(0.0, rms * 8.0))
+        }
+
+        return 0
     }
+
 
     private func makeNewRecordingURL(extension ext: String) throws -> URL {
         let fm = FileManager.default

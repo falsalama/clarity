@@ -33,65 +33,77 @@ struct TurnDetailView: View {
 
     private var turn: TurnEntity? { matches.first }
 
+    // MARK: - Audio
+
     private var audioURL: URL? {
         guard let path = turn?.audioPath, !path.isEmpty else { return nil }
+        guard FileManager.default.fileExists(atPath: path) else { return nil }
         return URL(fileURLWithPath: path)
     }
 
-    // Talk composer visibility gate: becomes true after first assistant reply or a continuation id exists
+    private var isAudioMissing: Bool {
+        guard let path = turn?.audioPath, !path.isEmpty else { return false }
+        return FileManager.default.fileExists(atPath: path) == false
+    }
+
+    // MARK: - Talk gating
+
     private var isTalkActive: Bool {
         guard let t = turn else { return false }
         if let id = t.talkLastResponseID, !id.isEmpty { return true }
-        let thread = loadTalkThread(from: t)
-        return thread.contains(where: { $0.role == .assistant })
+        return loadTalkThread(from: t).contains { $0.role == .assistant }
     }
 
-    // Strict “show talk section” gate: only after an assistant message exists
     private var hasTalkContent: Bool {
         guard let t = turn else { return false }
-        let thread = loadTalkThread(from: t)
-        return thread.contains(where: { $0.role == .assistant })
+        return loadTalkThread(from: t).contains { $0.role == .assistant }
     }
+
+    // MARK: - WAL badge (ONLY signal)
+
+    private var hasWAL: Bool {
+        guard let t = turn else { return false }
+
+        // Robust “is it non-empty” check without decoding.
+        // Default is "{}" in your model.
+        let s = String(data: t.walJSON, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        return !s.isEmpty && s != "{}" && s != "null"
+    }
+
+    // MARK: - Derived
+
+    private var hasAnyOutputs: Bool {
+        hasContent(turn?.reflectText)
+        || hasContent(turn?.perspectiveText)
+        || hasContent(turn?.optionsText)
+        || hasContent(turn?.questionsText)
+    }
+
+    private var isToolsEnabled: Bool {
+        let isReady = (turn?.stateRaw == "ready")
+        let hasText = !transcriptForCloudPayload(from: turn).isEmpty
+        return isReady && hasText
+    }
+
+    // MARK: - View
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                header
-                Divider()
-                playbackSection
-                Divider()
-                transcriptSection
-
-                // Outputs section only when there’s content
-                if hasAnyOutputs {
-                    Divider()
-                    outputsSection
-                }
-
-                // Talk-it-through section only after an assistant response exists
-                if hasTalkContent {
-                    Divider()
-                    talkSection
-                }
-
-                Divider()
-                actionsSection
-            }
-            .padding()
+            content
+                .padding()
         }
         .navigationTitle("Capture")
-#if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
-#endif
         .onAppear {
             if let url = audioURL { player.load(url: url) }
         }
         .onChange(of: turn?.audioPath) { _, _ in
             if let url = audioURL { player.load(url: url) }
+            else { player.stop() }
         }
-        .onDisappear {
-            player.stop()
-        }
+        .onDisappear { player.stop() }
         .sheet(item: $sheetRoute) { route in
             switch route {
             case .cloudTapOff:
@@ -100,7 +112,7 @@ struct TurnDetailView: View {
                 MissingCaptureSheet()
             }
         }
-        .alert(cloudConfirmTitle, isPresented: $showCloudConfirm) {
+        .alert("Send to Cloud Tap?", isPresented: $showCloudConfirm) {
             Button("Cancel", role: .cancel) {}
 
             Button(isSendingCloud ? "Sending…" : "Send") {
@@ -108,7 +120,7 @@ struct TurnDetailView: View {
             }
             .disabled(isSendingCloud || transcriptForCloudPayload(from: turn).isEmpty)
         } message: {
-            Text(cloudConfirmMessage)
+            Text("Send redacted text to generate \(pendingTool.rawValue). Audio and raw transcript stay on this device.")
         }
         .alert("Couldn't Send", isPresented: Binding(
             get: { cloudSendError != nil },
@@ -120,30 +132,12 @@ struct TurnDetailView: View {
         }
         .overlay {
             if isSendingCloud || isSendingChat {
-                ZStack {
-                    Rectangle()
-                        .fill(.black.opacity(0.08))
-                        .ignoresSafeArea()
-
-                    VStack(spacing: 12) {
-                        ProgressView()
-                        Text(isSendingChat ? "Sending message…" : "Sending…")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(16)
-                    .background(.thinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .transition(.opacity)
+                sendingOverlay
             }
         }
-        .animation(.easeOut(duration: 0.15), value: isSendingCloud)
-        .animation(.easeOut(duration: 0.15), value: isSendingChat)
         .allowsHitTesting(!(isSendingCloud || isSendingChat))
         .onChange(of: isTalkActive) { _, becameActive in
             if becameActive {
-                // Auto-focus the composer when it first becomes visible
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     isChatFocused = true
                 }
@@ -151,134 +145,44 @@ struct TurnDetailView: View {
         }
     }
 
-    private var cloudConfirmTitle: String { "Send to Cloud Tap?" }
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            Divider()
+            playbackSection
+            Divider()
+            transcriptSection
 
-    private var cloudConfirmMessage: String {
-        "Send redacted text to generate \(pendingTool.rawValue). Audio and raw transcript stay on this device."
-    }
-
-    private func sendCloudTapRequest() async {
-        guard !isSendingCloud else { return }
-        guard let t = turn else {
-            cloudSendError = "Capture unavailable."
-            return
-        }
-
-        let redactedText = transcriptForCloudPayload(from: t)
-        guard !redactedText.isEmpty else { return }
-
-        isSendingCloud = true
-        defer { isSendingCloud = false }
-
-        do {
-            let service = CloudTapService(
-                baseURL: CloudTapConfig.baseURL,
-                anonKey: CloudTapConfig.supabaseAnonKey
-            )
-
-            let appVersion =
-                Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-                ?? "0"
-
-            let snapshot = capsuleSnapshotOrNil()
-
-            switch pendingTool {
-            case .reflect, .options, .questions, .perspective:
-                let req = CloudTapReflectRequest(
-                    text: redactedText,
-                    recordedAt: t.recordedAt.ISO8601Format(),
-                    client: "ios",
-                    appVersion: appVersion,
-                    capsule: snapshot
-                )
-
-                let resp: CloudTapReflectResponse
-                switch pendingTool {
-                case .reflect:
-                    resp = try await service.reflect(req)
-                    t.reflectText = resp.text
-                    t.reflectPromptVersion = resp.prompt_version
-                    t.reflectUpdatedAt = Date()
-                case .options:
-                    resp = try await service.options(req)
-                    t.optionsText = resp.text
-                    t.optionsPromptVersion = resp.prompt_version
-                    t.optionsUpdatedAt = Date()
-                case .questions:
-                    resp = try await service.questions(req)
-                    t.questionsText = resp.text
-                    t.questionsPromptVersion = resp.prompt_version
-                    t.questionsUpdatedAt = Date()
-                case .perspective:
-                    resp = try await service.perspective(req)
-                    t.perspectiveText = resp.text
-                    t.perspectivePromptVersion = resp.prompt_version
-                    t.perspectiveUpdatedAt = Date()
-                default:
-                    fatalError("Unexpected tool branch")
-                }
-
-                // Legacy mirror
-                t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.perspectiveText) ?? ""
-
-            case .talkItThrough:
-                // This path is now handled by the chat composer; keep here as a fallback single-shot send.
-                let talkReq = CloudTapTalkRequest(
-                    text: redactedText,
-                    recordedAt: t.recordedAt.ISO8601Format(),
-                    client: "ios",
-                    appVersion: appVersion,
-                    previous_response_id: t.talkLastResponseID,
-                    capsule: snapshot
-                )
-
-                let talkResp: CloudTapTalkResponse = try await service.talkItThrough(talkReq)
-
-                var thread = loadTalkThread(from: t)
-                thread.append(TalkMessage(role: .user, text: redactedText))
-                thread.append(TalkMessage(role: .assistant, text: talkResp.text))
-                saveTalkThread(thread, into: t)
-
-                t.talkLastResponseID = talkResp.response_id
-                t.talkPromptVersion = talkResp.prompt_version
-                t.talkUpdatedAt = Date()
-
-                t.reflectionText = talkResp.text
+            if hasAnyOutputs {
+                Divider()
+                outputsSection
             }
 
-            try modelContext.save()
-        } catch {
-            cloudSendError = String(describing: error)
+            if hasTalkContent {
+                Divider()
+                talkSection
+            }
+
+            Divider()
+            actionsSection
         }
     }
 
-    private func capsuleSnapshotOrNil() -> CloudTapCapsuleSnapshot? {
-        let c = capsuleStore.capsule
-        let p = c.preferences
+    private var sendingOverlay: some View {
+        ZStack {
+            Rectangle()
+                .fill(.black.opacity(0.08))
+                .ignoresSafeArea()
 
-        let hasTyped =
-            (p.outputStyle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-            || (p.optionsBeforeQuestions != nil)
-            || (p.noTherapyFraming != nil)
-            || (p.noPersona != nil)
-
-        let hasExtras = !p.extras.isEmpty
-
-        guard hasTyped || hasExtras else { return nil }
-        return CloudTapCapsuleSnapshot.fromCapsule(c)
-    }
-
-    // MARK: - Talk thread helpers
-
-    private func loadTalkThread(from t: TurnEntity) -> [TalkMessage] {
-        let data = t.talkThreadJSON
-        guard !data.isEmpty else { return [] }
-        return (try? JSONDecoder().decode([TalkMessage].self, from: data)) ?? []
-    }
-
-    private func saveTalkThread(_ messages: [TalkMessage], into t: TurnEntity) {
-        if let data = try? JSONEncoder().encode(messages) {
-            t.talkThreadJSON = data
+            VStack(spacing: 12) {
+                ProgressView()
+                Text(isSendingChat ? "Sending message…" : "Sending…")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(16)
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
     }
 
@@ -304,10 +208,15 @@ struct TurnDetailView: View {
                     LaneBadge(text: "Cloud Tap armed")
                 }
 
+                if hasWAL {
+                    LaneBadge(text: "Learnt cues")
+                }
+
                 Spacer()
             }
 
-            if let t = turn, t.stateRaw == "failed", let msg = t.errorDebugMessage, !msg.isEmpty {
+            if let t = turn, t.stateRaw == "failed",
+               let msg = t.errorDebugMessage, !msg.isEmpty {
                 Text(msg)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -425,6 +334,9 @@ struct TurnDetailView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+            } else if isAudioMissing {
+                Text("Audio missing for this capture.")
+                    .foregroundStyle(.secondary)
             } else {
                 Text("No audio file found.")
                     .foregroundStyle(.secondary)
@@ -505,7 +417,32 @@ struct TurnDetailView: View {
         }
     }
 
-    // MARK: - Talk thread UI
+    @ViewBuilder
+    private func outputBlock(title: String, text: String?, prompt: String?) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                if let p = prompt, !p.isEmpty {
+                    Text(p)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let t = text, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(t)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+        }
+        .padding(12)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    // MARK: - Talk
 
     private var talkSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -513,16 +450,14 @@ struct TurnDetailView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            // Thread list
             if let t = turn {
                 let thread = loadTalkThread(from: t)
                 if !thread.isEmpty {
                     VStack(spacing: 8) {
                         ForEach(thread) { msg in
                             HStack {
-                                if msg.role == .assistant {
-                                    Spacer(minLength: 20)
-                                }
+                                if msg.role == .assistant { Spacer(minLength: 20) }
+
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(msg.role == .user ? "You" : "Clarity")
                                         .font(.caption)
@@ -533,16 +468,14 @@ struct TurnDetailView: View {
                                 .padding(10)
                                 .background(msg.role == .user ? Color.blue.opacity(0.08) : Color.gray.opacity(0.08))
                                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                if msg.role == .user {
-                                    Spacer(minLength: 20)
-                                }
+
+                                if msg.role == .user { Spacer(minLength: 20) }
                             }
                         }
                     }
                 }
             }
 
-            // Composer (only after first assistant response / active thread)
             if isTalkActive {
                 HStack(spacing: 8) {
                     TextField("Type a message…", text: $chatInput, axis: .vertical)
@@ -574,9 +507,9 @@ struct TurnDetailView: View {
         guard !isSendingChat else { return }
         guard let t = turn else { return }
 
-        // Redact user-entered text before sending
         let input = chatInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !input.isEmpty else { return }
+
         let redacted = Redactor(tokens: dictionary.tokens).redact(input).redactedText
         guard !redacted.isEmpty else { return }
 
@@ -594,7 +527,7 @@ struct TurnDetailView: View {
 
         let snapshot = capsuleSnapshotOrNil()
 
-        // Optimistically append the user message locally
+        // Optimistically append user message locally
         var thread = loadTalkThread(from: t)
         let optimisticUser = TalkMessage(role: .user, text: redacted)
         thread.append(optimisticUser)
@@ -613,7 +546,6 @@ struct TurnDetailView: View {
 
             let resp: CloudTapTalkResponse = try await service.talkItThrough(req)
 
-            // Append assistant response and update continuation
             thread.append(TalkMessage(role: .assistant, text: resp.text))
             saveTalkThread(thread, into: t)
 
@@ -621,12 +553,12 @@ struct TurnDetailView: View {
             t.talkPromptVersion = resp.prompt_version
             t.talkUpdatedAt = Date()
 
-            // Optional mirror for quick visibility
+            // Optional mirror
             t.reflectionText = resp.text
 
             try modelContext.save()
         } catch {
-            // Roll back optimistic user append on failure
+            // Roll back optimistic append
             var rolled = loadTalkThread(from: t)
             if let idx = rolled.lastIndex(where: { $0.id == optimisticUser.id }) {
                 rolled.remove(at: idx)
@@ -636,60 +568,19 @@ struct TurnDetailView: View {
         }
     }
 
-    private func hasContent(_ s: String?) -> Bool {
-        guard let s else { return false }
-        return !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
-
-    private var hasAnyOutputs: Bool {
-        hasContent(turn?.reflectText)
-        || hasContent(turn?.perspectiveText)
-        || hasContent(turn?.optionsText)
-        || hasContent(turn?.questionsText)
-    }
-
-    @ViewBuilder
-    private func outputBlock(title: String, text: String?, prompt: String?) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                if let p = prompt, !p.isEmpty {
-                    Text(p)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let t = text, !t.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text(t)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .textSelection(.enabled)
-            }
-        }
-        .padding(12)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
     // MARK: - Tools
 
     private var actionsSection: some View {
-        let isReady = (turn?.stateRaw == "ready")
-        let hasText = !transcriptForCloudPayload(from: turn).isEmpty
-        let enabled = isReady && hasText
-
-        return VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Tools")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            toolButton(title: toolTitle(.reflect), tool: .reflect, enabled: enabled)
-            toolButton(title: toolTitle(.perspective), tool: .perspective, enabled: enabled)
-            toolButton(title: toolTitle(.options), tool: .options, enabled: enabled)
-            toolButton(title: toolTitle(.questions), tool: .questions, enabled: enabled)
-            toolButton(title: "Talk it through", tool: .talkItThrough, enabled: enabled)
+            toolButton(title: toolTitle(.reflect), tool: .reflect, enabled: isToolsEnabled)
+            toolButton(title: toolTitle(.perspective), tool: .perspective, enabled: isToolsEnabled)
+            toolButton(title: toolTitle(.options), tool: .options, enabled: isToolsEnabled)
+            toolButton(title: toolTitle(.questions), tool: .questions, enabled: isToolsEnabled)
+            toolButton(title: "Talk it through", tool: .talkItThrough, enabled: isToolsEnabled)
 
             Text("Cloud actions are explicit and always require confirmation.")
                 .font(.footnote)
@@ -735,6 +626,131 @@ struct TurnDetailView: View {
         showCloudConfirm = true
     }
 
+    private func sendCloudTapRequest() async {
+        guard !isSendingCloud else { return }
+        guard let t = turn else {
+            cloudSendError = "Capture unavailable."
+            return
+        }
+
+        let redactedText = transcriptForCloudPayload(from: t)
+        guard !redactedText.isEmpty else { return }
+
+        isSendingCloud = true
+        defer { isSendingCloud = false }
+
+        do {
+            let service = CloudTapService(
+                baseURL: CloudTapConfig.baseURL,
+                anonKey: CloudTapConfig.supabaseAnonKey
+            )
+
+            let appVersion =
+                Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+                ?? "0"
+
+            let snapshot = capsuleSnapshotOrNil()
+
+            switch pendingTool {
+            case .reflect, .options, .questions, .perspective:
+                let req = CloudTapReflectRequest(
+                    text: redactedText,
+                    recordedAt: t.recordedAt.ISO8601Format(),
+                    client: "ios",
+                    appVersion: appVersion,
+                    capsule: snapshot
+                )
+
+                let resp: CloudTapReflectResponse
+                switch pendingTool {
+                case .reflect:
+                    resp = try await service.reflect(req)
+                    t.reflectText = resp.text
+                    t.reflectPromptVersion = resp.prompt_version
+                    t.reflectUpdatedAt = Date()
+                case .options:
+                    resp = try await service.options(req)
+                    t.optionsText = resp.text
+                    t.optionsPromptVersion = resp.prompt_version
+                    t.optionsUpdatedAt = Date()
+                case .questions:
+                    resp = try await service.questions(req)
+                    t.questionsText = resp.text
+                    t.questionsPromptVersion = resp.prompt_version
+                    t.questionsUpdatedAt = Date()
+                case .perspective:
+                    resp = try await service.perspective(req)
+                    t.perspectiveText = resp.text
+                    t.perspectivePromptVersion = resp.prompt_version
+                    t.perspectiveUpdatedAt = Date()
+                default:
+                    fatalError("Unexpected tool branch")
+                }
+
+                // Legacy mirror
+                t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.perspectiveText) ?? ""
+
+            case .talkItThrough:
+                // Leave this button as a single-shot fallback; the real path is the composer.
+                let talkReq = CloudTapTalkRequest(
+                    text: redactedText,
+                    recordedAt: t.recordedAt.ISO8601Format(),
+                    client: "ios",
+                    appVersion: appVersion,
+                    previous_response_id: t.talkLastResponseID,
+                    capsule: snapshot
+                )
+
+                let talkResp: CloudTapTalkResponse = try await service.talkItThrough(talkReq)
+
+                var thread = loadTalkThread(from: t)
+                thread.append(TalkMessage(role: .user, text: redactedText))
+                thread.append(TalkMessage(role: .assistant, text: talkResp.text))
+                saveTalkThread(thread, into: t)
+
+                t.talkLastResponseID = talkResp.response_id
+                t.talkPromptVersion = talkResp.prompt_version
+                t.talkUpdatedAt = Date()
+
+                t.reflectionText = talkResp.text
+            }
+
+            try modelContext.save()
+        } catch {
+            cloudSendError = String(describing: error)
+        }
+    }
+
+    private func capsuleSnapshotOrNil() -> CloudTapCapsuleSnapshot? {
+        let c = capsuleStore.capsule
+        let p = c.preferences
+
+        let hasTyped =
+            (p.outputStyle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            || (p.optionsBeforeQuestions != nil)
+            || (p.noTherapyFraming != nil)
+            || (p.noPersona != nil)
+
+        let hasExtras = !p.extras.isEmpty
+
+        guard hasTyped || hasExtras else { return nil }
+        return CloudTapCapsuleSnapshot.fromCapsule(c)
+    }
+
+    // MARK: - Talk thread helpers
+
+    private func loadTalkThread(from t: TurnEntity) -> [TalkMessage] {
+        let data = t.talkThreadJSON
+        guard !data.isEmpty else { return [] }
+        return (try? JSONDecoder().decode([TalkMessage].self, from: data)) ?? []
+    }
+
+    private func saveTalkThread(_ messages: [TalkMessage], into t: TurnEntity) {
+        if let data = try? JSONEncoder().encode(messages) {
+            t.talkThreadJSON = data
+        }
+    }
+
     // MARK: - Placeholder
 
     private func transcriptPlaceholder(for stateRaw: String?) -> String {
@@ -750,6 +766,18 @@ struct TurnDetailView: View {
         case .none: return "Not found."
         default: return "Processing…"
         }
+    }
+
+    private func hasContent(_ s: String?) -> Bool {
+        guard let s else { return false }
+        return !s.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func mmss(_ seconds: TimeInterval) -> String {
+        let s = max(0, Int(seconds.rounded()))
+        let m = s / 60
+        let r = s % 60
+        return String(format: "%d:%02d", m, r)
     }
 }
 
@@ -804,3 +832,4 @@ private enum CloudTool: String, CaseIterable, Identifiable {
     case talkItThrough = "Talk it through"
     var id: String { rawValue }
 }
+

@@ -76,6 +76,11 @@ final class TurnRepository {
         turn.transcriptRaw = nil
         turn.transcriptRedactedActive = trimmed
 
+        // WAL: initialise (local-only)
+        turn.walSnapshot = WALSnapshot.empty(now: Date())
+        turn.walUpdatedAt = Date()
+        turn.walVersion = 1
+
         turn.stateRaw = TurnState.ready.rawValue
 
         context.insert(turn)
@@ -113,6 +118,20 @@ final class TurnRepository {
             }
         }
 
+        // WAL: ensure it exists (local-only)
+        if turn.walSnapshot == nil {
+            turn.walSnapshot = WALSnapshot.empty(now: Date())
+            turn.walVersion = max(turn.walVersion, 1)
+        }
+
+        // WAL: minimal deterministic stamp so it's obviously not empty
+        var wal = turn.walSnapshot ?? WALSnapshot.empty(now: Date())
+        wal.updatedAtISO = ISO8601DateFormatter().string(from: Date())
+        wal.primitives["wal_status"] = "ready_v0"
+        turn.walSnapshot = wal
+        turn.walUpdatedAt = Date()
+
+
         turn.stateRaw = TurnState.ready.rawValue
         try context.save()
     }
@@ -136,3 +155,4 @@ final class TurnRepository {
         try context.save()
     }
 }
+

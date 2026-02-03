@@ -1,4 +1,3 @@
-// SwiftDataModels.swift
 import Foundation
 import SwiftData
 
@@ -79,7 +78,9 @@ final class TurnEntity {
     /// JSON-encoded WAL snapshot (local only).
     var walJSON: Data = Data("{}".utf8)
     var walUpdatedAt: Date?
-    var walVersion: Int = 1
+
+    /// Default to 0 so new captures don’t look "learned" by default.
+    var walVersion: Int = 0
 
     // MARK: Redaction
 
@@ -151,6 +152,19 @@ extension TurnEntity {
     }
 }
 
+// MARK: - WAL signal helpers (computed, migration-safe)
+
+extension TurnEntity {
+
+    /// UI signal only: do we have a non-empty WAL payload blob?
+    /// This avoids “always on” behaviour.
+    var hasLearnedCues: Bool {
+        let s = String(data: walJSON, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !s.isEmpty && s != "{}" && s != "null"
+    }
+}
+
 // MARK: - RedactionRecordEntity
 
 @Model
@@ -207,4 +221,3 @@ final class CapsuleEntity {
         self.learnedJSON = Data()
     }
 }
-

@@ -1,3 +1,4 @@
+// CapsuleStore.swift
 import Foundation
 import Combine
 
@@ -19,7 +20,7 @@ final class CapsuleStore: ObservableObject {
             self.capsule = .empty()
         }
     }
-    
+
     @MainActor
     func setPseudonym(_ value: String) {
         let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -27,7 +28,12 @@ final class CapsuleStore: ObservableObject {
         capsule.updatedAt = Date()
         persist()
     }
-
+    @MainActor
+    func clearLearnedTendencies() {
+        capsule.learnedTendencies = []
+        capsule.updatedAt = Date()
+        persist()
+    }
 
     // MARK: - Public API (typed)
 
@@ -39,6 +45,12 @@ final class CapsuleStore: ObservableObject {
 
     func setLearningEnabled(_ enabled: Bool) {
         capsule.learningEnabled = enabled
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    func resetLearnedProfile() {
+        capsule.learnedTendencies = []
         capsule.updatedAt = Date()
         persist()
     }
@@ -143,7 +155,6 @@ final class CapsuleStore: ObservableObject {
             .sorted { $0.key < $1.key }
 
         out.append(contentsOf: extrasPairs)
-
         return out
     }
 
