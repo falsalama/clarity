@@ -1,6 +1,7 @@
 // CloudTapService.swift
 
 import Foundation
+import OSLog
 
 enum CloudTapError: Error, Equatable {
     case unavailable
@@ -14,6 +15,11 @@ final class CloudTapService {
 
     private let overrideBaseURL: URL?
     private let overrideAnonKey: String?
+
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Clarity",
+        category: "CloudTap"
+    )
 
     init(
         baseURL: URL? = nil,
@@ -63,6 +69,11 @@ final class CloudTapService {
         let encoder = JSONEncoder()
         req.httpBody = try encoder.encode(body)
 
+        // DEBUG-only: prove whether learnedCues is present in the outgoing JSON body.
+        #if DEBUG
+        Self.logLearnedCuesPresence(in: req.httpBody)
+        #endif
+
         do {
             let (data, resp) = try await session.data(for: req)
             let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
@@ -81,6 +92,23 @@ final class CloudTapService {
             throw e
         } catch {
             throw CloudTapError.network(String(describing: error))
+        }
+    }
+
+    private static func logLearnedCuesPresence(in httpBody: Data?) {
+        guard let httpBody else { return }
+        guard
+            let obj = try? JSONSerialization.jsonObject(with: httpBody, options: []),
+            let dict = obj as? [String: Any]
+        else { return }
+
+        if
+            let capsule = dict["capsule"] as? [String: Any],
+            let cues = capsule["learnedCues"] as? [[String: Any]]
+        {
+            logger.debug("CloudTap payload includes learnedCues; count=\(cues.count, privacy: .public)")
+        } else {
+            logger.debug("CloudTap payload has no learnedCues.")
         }
     }
 
@@ -103,4 +131,3 @@ final class CloudTapService {
         return base.appendingPathComponent(endpoint)
     }
 }
-
