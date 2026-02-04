@@ -46,6 +46,7 @@ final class TurnCaptureCoordinator: ObservableObject {
 
     private var modelContext: ModelContext?
     private var dictionary: RedactionDictionary?
+    private var capsuleStore: CapsuleStore?
     private var repo: TurnRepository?
 
     private let recorder = AudioRecorder()
@@ -66,9 +67,10 @@ final class TurnCaptureCoordinator: ObservableObject {
 
     init() {}
 
-    func bind(modelContext: ModelContext, dictionary: RedactionDictionary) {
+    func bind(modelContext: ModelContext, dictionary: RedactionDictionary, capsuleStore: CapsuleStore) {
         self.modelContext = modelContext
         self.dictionary = dictionary
+        self.capsuleStore = capsuleStore
         self.repo = TurnRepository(context: modelContext)
         wireIfNeeded()
     }
@@ -315,6 +317,36 @@ final class TurnCaptureCoordinator: ObservableObject {
                 titleIfAuto: autoTitle
             )
 
+            // C2: Local WAL build (internal flag, non-UI)
+            if FeatureFlags.localWALBuildEnabled {
+                let lift0 = Lift0Extractor().extract(from: redacted)
+                let candidates = PrimitiveCandidateExtractor().extract(from: redacted)
+                let topScore = candidates.first?.score
+                let selection = PrimitiveCandidateExtractor().selectTop(from: candidates)
+                let lenses = LensSelector().select(from: selection.dominant, background: selection.background, topCandidateScore: topScore)
+                let validated = WALValidator().validate(
+                    lift0: lift0,
+                    primitiveDominant: selection.dominant,
+                    primitiveBackground: selection.background,
+                    candidates: candidates,
+                    lenses: lenses,
+                    confirmationNeeded: selection.needsConfirmation
+                )
+
+                // Persist only the validated snapshot
+                try repo.updateWAL(id: id, snapshot: validated)
+
+                // NEW: Derive and apply learning observations (gated, validated-only)
+                if let context = self.modelContext, let store = self.capsuleStore, store.capsule.learningEnabled {
+                    let learner = PatternLearner()
+                    let observations = learner.deriveObservations(from: validated, redactedText: redacted)
+                    try learner.apply(observations: observations, into: context, now: Date())
+
+                    // Bridge to Capsule: project PatternStats -> Capsule.learnedTendencies (one-way)
+                    LearningSync.sync(context: context, capsuleStore: store, now: Date())
+                }
+            }
+
             lastCompletedTurnID = id
             lastCompletionAt = Date()
 
@@ -375,4 +407,3 @@ final class TurnCaptureCoordinator: ObservableObject {
         return capped.isEmpty ? nil : capped
     }
 }
-

@@ -27,6 +27,7 @@ struct ClarityApp: App {
                 for: TurnEntity.self,
                 RedactionRecordEntity.self,
                 CapsuleEntity.self,
+                PatternStatsEntity.self,
                 configurations: config
             )
 
@@ -63,4 +64,3 @@ struct ClarityApp: App {
         return dir.appendingPathComponent(filename)
     }
 }
-

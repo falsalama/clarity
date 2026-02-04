@@ -29,14 +29,17 @@ struct CapsuleModel: Codable, Sendable, Equatable {
     var preferences: CapsulePreferences
     var learnedTendencies: [CapsuleTendency]
 
+    // Suppression token: projection ignores stats at/before this instant
+    var learningResetAt: Date?
+
     static func empty() -> CapsuleModel {
         CapsuleModel(
             version: 1,
             learningEnabled: true,
             updatedAt: Date(),
             preferences: CapsulePreferences(),
-            learnedTendencies: []
+            learnedTendencies: [],
+            learningResetAt: nil
         )
     }
 }
-

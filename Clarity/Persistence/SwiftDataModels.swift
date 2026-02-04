@@ -221,3 +221,71 @@ final class CapsuleEntity {
         self.learnedJSON = Data()
     }
 }
+
+// MARK: - PatternStatsEntity (Learning; add-only schema)
+
+@Model
+final class PatternStatsEntity {
+
+    @Attribute(.unique)
+    var id: UUID
+
+    // Kind of pattern (allowed: style_preference, workflow_preference, topic_recurrence, resolution_pattern, constraints_sensitivity, narrative_pattern, lens_preference, constraint_trigger, contraction_pattern, release_pattern)
+    var kindRaw: String
+
+    // Pattern key (e.g., "bullets", "concise", "options_first", "topic:taxes")
+    var key: String
+
+    // Decayed score (0...1 or any non-negative real); we’ll keep Double flexible
+    var score: Double
+
+    // Observed count (integer, bounded)
+    var count: Int
+
+    // First and last observation timestamps
+    var firstSeenAt: Date
+    var lastSeenAt: Date
+
+    // Decay control (days)
+    var halfLifeDays: Double
+
+    init(
+        id: UUID = UUID(),
+        kindRaw: String,
+        key: String,
+        score: Double = 0,
+        count: Int = 0,
+        firstSeenAt: Date = Date(),
+        lastSeenAt: Date = Date(),
+        halfLifeDays: Double = 14.0
+    ) {
+        self.id = id
+        self.kindRaw = kindRaw
+        self.key = key
+        self.score = score
+        self.count = count
+        self.firstSeenAt = firstSeenAt
+        self.lastSeenAt = lastSeenAt
+        self.halfLifeDays = halfLifeDays
+    }
+}
+
+extension PatternStatsEntity {
+    enum Kind: String, CaseIterable {
+        case style_preference
+        case workflow_preference
+        case topic_recurrence
+        case resolution_pattern
+        case constraints_sensitivity
+        case narrative_pattern
+        case lens_preference
+        case constraint_trigger
+        case contraction_pattern
+        case release_pattern
+    }
+
+    var kind: Kind {
+        get { Kind(rawValue: kindRaw) ?? .style_preference }
+        set { kindRaw = newValue.rawValue }
+    }
+}

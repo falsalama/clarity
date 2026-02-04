@@ -1,4 +1,3 @@
-// CapsuleView.swift
 import SwiftUI
 #if os(iOS)
 import UIKit
@@ -14,12 +13,30 @@ struct CapsuleView: View {
     private enum Field: Hashable { case label, value, pseudonym }
     @FocusState private var focusedField: Field?
 
+    // Treat any focused field as “editing” to lift the footer above the keyboard accessory.
     private var isEditing: Bool { focusedField != nil }
 
     var body: some View {
         List {
             Section {
+                // Intentionally empty (kept for spacing if you want later copy)
                 EmptyView()
+            }
+
+            // Learning navigation
+            Section {
+                NavigationLink {
+                    LearningView()
+                } label: {
+                    HStack {
+                        Text("Learning")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .accessibilityLabel("Learning")
             }
 
             Section("Pseudonym") {
@@ -32,19 +49,6 @@ struct CapsuleView: View {
                     .onChange(of: pseudonymDraft) { _, newValue in
                         store.setPseudonym(newValue)
                     }
-            }
-
-            Section("Learning") {
-                NavigationLink {
-                    CapsuleLearningView()
-                } label: {
-                    HStack {
-                        Text("Learning")
-                        Spacer()
-                        Text(store.capsule.learningEnabled ? "On" : "Off")
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
 
             preferencesSection
@@ -84,13 +88,15 @@ struct CapsuleView: View {
                 }
             }
         }
+        // Add bottom inset only while editing so the footer isn't covered by the keyboard accessory.
         .safeAreaInset(edge: .bottom) {
             if isEditing {
                 Color.clear
-                    .frame(height: 56)
+                    .frame(height: 56) // adjust if your accessory bar is taller/shorter
                     .allowsHitTesting(false)
             }
         }
+        // Initialise drafts once per appearance without clobbering active edits.
         .onAppear {
             if pseudonymDraft.isEmpty {
                 pseudonymDraft = store.capsule.preferences.pseudonym ?? ""
@@ -235,4 +241,3 @@ struct CapsuleView: View {
             .environmentObject(CapsuleStore())
     }
 }
-

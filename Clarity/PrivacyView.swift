@@ -46,28 +46,6 @@ struct PrivacyView: View {
             } footer: {
                 Text("Preview exactly what would be sent for a specific action.")
             }
-
-            Section {
-                Toggle(isOn: $cloudTap.showLaneBadges) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Show lane badges")
-                        Text("Label outputs as Local / On-device / Cloud Tap.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Transparency")
-            }
-
-            Section {
-                LabeledContent("Driving / CarPlay") { Text("Capture only") }
-                Text("Reflection and cloud actions are unavailable while driving.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("Safety")
-            }
         }
         .navigationTitle("Privacy / Cloud Tap")
 #if os(iOS)
@@ -126,4 +104,3 @@ private struct PayloadPreviewExplainerView: View {
 #endif
     }
 }
-

@@ -28,9 +28,19 @@ final class CapsuleStore: ObservableObject {
         capsule.updatedAt = Date()
         persist()
     }
+
     @MainActor
     func clearLearnedTendencies() {
+        // Suppress projection of any pre-reset stats; only new evidence will show
+        capsule.learningResetAt = Date()
         capsule.learnedTendencies = []
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    // NEW: curated learned cues projection setter (idempotent caller should check, but we still persist once set)
+    func setLearnedTendencies(_ items: [CapsuleTendency]) {
+        capsule.learnedTendencies = items
         capsule.updatedAt = Date()
         persist()
     }
@@ -45,12 +55,6 @@ final class CapsuleStore: ObservableObject {
 
     func setLearningEnabled(_ enabled: Bool) {
         capsule.learningEnabled = enabled
-        capsule.updatedAt = Date()
-        persist()
-    }
-
-    func resetLearnedProfile() {
-        capsule.learnedTendencies = []
         capsule.updatedAt = Date()
         persist()
     }
@@ -225,4 +229,3 @@ final class CapsuleStore: ObservableObject {
         k.range(of: #"^[a-z0-9_]+$"#, options: .regularExpression) != nil
     }
 }
-

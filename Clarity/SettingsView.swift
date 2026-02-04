@@ -12,36 +12,10 @@ struct SettingsView: View {
 
     var body: some View {
         List {
-            Section {
-                Text(LocalizedStringKey("settings.local_first"))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            // NEW: Profile / learning
-            Section {
-                NavigationLink {
-                    CapsuleView()
-                } label: {
-                    Text("Capsule")
-                }
-
-                NavigationLink {
-                    LearningView()
-                } label: {
-                    Text("Learning")
-                }
-
-                Text("Optional. Keeps a small, local profile to improve responses. You can switch it off or clear it any time.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("About you")
-            }
-
-            Section {
+            // Redaction terms
+            Section("Redaction") {
                 if dictionary.tokens.isEmpty {
-                    Text(LocalizedStringKey("settings.redaction.empty"))
+                    Text("No redacted terms yet.")
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(dictionary.tokens, id: \.self) { token in
@@ -52,34 +26,24 @@ struct SettingsView: View {
                     .onDelete(perform: dictionary.remove)
                 }
 
-                VStack(alignment: .leading, spacing: 10) {
-                    TextField(LocalizedStringKey("settings.redaction.add.placeholder"), text: $newToken)
+                HStack(spacing: 10) {
+                    TextField("Add a name or term to always redact", text: $newToken)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled(true)
                         .submitLabel(.done)
                         .onSubmit { addToken() }
 
-                    HStack(spacing: 10) {
-                        Button {
-                            addToken()
-                        } label: {
-                            Text(LocalizedStringKey("settings.redaction.add"))
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(newTokenTrimmed.isEmpty)
-
-                        Button("Done") {
-                            hideKeyboard()
-                        }
-                        .buttonStyle(.bordered)
+                    Button {
+                        addToken()
+                    } label: {
+                        Text("Add")
+                            .fontWeight(.semibold)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(newTokenTrimmed.isEmpty)
+                    .accessibilityLabel("Add redaction term")
                 }
                 .padding(.vertical, 4)
-
-            } header: {
-                Text(LocalizedStringKey("settings.redaction.header"))
-            } footer: {
-                Text(LocalizedStringKey("settings.redaction.footer"))
             }
 
             if !dictionary.tokens.isEmpty {
@@ -88,37 +52,82 @@ struct SettingsView: View {
                         hideKeyboard()
                         confirmRemoveAll = true
                     } label: {
-                        Text(LocalizedStringKey("settings.redaction.remove_all"))
+                        Text("Remove all redaction terms")
                     }
                 }
             }
 
+            // Privacy / Cloud Tap
             Section {
                 NavigationLink {
                     PrivacyView()
                 } label: {
-                    Text(LocalizedStringKey("settings.privacy.link"))
+                    Text("Privacy / Cloud Tap")
                 }
 
-                Text(LocalizedStringKey("settings.privacy.note"))
+                Text("Audio and raw transcripts stay on this device. Redacted text only is used when you explicitly choose Cloud Tap.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Privacy")
+            }
+
+            // Transparency
+            Section {
+                Toggle(isOn: $cloudTap.showLaneBadges) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Show lane badges")
+                        Text("Label outputs as Local / On-device / Cloud Tap.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Transparency")
+            }
+
+            // Safety (Driving / CarPlay)
+            Section {
+                LabeledContent("Driving / CarPlay") { Text("Capture only") }
+                Text("Reflection and cloud actions are unavailable while driving.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {
-                Text(LocalizedStringKey("settings.privacy.header"))
+                Text("Safety")
             }
+
+#if DEBUG
+            // Developer
+            Section {
+                Toggle(isOn: Binding(
+                    get: { FeatureFlags.localWALBuildEnabled },
+                    set: { FeatureFlags.localWALBuildEnabled = $0 }
+                )) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Enable local WAL build")
+                        Text("Generates WAL locally and updates learned cues (development only).")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Developer")
+            }
+#endif
         }
-        .navigationTitle(Text(LocalizedStringKey("settings.title")))
+        .navigationTitle("Settings")
         .confirmationDialog(
-            Text(LocalizedStringKey("settings.redaction.remove_all.confirm.title")),
+            Text("Remove all redaction terms?"),
             isPresented: $confirmRemoveAll,
             titleVisibility: .visible
         ) {
-            Button(LocalizedStringKey("settings.redaction.remove_all.confirm.ok"), role: .destructive) {
+            Button("Remove all", role: .destructive) {
                 dictionary.wipe()
             }
-            Button(LocalizedStringKey("settings.redaction.remove_all.confirm.cancel"), role: .cancel) { }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text(LocalizedStringKey("settings.redaction.remove_all.confirm.message"))
+            Text("This clears your redaction list. You can add terms again at any time.")
         }
     }
 

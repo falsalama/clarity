@@ -1,6 +1,8 @@
 import SwiftUI
+import SwiftData
 
 struct LearningView: View {
+    @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var capsuleStore: CapsuleStore
 
     @State private var confirmClearLearned = false
@@ -8,7 +10,7 @@ struct LearningView: View {
     var body: some View {
         Form {
             Section {
-                Text("Clarity can learn small cues from your captures to improve responses. This stays on this device unless you explicitly use Cloud Tap.")
+                Text("Clarity derives small cues from recent captures to improve responses. These cues decay over time and stay on this device unless you explicitly use Cloud Tap.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -19,11 +21,39 @@ struct LearningView: View {
                     set: { capsuleStore.setLearningEnabled($0) }
                 ))
 
-                Text("When on, Clarity may keep a compact, editable summary of patterns - for example how you prefer information presented.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                HStack {
+                    Text("Learned cues")
+                    Spacer()
+                    Text("\(capsuleStore.capsule.learnedTendencies.count)")
+                        .foregroundStyle(.secondary)
+                }
             } header: {
                 Text("Learning")
+            }
+
+            if !capsuleStore.capsule.learnedTendencies.isEmpty {
+                Section {
+                    ForEach(capsuleStore.capsule.learnedTendencies) { t in
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(t.statement)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            VStack(alignment: .trailing) {
+                                Text("x\(t.evidenceCount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text(t.lastSeenAt.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Learned cues (derived)")
+                } footer: {
+                    Text("Derived cues are not identity statements. They summarise recent patterns and decay over time.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {
@@ -33,7 +63,7 @@ struct LearningView: View {
                     Text("Clear learned cues")
                 }
 
-                Text("This does not delete your captures. It only clears what Clarity has learnt from them.")
+                Text("This does not delete your captures. It only clears the derived cues.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {
@@ -44,18 +74,20 @@ struct LearningView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .confirmationDialog(
-            "Clear learned cues?",
-            isPresented: $confirmClearLearned,
-            titleVisibility: .visible
+        .onAppear {
+            // Refresh projection from PatternStats -> Capsule (idempotent)
+            LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
+        }
+        .alert(
+            "Clear all learned cues?",
+            isPresented: $confirmClearLearned
         ) {
             Button("Clear", role: .destructive) {
                 capsuleStore.clearLearnedTendencies()
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("This removes the learned profile. You can keep using Capsule preferences.")
+            Text("This will remove all learned cues permanently.")
         }
     }
 }
-

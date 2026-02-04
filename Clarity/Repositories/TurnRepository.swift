@@ -118,20 +118,7 @@ final class TurnRepository {
             }
         }
 
-        // WAL: ensure it exists (local-only)
-        if turn.walSnapshot == nil {
-            turn.walSnapshot = WALSnapshot.empty(now: Date())
-            turn.walVersion = max(turn.walVersion, 1)
-        }
-
-        // WAL: minimal deterministic stamp so it's obviously not empty
-        var wal = turn.walSnapshot ?? WALSnapshot.empty(now: Date())
-        wal.updatedAtISO = ISO8601DateFormatter().string(from: Date())
-        wal.primitives["wal_status"] = "ready_v0"
-        turn.walSnapshot = wal
-        turn.walUpdatedAt = Date()
-
-
+        // WAL: no placeholder stamping here; validated snapshots are persisted via updateWAL(id:snapshot:)
         turn.stateRaw = TurnState.ready.rawValue
         try context.save()
     }
@@ -140,6 +127,19 @@ final class TurnRepository {
         guard let turn = try fetch(id: id) else { return }
         turn.stateRaw = TurnState.failed.rawValue
         turn.errorDebugMessage = debug
+        try context.save()
+    }
+
+    // MARK: - WAL update (C2)
+
+    func updateWAL(id: UUID, snapshot: ValidatedWalSnapshot) throws {
+        guard let turn = try fetch(id: id) else { return }
+        // Store as compact JSON into existing walJSON slot for now
+        if let data = try? JSONEncoder().encode(snapshot.snapshot) {
+            turn.walJSON = data
+        }
+        turn.walUpdatedAt = Date()
+        turn.walVersion = max(turn.walVersion, snapshot.snapshot.version)
         try context.save()
     }
 
@@ -155,4 +155,3 @@ final class TurnRepository {
         try context.save()
     }
 }
-

@@ -12,22 +12,24 @@ struct CapsuleLearningView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section("Learning") {
+            Section {
                 Toggle("Allow learning", isOn: Binding(
                     get: { store.capsule.learningEnabled },
                     set: { store.setLearningEnabled($0) }
                 ))
 
                 HStack {
-                    Text("Learned items")
+                    Text("Learned cues")
                     Spacer()
                     Text("\(store.capsule.learnedTendencies.count)")
                         .foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("Learning")
             }
 
             if !store.capsule.learnedTendencies.isEmpty {
-                Section("Learned patterns") {
+                Section {
                     ForEach(store.capsule.learnedTendencies) { t in
                         VStack(alignment: .leading, spacing: 6) {
                             Text(t.statement)
@@ -42,15 +44,21 @@ struct CapsuleLearningView: View {
                         }
                         .padding(.vertical, 2)
                     }
+                } header: {
+                    Text("Learned cues (derived)")
+                } footer: {
+                    Text("Derived cues are not identity statements. They summarise recent patterns and decay over time.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section {
                     Button(role: .destructive) {
-                        store.resetLearnedProfile()
+                        store.clearLearnedTendencies()
                     } label: {
-                        Text("Reset learned patterns")
+                        Text("Clear learned cues")
                     }
-                    .accessibilityHint("Clears learned patterns but keeps your preferences.")
+                    .accessibilityHint("Clears learned cues but keeps your preferences.")
                 }
             }
         }
@@ -67,4 +75,3 @@ struct CapsuleLearningView: View {
             .environmentObject(CapsuleStore())
     }
 }
-

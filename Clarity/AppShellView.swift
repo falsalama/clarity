@@ -40,12 +40,18 @@ struct AppShellView: View {
         .onAppear {
             captureCoordinator.bind(
                 modelContext: modelContext,
-                dictionary: redactionDictionary
+                dictionary: redactionDictionary,
+                capsuleStore: capsuleStore
             )
+            // Initial projection refresh (idempotent)
+            LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
         }
         .onChange(of: scenePhase) { _, newValue in
             captureCoordinator.handleScenePhaseChange(newValue)
+            if newValue == .active {
+                // Foreground refresh so decay/ordering is current
+                LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
+            }
         }
     }
 }
-

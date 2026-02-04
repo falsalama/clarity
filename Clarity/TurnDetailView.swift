@@ -153,6 +153,8 @@ struct TurnDetailView: View {
             Divider()
             transcriptSection
 
+            // WAL preview removed per design: show only the badge in header.
+
             if hasAnyOutputs {
                 Divider()
                 outputsSection
@@ -209,7 +211,7 @@ struct TurnDetailView: View {
                 }
 
                 if hasWAL {
-                    LaneBadge(text: "Learnt cues")
+                    LaneBadge(text: "WAL ready")
                 }
 
                 Spacer()
@@ -832,4 +834,3 @@ private enum CloudTool: String, CaseIterable, Identifiable {
     case talkItThrough = "Talk it through"
     var id: String { rawValue }
 }
-
