@@ -83,6 +83,8 @@ struct LearningView: View {
             isPresented: $confirmClearLearned
         ) {
             Button("Clear", role: .destructive) {
+                // Hard reset: wipe stats from SwiftData, then clear projection/reset token
+                LearningSync.wipeAllStats(context: modelContext)
                 capsuleStore.clearLearnedTendencies()
             }
             Button("Cancel", role: .cancel) { }

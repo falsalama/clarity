@@ -13,8 +13,24 @@ struct LearningSync {
                 rows = rows.filter { $0.lastSeenAt > resetAt }
             }
 
-            // Threshold
-            rows = rows.filter { $0.score >= 0.3 }
+            // Thresholds (per-kind + per-key overrides)
+            rows = rows.filter { r in
+                switch r.kind {
+                case .constraints_sensitivity:
+                    // Delicate cues: require stronger score and at least two observations
+                    return r.score >= 0.6 && r.count >= 2
+
+                case .workflow_preference:
+                    // New explicit-phrase v1 cues: require at least two observations and score >= 0.4
+                    if ["question_light", "question_guided", "narrow_first", "explore_space"].contains(r.key) {
+                        return r.score >= 0.4 && r.count >= 2
+                    }
+                    return r.score >= 0.3
+
+                default:
+                    return r.score >= 0.3
+                }
+            }
 
             // Exclude specific keys we don't want to surface
             rows = rows.filter { !($0.kind == .constraint_trigger && $0.key == "trigger:eye_contact") }
@@ -73,6 +89,18 @@ struct LearningSync {
         }
     }
 
+    static func wipeAllStats(context: ModelContext) {
+        do {
+            let all = try context.fetch(FetchDescriptor<PatternStatsEntity>())
+            for row in all {
+                context.delete(row)
+            }
+            try context.save()
+        } catch {
+            // Silent by design
+        }
+    }
+
     private static func statement(for kind: PatternStatsEntity.Kind, key: String) -> String {
         let k = key.replacingOccurrences(of: "_", with: " ")
         switch kind {
@@ -98,6 +126,13 @@ struct LearningSync {
             case "prefers_just_answer": return "Prefers a direct answer"
             case "prefers_few_questions": return "Prefers fewer questions"
             case "prefers_no_clarifying_questions": return "Prefers no clarifying questions"
+
+            // New explicit-phrase v1 cues
+            case "question_light": return "Prefers lighter questioning"
+            case "question_guided": return "Prefers guided questioning"
+            case "narrow_first": return "Prefers one path first"
+            case "explore_space": return "Prefers exploring options"
+
             default: return "Often wants \(k)"
             }
 
@@ -124,7 +159,7 @@ struct LearningSync {
             case "low_energy": return "Often constrained by low energy"
             case "money_limit": return "Often constrained by money limits"
             case "social_overload": return "Often constrained by social factors"
-            case "dependency_blocked": return "Often blocked by dependencies"
+            case "dependency_blocked": return "Often constrained by dependencies"
             case "sensory_noise": return "Sensitive to sensory overload"
             case "legal_risk": return "Often constrained by legal risk"
             default: return "Often constrained by \(k)"

@@ -62,12 +62,30 @@ struct Lift0Extractor {
         if containsAny(t, ["deadline", "tomorrow", "urgent", "no time"]) { out.append("time") }
         if containsAny(t, ["exhausted", "burnt out", "can't face it", "cant face"]) { out.append("energy") }
         if containsAny(t, ["budget", "can't afford", "cant afford"]) { out.append("money") }
-        if containsAny(t, ["awkward", "politics", "conflict", "what will they think"]) { out.append("social") }
-        if containsAny(t, ["noisy", "bright", "overwhelming"]) { out.append("sensory") }
+
+        // SOCIAL: broaden to catch "social overwhelm" and common social-stress phrasings
+        if containsAny(t, [
+            "awkward", "politics", "conflict", "what will they think",
+            "social situation", "social situations", "socially overwhelmed", "overwhelmed socially",
+            "social overwhelm", "socially draining", "socially drained", "draining socially",
+            "crowds", "too many people", "group dynamics", "social dynamics", "being watched", "being observed"
+        ]) {
+            out.append("social")
+        }
+
+        // SENSORY: include overload/overstim variants (not just “overwhelming”)
+        if containsAny(t, [
+            "noisy", "bright", "overwhelming", "overstimulated", "overstimulating",
+            "sensory overload", "overloaded"
+        ]) {
+            out.append("sensory")
+        }
+
         if containsAny(t, ["waiting on", "blocked", "need approval"]) { out.append("dependencies") }
         // "legal" and "information" as catch-alls
         if t.contains("legal") { out.append("legal") }
         if containsAny(t, ["lack of info", "no information", "missing info", "don't know enough", "dont know enough"]) { out.append("information") }
+
         let dedup = Array(Set(out))
         return Array(dedup.prefix(6))
     }

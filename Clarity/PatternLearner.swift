@@ -105,6 +105,7 @@ struct PatternLearner {
         }
 
         // MARK: Constraints sensitivities (non-clinical; user-stated only via Lift0)
+        // Lower per-observation strength so one mention won’t surface immediately.
         let constraintMap: [String: String] = [
             "time": "time_pressure",
             "energy": "low_energy",
@@ -116,7 +117,7 @@ struct PatternLearner {
         ]
         for c in constraints {
             if let key = constraintMap[c] {
-                out.append(.init(kind: .constraints_sensitivity, key: key, strength: 0.5))
+                out.append(.init(kind: .constraints_sensitivity, key: key, strength: 0.25))
             }
         }
 
@@ -162,6 +163,11 @@ struct PatternLearner {
         // MARK: Situational constraints (explicit phrases only; local redacted text)
         if let text = redactedText?.lowercased(), !text.isEmpty {
             out.append(contentsOf: deriveSituationalConstraints(from: text))
+        }
+
+        // MARK: New: explicit-phrase v1 for question/breadth density (low-authority)
+        if let text = redactedText?.lowercased(), !text.isEmpty {
+            out.append(contentsOf: deriveQuestionAndBreadthPreferences(from: text))
         }
 
         // Keep bounded and deduplicated per (kind,key)
@@ -234,6 +240,49 @@ struct PatternLearner {
         }
         if opennessPhrases.contains(where: { text.contains($0) }) {
             out.append(.init(kind: .release_pattern, key: "release:openness", strength: 0.3))
+        }
+
+        return out
+    }
+
+    // NEW: explicit-phrase v1 for the four cues
+    private func deriveQuestionAndBreadthPreferences(from text: String) -> [PatternObservation] {
+        var out: [PatternObservation] = []
+
+        // question_light
+        let qLight = [
+            "stop asking questions", "just tell me", "don't ask me questions", "do not ask me questions",
+            "no questions", "no more questions", "quit asking questions", "stop with the questions"
+        ]
+        if qLight.contains(where: { text.contains($0) }) {
+            out.append(.init(kind: .workflow_preference, key: "question_light", strength: 0.5))
+        }
+
+        // question_guided
+        let qGuided = [
+            "ask me questions", "help me think this through", "question me", "can you question me",
+            "guide me with questions", "ask questions to help me think"
+        ]
+        if qGuided.contains(where: { text.contains($0) }) {
+            out.append(.init(kind: .workflow_preference, key: "question_guided", strength: 0.5))
+        }
+
+        // narrow_first
+        let narrow = [
+            "one thing at a time", "just pick one", "too many options", "pick one for me",
+            "choose one for me", "don't give me options", "do not give me options", "just choose for me", "pick one"
+        ]
+        if narrow.contains(where: { text.contains($0) }) {
+            out.append(.init(kind: .workflow_preference, key: "narrow_first", strength: 0.5))
+        }
+
+        // explore_space
+        let explore = [
+            "what are my options", "map it out", "what else could work", "alternatives",
+            "explore options", "show me options", "option space", "lay out the options"
+        ]
+        if explore.contains(where: { text.contains($0) }) {
+            out.append(.init(kind: .workflow_preference, key: "explore_space", strength: 0.5))
         }
 
         return out

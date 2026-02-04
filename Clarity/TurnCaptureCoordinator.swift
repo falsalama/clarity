@@ -72,6 +72,9 @@ final class TurnCaptureCoordinator: ObservableObject {
     private var hasWarmedUp: Bool = false
     private var warmUpTask: Task<Void, Never>?
 
+    // Prevent duplicate learning updates for the same turn if transcripts arrive more than once
+    private var learnedTurnIDs: Set<UUID> = []
+
     init() {}
 
     func bind(modelContext: ModelContext, dictionary: RedactionDictionary, capsuleStore: CapsuleStore) {
@@ -359,11 +362,18 @@ final class TurnCaptureCoordinator: ObservableObject {
             let validated = WALBuilder.buildValidated(from: redacted, now: now)
             try repo.updateWAL(id: id, snapshot: validated)
 
-            // Derive and apply learning observations only when learning is enabled.
-            if let context = self.modelContext, let store = self.capsuleStore, store.capsule.learningEnabled {
+            // Derive and apply learning observations only when learning is enabled (idempotent per turn).
+            if let context = self.modelContext,
+               let store = self.capsuleStore,
+               store.capsule.learningEnabled,
+               learnedTurnIDs.contains(id) == false
+            {
                 let learner = PatternLearner()
                 let observations = learner.deriveObservations(from: validated, redactedText: redacted)
                 try learner.apply(observations: observations, into: context, now: now)
+
+                // Mark learned for this turn to prevent duplicate increments
+                learnedTurnIDs.insert(id)
 
                 // Bridge to Capsule: project PatternStats -> Capsule.learnedTendencies (one-way)
                 LearningSync.sync(context: context, capsuleStore: store, now: now)
