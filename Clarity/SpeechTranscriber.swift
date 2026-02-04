@@ -517,6 +517,47 @@ final class SpeechTranscriber: ObservableObject {
         }
     }
 
+    // MARK: - File-based transcription (full pass after recording stops)
+
+    func transcribeFile(
+        at url: URL,
+        localeIdentifier: String = "en_GB",
+        onDevicePreferred: Bool = false
+    ) async throws -> String {
+        // Separate, one-shot recognizer; does not interfere with live session.
+        guard await ensureSpeechAuth() else {
+            throw NSError(domain: "Clarity", code: 401, userInfo: [NSLocalizedDescriptionKey: "Speech not authorised"])
+        }
+
+        guard let rec = SFSpeechRecognizer(locale: Locale(identifier: localeIdentifier)) else {
+            throw NSError(domain: "Clarity", code: 500, userInfo: [NSLocalizedDescriptionKey: "Recognizer unavailable"])
+        }
+
+        let req = SFSpeechURLRecognitionRequest(url: url)
+        req.shouldReportPartialResults = false
+        if rec.supportsOnDeviceRecognition {
+            req.requiresOnDeviceRecognition = onDevicePreferred
+        }
+
+        return try await withCheckedThrowingContinuation { cont in
+            var t: SFSpeechRecognitionTask?
+            t = rec.recognitionTask(with: req) { result, error in
+                if let error {
+                    t?.cancel()
+                    cont.resume(throwing: error)
+                    return
+                }
+                guard let result else { return }
+                if result.isFinal {
+                    t?.cancel()
+                    let text = result.bestTranscription.formattedString
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    cont.resume(returning: text)
+                }
+            }
+        }
+    }
+
     // MARK: - Join
 
     private func joinTranscript(_ a: String, _ b: String) -> String {
@@ -527,4 +568,3 @@ final class SpeechTranscriber: ObservableObject {
         return left + " " + right
     }
 }
-

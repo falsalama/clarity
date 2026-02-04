@@ -376,6 +376,9 @@ final class TurnCaptureCoordinator: ObservableObject {
 
             transcriber.resetUI()
             liveTranscript = ""
+
+            // Kick off a full file-based pass to ensure long recordings are fully transcribed.
+            runFileTranscriptionBackfill(for: id)
         } catch {
             setError(.couldntSaveTranscript, debug: "markReady failed: \(error.localizedDescription)")
             try? repo.markFailed(id: id, debug: lastError ?? "")
@@ -433,6 +436,49 @@ final class TurnCaptureCoordinator: ObservableObject {
         let title = words.joined(separator: " ")
         let capped = String(title.prefix(56))
         return capped.isEmpty ? nil : capped
+    }
+
+    // MARK: - Full file backfill
+
+    private func runFileTranscriptionBackfill(for id: UUID) {
+        guard let repo, let dictionary else { return }
+
+        // Resolve audio URL
+        let url: URL?
+        if let u = pendingCaptureURL {
+            url = u
+        } else if let t = try? repo.fetch(id: id), let path = t.audioPath, !path.isEmpty {
+            url = URL(fileURLWithPath: path)
+        } else {
+            url = nil
+        }
+        guard let audioURL = url else { return }
+
+        Task { @MainActor in
+            do {
+                let fullText = try await transcriber.transcribeFile(at: audioURL, onDevicePreferred: false)
+                guard !fullText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+
+                // If unchanged, skip
+                guard let t = try repo.fetch(id: id) else { return }
+                if t.transcriptRaw == fullText { return }
+
+                // Replace transcript with full-pass result
+                let redacted = Redactor(tokens: dictionary.tokens).redact(fullText).redactedText
+                t.transcriptRaw = fullText
+                t.transcriptRedactedActive = redacted
+                t.redactionTimestamp = Date()
+                t.redactionVersion = max(t.redactionVersion, 1)
+
+                // Rebuild WAL snapshot (local only); avoid re-applying learning to prevent double counting.
+                let validated = WALBuilder.buildValidated(from: redacted, now: Date())
+                try repo.updateWAL(id: id, snapshot: validated)
+
+                try modelContext?.save()
+            } catch {
+                // Silent: backfill is best-effort
+            }
+        }
     }
 
     // MARK: - Idle timer (iOS only)
@@ -497,4 +543,3 @@ final class TurnCaptureCoordinator: ObservableObject {
         hasWarmedUp = true
     }
 }
-

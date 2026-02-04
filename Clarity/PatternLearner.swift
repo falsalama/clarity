@@ -182,7 +182,7 @@ struct PatternLearner {
             "trigger:crowds": ["crowds", "crowded", "crowded places", "busy places", "too many people"],
 
             // Social
-            "trigger:eye_contact": ["eye contact"],
+            // Removed: "trigger:eye_contact"
             "trigger:group_dynamics": ["group dynamics"],
             "trigger:hierarchy_games": ["hierarchy games", "power games", "status games", "power dynamics"],
             "trigger:being_observed": ["being watched", "being observed", "people watching me"],

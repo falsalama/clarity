@@ -16,6 +16,9 @@ struct LearningSync {
             // Threshold
             rows = rows.filter { $0.score >= 0.3 }
 
+            // Exclude specific keys we don't want to surface
+            rows = rows.filter { !($0.kind == .constraint_trigger && $0.key == "trigger:eye_contact") }
+
             // Sort: score desc, then lastSeenAt desc
             rows.sort {
                 if $0.score == $1.score {
@@ -157,7 +160,6 @@ struct LearningSync {
             case "trigger:noise": return "Often harder in noisy environments"
             case "trigger:bright_light": return "Often harder with bright light"
             case "trigger:crowds": return "Often harder in crowds"
-            case "trigger:eye_contact": return "Often harder with direct eye contact"
             case "trigger:group_dynamics": return "Often harder with complex group dynamics"
             case "trigger:hierarchy_games": return "Often harder with power dynamics"
             case "trigger:being_observed": return "Often harder when being observed"
