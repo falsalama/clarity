@@ -85,38 +85,19 @@ struct PasteTextTurnSheet: View {
                 captureContext: .unknown
             )
 
-            // Local WAL build + learning (development flag, on-device only)
-            if FeatureFlags.localWALBuildEnabled {
-                let lift0 = Lift0Extractor().extract(from: redacted)
-                let candidates = PrimitiveCandidateExtractor().extract(from: redacted)
-                let topScore = candidates.first?.score
-                let selection = PrimitiveCandidateExtractor().selectTop(from: candidates)
-                let lenses = LensSelector().select(
-                    from: selection.dominant,
-                    background: selection.background,
-                    topCandidateScore: topScore
-                )
-                let validated = WALValidator().validate(
-                    lift0: lift0,
-                    primitiveDominant: selection.dominant,
-                    primitiveBackground: selection.background,
-                    candidates: candidates,
-                    lenses: lenses,
-                    confirmationNeeded: selection.needsConfirmation
-                )
+            // Build validated WAL unconditionally and always persist locally.
+            let now = Date()
+            let validated = WALBuilder.buildValidated(from: redacted, now: now)
+            try repo.updateWAL(id: id, snapshot: validated)
 
-                // Persist only the validated snapshot
-                try repo.updateWAL(id: id, snapshot: validated)
+            // Run learning only if enabled.
+            if capsuleStore.capsule.learningEnabled {
+                let learner = PatternLearner()
+                let observations = learner.deriveObservations(from: validated, redactedText: redacted)
+                try learner.apply(observations: observations, into: modelContext, now: now)
 
-                // Run learning if enabled
-                if capsuleStore.capsule.learningEnabled {
-                    let learner = PatternLearner()
-                    let observations = learner.deriveObservations(from: validated, redactedText: redacted)
-                    try learner.apply(observations: observations, into: modelContext, now: Date())
-
-                    // Project PatternStats -> Capsule.learnedTendencies
-                    LearningSync.sync(context: modelContext, capsuleStore: capsuleStore, now: Date())
-                }
+                // Project PatternStats -> Capsule.learnedTendencies
+                LearningSync.sync(context: modelContext, capsuleStore: capsuleStore, now: now)
             }
 
             onCreated(id)

@@ -62,8 +62,15 @@ final class TurnCaptureCoordinator: ObservableObject {
     // Ignore late/duplicate simulator errors
     private var lastCompletionAt: Date?
 
-    // NEW: hold URL until we know recording really started
+    // Hold URL until we know recording really started
     private var pendingCaptureURL: URL?
+
+    // Idle timer guard (keeps reasserting while recording)
+    private var idleGuardTask: Task<Void, Never>?
+
+    // One-time recognizer warm-up per app session
+    private var hasWarmedUp: Bool = false
+    private var warmUpTask: Task<Void, Never>?
 
     init() {}
 
@@ -73,6 +80,14 @@ final class TurnCaptureCoordinator: ObservableObject {
         self.capsuleStore = capsuleStore
         self.repo = TurnRepository(context: modelContext)
         wireIfNeeded()
+
+        // Eager, one-time warm-up so first real capture isn't truncated.
+        if !hasWarmedUp {
+            warmUpTask?.cancel()
+            warmUpTask = Task { [weak self] in
+                await self?.warmUpIfNeeded()
+            }
+        }
     }
 
     func handleScenePhaseChange(_ newPhase: ScenePhase) {
@@ -88,6 +103,10 @@ final class TurnCaptureCoordinator: ObservableObject {
 
     private func stopIfNeededForLifecycle() {
         guard !isStoppingForLifecycle else { return }
+
+        // Always restore idle on lifecycle stop
+        stopIdleGuard()
+        setIdleTimerDisabled(false)
 
         switch phase {
         case .idle:
@@ -122,6 +141,10 @@ final class TurnCaptureCoordinator: ObservableObject {
             return
         }
 
+        // If a warm-up is in progress, cancel it immediately to prioritise real capture.
+        warmUpTask?.cancel()
+        warmUpTask = nil
+
         clearErrors()
         isStoppingForLifecycle = false
 
@@ -133,11 +156,17 @@ final class TurnCaptureCoordinator: ObservableObject {
 
         if transcriber.isTranscribing { transcriber.cancel() }
 
+        // Enter recording phase and immediately assert idle disabled.
         phase = .recording
+        setIdleTimerDisabled(true)
+        startIdleGuard()
 
         Task { @MainActor in
             let ok = await transcriber.startSession()
             guard ok else {
+                // Failed to start speech; leave recording flow and restore idle.
+                stopIdleGuard()
+                setIdleTimerDisabled(false)
                 phase = .idle
                 return
             }
@@ -159,6 +188,8 @@ final class TurnCaptureCoordinator: ObservableObject {
             transcriber.stop()
         } else {
             phase = .idle
+            stopIdleGuard()
+            setIdleTimerDisabled(false)
         }
 
         // If we never created a turn (recording never truly started), clear pending URL.
@@ -262,9 +293,12 @@ final class TurnCaptureCoordinator: ObservableObject {
     }
 
     private func handleRecorderRecordingChanged(_ isRecording: Bool) {
+        // Mirror the device state promptly.
+        setIdleTimerDisabled(isRecording)
         if isRecording {
             // Now we know the engine actually started.
             if phase != .recording { phase = .recording }
+            startIdleGuard()
             createTurnIfNeededNowThatRecordingIsLive()
             return
         }
@@ -272,6 +306,7 @@ final class TurnCaptureCoordinator: ObservableObject {
         // Recording stopped. Move to transcribing (unless already finished)
         if phase == .finalising || phase == .recording {
             phase = .transcribing
+            stopIdleGuard()
         }
     }
 
@@ -298,6 +333,8 @@ final class TurnCaptureCoordinator: ObservableObject {
         guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard let id = activeTurnID, let repo, let dictionary else {
             phase = .idle
+            stopIdleGuard()
+            setIdleTimerDisabled(false)
             return
         }
 
@@ -317,34 +354,19 @@ final class TurnCaptureCoordinator: ObservableObject {
                 titleIfAuto: autoTitle
             )
 
-            // C2: Local WAL build (internal flag, non-UI)
-            if FeatureFlags.localWALBuildEnabled {
-                let lift0 = Lift0Extractor().extract(from: redacted)
-                let candidates = PrimitiveCandidateExtractor().extract(from: redacted)
-                let topScore = candidates.first?.score
-                let selection = PrimitiveCandidateExtractor().selectTop(from: candidates)
-                let lenses = LensSelector().select(from: selection.dominant, background: selection.background, topCandidateScore: topScore)
-                let validated = WALValidator().validate(
-                    lift0: lift0,
-                    primitiveDominant: selection.dominant,
-                    primitiveBackground: selection.background,
-                    candidates: candidates,
-                    lenses: lenses,
-                    confirmationNeeded: selection.needsConfirmation
-                )
+            // Build validated WAL unconditionally and always persist locally.
+            let now = Date()
+            let validated = WALBuilder.buildValidated(from: redacted, now: now)
+            try repo.updateWAL(id: id, snapshot: validated)
 
-                // Persist only the validated snapshot
-                try repo.updateWAL(id: id, snapshot: validated)
+            // Derive and apply learning observations only when learning is enabled.
+            if let context = self.modelContext, let store = self.capsuleStore, store.capsule.learningEnabled {
+                let learner = PatternLearner()
+                let observations = learner.deriveObservations(from: validated, redactedText: redacted)
+                try learner.apply(observations: observations, into: context, now: now)
 
-                // NEW: Derive and apply learning observations (gated, validated-only)
-                if let context = self.modelContext, let store = self.capsuleStore, store.capsule.learningEnabled {
-                    let learner = PatternLearner()
-                    let observations = learner.deriveObservations(from: validated, redactedText: redacted)
-                    try learner.apply(observations: observations, into: context, now: Date())
-
-                    // Bridge to Capsule: project PatternStats -> Capsule.learnedTendencies (one-way)
-                    LearningSync.sync(context: context, capsuleStore: store, now: Date())
-                }
+                // Bridge to Capsule: project PatternStats -> Capsule.learnedTendencies (one-way)
+                LearningSync.sync(context: context, capsuleStore: store, now: now)
             }
 
             lastCompletedTurnID = id
@@ -360,6 +382,8 @@ final class TurnCaptureCoordinator: ObservableObject {
         }
 
         phase = .idle
+        stopIdleGuard()
+        setIdleTimerDisabled(false)
     }
 
     private func handleTranscriptionError(_ message: String) {
@@ -367,6 +391,8 @@ final class TurnCaptureCoordinator: ObservableObject {
            let t = lastCompletionAt,
            Date().timeIntervalSince(t) < 3.0 {
             phase = .idle
+            stopIdleGuard()
+            setIdleTimerDisabled(false)
             return
         }
 
@@ -388,6 +414,8 @@ final class TurnCaptureCoordinator: ObservableObject {
         }
 
         phase = .idle
+        stopIdleGuard()
+        setIdleTimerDisabled(false)
     }
 
     private static func autoTitle(from text: String) -> String? {
@@ -406,4 +434,67 @@ final class TurnCaptureCoordinator: ObservableObject {
         let capped = String(title.prefix(56))
         return capped.isEmpty ? nil : capped
     }
+
+    // MARK: - Idle timer (iOS only)
+
+    private func startIdleGuard() {
+        // Cancel any previous guard
+        idleGuardTask?.cancel()
+        idleGuardTask = Task { [weak self] in
+            // Reassert every ~20s (shorter than typical auto-lock values), while recording.
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 20_000_000_000)
+                await MainActor.run {
+                    guard let self else { return }
+                    if self.phase == .recording {
+                        self.setIdleTimerDisabled(true)
+                    } else {
+                        self.idleGuardTask?.cancel()
+                        self.idleGuardTask = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopIdleGuard() {
+        idleGuardTask?.cancel()
+        idleGuardTask = nil
+    }
+
+    @MainActor
+    private func setIdleTimerDisabled(_ disabled: Bool) {
+#if os(iOS)
+        UIApplication.shared.isIdleTimerDisabled = disabled
+#endif
+    }
+
+    // MARK: - One-time warm-up
+
+    private func warmUpIfNeeded() async {
+        guard !hasWarmedUp else { return }
+
+        // Start a short, hidden session to prime recognizer and audio paths.
+        let ok = await transcriber.startSession(timeoutSeconds: 5)
+        guard ok else {
+            hasWarmedUp = true // avoid retry loops; we can revisit if needed
+            return
+        }
+
+        // No need to attach the recorder; we just want the recognizer spun up.
+        // Wait briefly to allow model initialisation.
+        do {
+            try await Task.sleep(nanoseconds: 1_500_000_000) // ~1.5s
+        } catch { }
+
+        // If a real capture started meanwhile, transcriber might already be in use; bail safely.
+        if phase == .recording || phase == .transcribing || phase == .redacting {
+            hasWarmedUp = true
+            return
+        }
+
+        transcriber.cancel()
+        hasWarmedUp = true
+    }
 }
+

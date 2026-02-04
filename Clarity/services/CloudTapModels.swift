@@ -1,17 +1,27 @@
 import Foundation
 
+// MARK: - Learned cues (bounded, optional)
+
+struct CloudTapLearnedCue: Codable, Sendable, Equatable {
+    let statement: String
+    let evidenceCount: Int
+    let lastSeenAtISO: String
+}
+
 // MARK: - Capsule snapshot (bounded, safe)
 
 struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
     let version: Int
     let updatedAt: String
     let preferences: [String: String]
+    let learnedCues: [CloudTapLearnedCue]?    // optional, gated by learningEnabled
 
     static func fromCapsule(_ capsule: CapsuleModel) -> CloudTapCapsuleSnapshot {
         CloudTapCapsuleSnapshot(
             version: capsule.version,
             updatedAt: ISO8601DateFormatter().string(from: capsule.updatedAt),
-            preferences: boundPreferences(capsule.preferences)
+            preferences: boundPreferences(capsule.preferences),
+            learnedCues: capsule.cloudTapLearnedCuesPayload(max: 12) // returns nil unless learningEnabled && non-empty
         )
     }
 

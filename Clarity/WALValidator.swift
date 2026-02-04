@@ -65,7 +65,8 @@ struct WALValidator {
         primitiveBackground: [CanonicalPrimitive],
         candidates: [PrimitiveCandidate],
         lenses: LensSelection,
-        confirmationNeeded: Bool
+        confirmationNeeded: Bool,
+        now: Date = Date()
     ) -> ValidatedWalSnapshot {
         // Clamp counts per spec
         let dom = Array(primitiveDominant.prefix(2)).map { $0.rawValue }
@@ -100,7 +101,7 @@ struct WALValidator {
             pattern_signals: [],
             capsule_suggestions: [],
             provenance: ["built_by": "local", "cloudtap_used": "false"],
-            updatedAtISO: ISO8601DateFormatter().string(from: Date()),
+            updatedAtISO: ISO8601DateFormatter().string(from: now),
             version: 1
         )
         return ValidatedWalSnapshot(snapshot: out)

@@ -735,7 +735,11 @@ struct TurnDetailView: View {
 
         let hasExtras = !p.extras.isEmpty
 
-        guard hasTyped || hasExtras else { return nil }
+        // NEW: learned cues count only when learningEnabled is true
+        let learned = c.cloudTapLearnedCuesPayload(max: 12)
+        let hasLearned = (learned?.isEmpty == false)
+
+        guard hasTyped || hasExtras || hasLearned else { return nil }
         return CloudTapCapsuleSnapshot.fromCapsule(c)
     }
 

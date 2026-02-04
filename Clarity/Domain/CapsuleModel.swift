@@ -43,3 +43,34 @@ struct CapsuleModel: Codable, Sendable, Equatable {
         )
     }
 }
+
+// MARK: - Cloud Tap learned cues export (bounded, optional)
+
+extension CapsuleModel {
+    func cloudTapLearnedCuesPayload(max limit: Int = 12) -> [CloudTapLearnedCue]? {
+        guard learningEnabled else { return nil }
+        guard !learnedTendencies.isEmpty else { return nil }
+
+        let iso = ISO8601DateFormatter()
+
+        // Take top N as already curated/sorted by LearningSync
+        let capped = learnedTendencies.prefix(limit)
+
+        let items: [CloudTapLearnedCue] = capped.compactMap { t -> CloudTapLearnedCue? in
+            let s = t.statement.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !s.isEmpty else { return nil }
+
+            // Bound fields defensively
+            let boundedStatement = String(s.prefix(140))
+            let boundedCount = max(1, min(999, t.evidenceCount))
+
+            return CloudTapLearnedCue(
+                statement: boundedStatement,
+                evidenceCount: boundedCount,
+                lastSeenAtISO: iso.string(from: t.lastSeenAt)
+            )
+        }
+
+        return items.isEmpty ? nil : items
+    }
+}

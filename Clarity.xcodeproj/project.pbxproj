@@ -6,7 +6,12 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		F534AC5A2F32C9010046860C /* WALBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F534AC592F32C9010046860C /* WALBuilder.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		F534AC592F32C9010046860C /* WALBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WALBuilder.swift; sourceTree = "<group>"; };
 		F54A10682F1F9624003FF874 /* Clarity.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Clarity.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -53,6 +58,7 @@
 				F54A106A2F1F9624003FF874 /* Clarity */,
 				F54A10692F1F9624003FF874 /* Products */,
 				F5682B2D2F23857000AE7D8E /* docs */,
+				F534AC592F32C9010046860C /* WALBuilder.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -138,6 +144,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F534AC5A2F32C9010046860C /* WALBuilder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

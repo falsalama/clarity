@@ -96,25 +96,6 @@ struct SettingsView: View {
             } header: {
                 Text("Safety")
             }
-
-#if DEBUG
-            // Developer
-            Section {
-                Toggle(isOn: Binding(
-                    get: { FeatureFlags.localWALBuildEnabled },
-                    set: { FeatureFlags.localWALBuildEnabled = $0 }
-                )) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Enable local WAL build")
-                        Text("Generates WAL locally and updates learned cues (development only).")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Developer")
-            }
-#endif
         }
         .navigationTitle("Settings")
         .confirmationDialog(
