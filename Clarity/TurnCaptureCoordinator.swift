@@ -97,12 +97,21 @@ final class TurnCaptureCoordinator: ObservableObject {
         switch newPhase {
         case .active:
             isStoppingForLifecycle = false
-        case .inactive, .background:
+
+        case .inactive:
+            // IMPORTANT:
+            // Siri handoff / overlays often flip the app to .inactive briefly.
+            // Do NOT stop capture on .inactive or Siri-start will "blink off".
+            return
+
+        case .background:
             stopIfNeededForLifecycle()
+
         @unknown default:
             stopIfNeededForLifecycle()
         }
     }
+
 
     private func stopIfNeededForLifecycle() {
         guard !isStoppingForLifecycle else { return }

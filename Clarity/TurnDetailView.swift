@@ -4,6 +4,7 @@ import SwiftData
 struct TurnDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var cloudTap: CloudTapSettings
+    @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var dictionary: RedactionDictionary
     @EnvironmentObject private var capsuleStore: CapsuleStore
 
@@ -607,12 +608,12 @@ struct TurnDetailView: View {
     }
 
     private func toolButton(title: String, tool: CloudTool, enabled: Bool) -> some View {
-        Button(title) { requestCloudTool(tool) }
+        Button(title) { requestTool(tool) }
             .buttonStyle(.bordered)
             .disabled(!enabled)
     }
 
-    private func requestCloudTool(_ tool: CloudTool) {
+    private func requestTool(_ tool: CloudTool) {
         pendingTool = tool
 
         guard turn != nil else {
@@ -620,12 +621,94 @@ struct TurnDetailView: View {
             return
         }
 
-        guard cloudTap.isEnabled else {
-            sheetRoute = .cloudTapOff
-            return
+        if shouldUseCloudTap(for: tool) {
+            guard cloudTap.isEnabled else {
+                sheetRoute = .cloudTapOff
+                return
+            }
+            showCloudConfirm = true
+        } else {
+            Task { await sendDeviceTapRequest() }
+        }
+    }
+
+    private func shouldUseCloudTap(for tool: CloudTool) -> Bool {
+        // Talk-it-through remains cloud-only for now.
+        if tool == .talkItThrough { return true }
+        switch providerSettings.choice {
+        case .cloudTap:
+            return true
+        case .auto:
+            // Until Device Tap is wired, keep Auto on Cloud Tap.
+            return true
+        case .deviceTapApple, .deviceTapLlama:
+            return false
+        }
+    }
+
+    private func sendDeviceTapRequest() async {
+        guard let t = turn else { return }
+        let redactedText = transcriptForCloudPayload(from: t)
+        guard !redactedText.isEmpty else { return }
+
+        isSendingCloud = true
+        defer { isSendingCloud = false }
+
+        let appVersion =
+            Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+            ?? "0"
+
+        let snapshot = capsuleSnapshotOrNil()
+
+        let mode: ContemplationMode
+        switch pendingTool {
+        case .reflect: mode = .reflect
+        case .perspective: mode = .perspective
+        case .options: mode = .options
+        case .questions: mode = .questions
+        case .talkItThrough: mode = .talkItThrough
         }
 
-        showCloudConfirm = true
+        let request = ContemplationRequest(
+            mode: mode,
+            text: redactedText,
+            recordedAtISO: t.recordedAt.ISO8601Format(),
+            appVersion: appVersion,
+            capsule: snapshot,
+            previousResponseID: t.talkLastResponseID
+        )
+
+        do {
+            let service = ContemplationService(cloudTap: cloudTap, providerSettings: providerSettings)
+            let resp = try await service.generate(request)
+
+            // Save into the same fields as Cloud Tap so the UI stays the same.
+            switch pendingTool {
+            case .reflect:
+                t.reflectText = resp.text
+                t.reflectPromptVersion = resp.promptVersion
+                t.reflectUpdatedAt = Date()
+            case .options:
+                t.optionsText = resp.text
+                t.optionsPromptVersion = resp.promptVersion
+                t.optionsUpdatedAt = Date()
+            case .questions:
+                t.questionsText = resp.text
+                t.questionsPromptVersion = resp.promptVersion
+                t.questionsUpdatedAt = Date()
+            case .perspective:
+                t.perspectiveText = resp.text
+                t.perspectivePromptVersion = resp.promptVersion
+                t.perspectiveUpdatedAt = Date()
+            case .talkItThrough:
+                t.reflectionText = resp.text
+            }
+
+            t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.perspectiveText) ?? ""
+            try modelContext.save()
+        } catch {
+            cloudSendError = String(describing: error)
+        }
     }
 
     private func sendCloudTapRequest() async {

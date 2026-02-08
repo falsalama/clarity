@@ -274,7 +274,7 @@
 				CODE_SIGN_ENTITLEMENTS = Clarity/Clarity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 9WUKD3DY42;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -284,6 +284,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Clarity;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
+				INFOPLIST_KEY_NSSiriUsageDescription = "to open and record audio captures";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on-device";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -326,7 +327,7 @@
 				CODE_SIGN_ENTITLEMENTS = Clarity/Clarity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 9WUKD3DY42;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -336,6 +337,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Clarity;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
+				INFOPLIST_KEY_NSSiriUsageDescription = "to open and record audio captures";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on-device";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;

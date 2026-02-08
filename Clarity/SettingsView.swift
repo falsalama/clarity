@@ -6,13 +6,114 @@ import UIKit
 struct SettingsView: View {
     @EnvironmentObject private var dictionary: RedactionDictionary
     @EnvironmentObject private var cloudTap: CloudTapSettings
+    @EnvironmentObject private var providerSettings: ContemplationProviderSettings
+
+    @StateObject private var modelManager = LocalModelManager.shared
 
     @State private var newToken: String = ""
     @State private var confirmRemoveAll = false
 
     var body: some View {
         List {
-            // Redaction terms
+            Section {
+                Picker("Provider", selection: $providerSettings.choice) {
+                    ForEach(ContemplationProviderSettings.Choice.allCases) { choice in
+                        Text(choice.title).tag(choice)
+                    }
+                }
+
+                Text(providerSettings.choice.footnote)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if providerSettings.choice == .deviceTapApple {
+                    Text("Device Tap (Apple) uses the system on-device model. It requires iOS 26+ and an Apple Intelligence-capable device.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if providerSettings.choice == .deviceTapLlama {
+                    Text("Device Tap (Llama) runs locally using an optional downloaded model: \(modelManager.modelNameForUI).")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+            } header: {
+                Text("Processing")
+            }
+
+            // Local model section only when Llama is selected
+            if providerSettings.choice == .deviceTapLlama {
+                Section {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Expected file: \(modelManager.expectedFileNameForUI)")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Text("Expected path:")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                        Text(modelManager.expectedPathForUI)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+
+                        Text("Exists: \(modelManager.existsForUI ? "Yes" : "No")")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .foregroundColor(modelManager.existsForUI ? nil : .red)
+
+
+                        Text("Size: \(modelManager.fileSizeBytesForUI) bytes")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+
+                    switch modelManager.state {
+                    case .notInstalled:
+                        Button("Download local model (~2 GB)") {
+                            modelManager.startDownload()
+                        }
+                        Text("Downloaded to this device only. Required for Device Tap (Llama).")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                    case .downloading:
+                        ProgressView()
+                        Text("Downloading…")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+
+                    case .ready:
+                        LabeledContent("Status") { Text("Installed") }
+                        Button("Delete local model", role: .destructive) {
+                            modelManager.deleteModel()
+                        }
+
+                    case .failed(let message):
+                        Text("Download failed: \(message)")
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Button("Retry download") {
+                            modelManager.startDownload()
+                        }
+                    }
+
+                    Button("Refresh model status") {
+                        modelManager.refreshStatePublic()
+                    }
+                } header: {
+                    Text("Local model")
+                }
+            }
+
+            // Redaction
             Section("Redaction") {
                 if dictionary.tokens.isEmpty {
                     Text("No redacted terms yet.")
@@ -33,9 +134,7 @@ struct SettingsView: View {
                         .submitLabel(.done)
                         .onSubmit { addToken() }
 
-                    Button {
-                        addToken()
-                    } label: {
+                    Button { addToken() } label: {
                         Text("Add")
                             .fontWeight(.semibold)
                     }
@@ -87,7 +186,7 @@ struct SettingsView: View {
                 Text("Transparency")
             }
 
-            // Safety (Driving / CarPlay)
+            // Safety
             Section {
                 LabeledContent("Driving / CarPlay") { Text("Capture only") }
                 Text("Reflection and cloud actions are unavailable while driving.")
@@ -103,9 +202,7 @@ struct SettingsView: View {
             isPresented: $confirmRemoveAll,
             titleVisibility: .visible
         ) {
-            Button("Remove all", role: .destructive) {
-                dictionary.wipe()
-            }
+            Button("Remove all", role: .destructive) { dictionary.wipe() }
             Button("Cancel", role: .cancel) { }
         } message: {
             Text("This clears your redaction list. You can add terms again at any time.")
