@@ -33,8 +33,7 @@ final class ContemplationService {
             return AppleFMProvider()
 
         case .deviceTapLlama:
-            return LocalLlamaProvider()
-
+            return LocalLlamaProvider.shared
 
         case .auto:
             // Only pick Apple FM when it is *actually* available.

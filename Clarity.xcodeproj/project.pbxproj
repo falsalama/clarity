@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F534AC5A2F32C9010046860C /* WALBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F534AC592F32C9010046860C /* WALBuilder.swift */; };
+		F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F5A6E0222F3939A00097A43D /* LlamaSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +92,7 @@
 			);
 			name = Clarity;
 			packageProductDependencies = (
+				F5A6E0222F3939A00097A43D /* LlamaSwift */,
 			);
 			productName = Clarity;
 			productReference = F54A10682F1F9624003FF874 /* Clarity.app */;
@@ -119,6 +122,9 @@
 			);
 			mainGroup = F54A105F2F1F9624003FF874;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F54A10692F1F9624003FF874 /* Products */;
 			projectDirPath = "";
@@ -395,6 +401,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mattt/llama.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7972.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F5A6E0222F3939A00097A43D /* LlamaSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */;
+			productName = LlamaSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F54A10602F1F9624003FF874 /* Project object */;
 }

@@ -9,6 +9,7 @@ struct AppShellView: View {
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
+    @StateObject private var providerSettings = ContemplationProviderSettings()
 
     @State private var didBind = false
     @State private var pendingSiriStart = false
@@ -41,6 +42,7 @@ struct AppShellView: View {
         .environmentObject(capsuleStore)
         .environmentObject(redactionDictionary)
         .environmentObject(captureCoordinator)
+        .environmentObject(providerSettings)
         .onAppear {
             guard !didBind else { return }
             didBind = true
@@ -115,4 +117,3 @@ struct AppShellView: View {
         }
     }
 }
-
