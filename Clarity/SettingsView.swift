@@ -337,8 +337,8 @@ enum SettingsCopy {
     // MARK: - Safety
     static let safetyHeader = "Safety"
     static let drivingTitle = "Driving / CarPlay"
-    static let drivingValue = "Capture only"
-    static let drivingFootnote = "Reflection and cloud actions are unavailable while driving."
+    static let drivingValue = "capture playback & handsfree capture"
+    static let drivingFootnote = "Hands free audio capture is available on iPhone (and via siri shortcut, if enabled).."
 
     // MARK: - Errors
     static let importFailedTitle = "Couldn’t import model"
