@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F534AC5A2F32C9010046860C /* WALBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F534AC592F32C9010046860C /* WALBuilder.swift */; };
+		F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F5A6E0222F3939A00097A43D /* LlamaSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +92,7 @@
 			);
 			name = Clarity;
 			packageProductDependencies = (
+				F5A6E0222F3939A00097A43D /* LlamaSwift */,
 			);
 			productName = Clarity;
 			productReference = F54A10682F1F9624003FF874 /* Clarity.app */;
@@ -119,6 +122,9 @@
 			);
 			mainGroup = F54A105F2F1F9624003FF874;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F54A10692F1F9624003FF874 /* Products */;
 			projectDirPath = "";
@@ -274,7 +280,7 @@
 				CODE_SIGN_ENTITLEMENTS = Clarity/Clarity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 9WUKD3DY42;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -284,6 +290,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Clarity;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
+				INFOPLIST_KEY_NSSiriUsageDescription = "to open and record audio captures";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on-device";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -310,6 +317,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "Clarity/LocalLlamaRuntime/Clarity-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
@@ -326,7 +334,7 @@
 				CODE_SIGN_ENTITLEMENTS = Clarity/Clarity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 9WUKD3DY42;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -336,6 +344,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Clarity;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
+				INFOPLIST_KEY_NSSiriUsageDescription = "to open and record audio captures";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on-device";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
@@ -362,6 +371,7 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "Clarity/LocalLlamaRuntime/Clarity-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
@@ -391,6 +401,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/mattt/llama.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7972.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		F5A6E0222F3939A00097A43D /* LlamaSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */;
+			productName = LlamaSwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = F54A10602F1F9624003FF874 /* Project object */;
 }
