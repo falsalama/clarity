@@ -2,10 +2,6 @@
 import SwiftUI
 
 struct PrivacyView: View {
-    @EnvironmentObject private var cloudTap: CloudTapSettings
-
-    @State private var confirmDisable = false
-
     var body: some View {
         Form {
             Section {
@@ -16,21 +12,6 @@ struct PrivacyView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Section {
-                Toggle(isOn: enableBinding) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Enable Cloud Tap")
-                        Text("You confirm each send.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            } header: {
-                Text("Cloud Tap")
-            } footer: {
-                Text("Cloud Tap enables optional on-demand processing. Nothing is sent automatically.")
             }
 
             Section {
@@ -51,29 +32,6 @@ struct PrivacyView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .confirmationDialog(
-            "Disable Cloud Tap?",
-            isPresented: $confirmDisable,
-            titleVisibility: .visible
-        ) {
-            Button("Disable", role: .destructive) { cloudTap.isEnabled = false }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Cloud Tap will remain off until you enable it again.")
-        }
-    }
-
-    private var enableBinding: Binding<Bool> {
-        Binding(
-            get: { cloudTap.isEnabled },
-            set: { newValue in
-                if !newValue, cloudTap.isEnabled {
-                    confirmDisable = true
-                } else {
-                    cloudTap.isEnabled = newValue
-                }
-            }
-        )
     }
 }
 

@@ -5,6 +5,7 @@ import SwiftData
 @main
 struct ClarityApp: App {
     @StateObject private var cloudTap = CloudTapSettings()
+    @StateObject private var providerSettings = ContemplationProviderSettings()
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
 
@@ -41,6 +42,7 @@ struct ClarityApp: App {
         WindowGroup {
             AppShellView()
                 .environmentObject(cloudTap)
+                .environmentObject(providerSettings)
                 .environmentObject(capsuleStore)
                 .environmentObject(redactionDictionary)
         }
