@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
@@ -12,7 +13,10 @@ struct AppShellView: View {
     @EnvironmentObject private var redactionDictionary: RedactionDictionary
 
     // First-run welcome splash gate
-    @AppStorage("hasSeenWelcomeOverlay_v7") private var hasSeenWelcomeOverlay: Bool = false
+    @AppStorage("hasSeenWelcomeOverlay_v9") private var hasSeenWelcomeOverlay: Bool = false
+
+    // DEBUG ONLY — keep false in normal builds
+    private let FORCE_SPLASH_DEBUG: Bool = true
 
     // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
@@ -26,6 +30,10 @@ struct AppShellView: View {
     @State private var showWelcomeSplash: Bool = false
     @State private var initialTabWhenSplashShown: AppTab? = nil
     @State private var ignoreTabChangesUntil: Date = .distantPast
+
+    // Tab bar fade-in
+    @State private var tabBar: UITabBar? = nil
+    @State private var didRunTabBarFadeThisLaunch: Bool = false
 
     private enum AppTab: Hashable { case reflect, focus, practice, profile }
     @State private var selectedTab: AppTab = .reflect
@@ -51,6 +59,8 @@ struct AppShellView: View {
         }
         .environmentObject(captureCoordinator)
         .environmentObject(welcomeSurface)
+
+        // Bind + show splash once
         .onAppear {
             if !didBind {
                 didBind = true
@@ -63,37 +73,43 @@ struct AppShellView: View {
 
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
 
-                // If Siri set the flag before the UI was ready, mark pending.
                 if SiriLaunchFlag.consumeStartCaptureRequest() {
                     pendingSiriStart = true
                 }
 
-                // If we already appear and we're active, try.
                 if scenePhase == .active {
                     scheduleSiriStartIfNeeded()
                 }
-
-                // Best-effort refresh of daily welcome surface.
-                Task { await welcomeSurface.refreshIfNeeded() }
             }
 
-            if !hasSeenWelcomeOverlay {
+            // Splash gate
+            if FORCE_SPLASH_DEBUG || !hasSeenWelcomeOverlay {
                 showWelcomeSplash = true
                 initialTabWhenSplashShown = selectedTab
                 ignoreTabChangesUntil = Date().addingTimeInterval(0.35)
+                maybeStartTabBarFade()
             } else {
                 showWelcomeSplash = false
+                tabBar?.alpha = 1.0
             }
         }
+
+        // Fetch manifest + image (runs once per view lifetime)
+        .task {
+            await welcomeSurface.refreshIfNeeded()
+        }
+
+        // Dismiss splash when user switches tab (optional behaviour)
         .onChange(of: selectedTab) { _, newTab in
-            guard showWelcomeSplash else { return }
+            guard showWelcomeSplash || FORCE_SPLASH_DEBUG else { return }
             guard Date() >= ignoreTabChangesUntil else { return }
 
-            // Dismiss only if the user actually changed tabs.
             if let initial = initialTabWhenSplashShown, newTab != initial {
                 dismissWelcomeSplash()
             }
         }
+
+        // Refresh when app becomes active
         .onChange(of: scenePhase) { _, newPhase in
             captureCoordinator.handleScenePhaseChange(newPhase)
 
@@ -101,28 +117,25 @@ struct AppShellView: View {
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
                 Task { await welcomeSurface.refreshIfNeeded() }
 
-                // If Siri sets the flag while we're running, mark pending.
                 if SiriLaunchFlag.consumeStartCaptureRequest() {
                     pendingSiriStart = true
                 }
 
                 scheduleSiriStartIfNeeded()
             } else {
-                // Cancel attempts while Siri/OS is bouncing lifecycle.
                 siriTask?.cancel()
                 siriTask = nil
             }
         }
     }
 
-    // MARK: - Tab wrapper (overlay lives INSIDE the tab content so the tab bar always stays on top)
+    // MARK: - Tab wrapper (overlay lives INSIDE tab content so tab bar stays on top)
 
     private func tabRoot<Content: View>(_ content: Content) -> some View {
         ZStack {
             content
 
-            if showWelcomeSplash {
-                // Tap anywhere dismisses (no fade). This overlay sits under the UIKit tab bar by construction.
+            if showWelcomeSplash || FORCE_SPLASH_DEBUG {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture { dismissWelcomeSplash() }
@@ -134,12 +147,37 @@ struct AppShellView: View {
                     .ignoresSafeArea()
             }
         }
+        .background(
+            TabBarReader { bar in
+                self.tabBar = bar
+                self.maybeStartTabBarFade()
+            }
+            .frame(width: 0, height: 0)
+        )
     }
 
     private func dismissWelcomeSplash() {
         showWelcomeSplash = false
-        hasSeenWelcomeOverlay = true
+        if !FORCE_SPLASH_DEBUG {
+            hasSeenWelcomeOverlay = true
+        }
         initialTabWhenSplashShown = nil
+        tabBar?.alpha = 1.0
+    }
+
+    private func maybeStartTabBarFade() {
+        guard (showWelcomeSplash || FORCE_SPLASH_DEBUG) else { return }
+        guard !didRunTabBarFadeThisLaunch else { return }
+        guard let bar = tabBar else { return }
+
+        didRunTabBarFadeThisLaunch = true
+
+        DispatchQueue.main.async {
+            bar.alpha = 0.12
+            UIView.animate(withDuration: 0.65, delay: 0.05, options: [.curveEaseOut, .beginFromCurrentState]) {
+                bar.alpha = 1.0
+            }
+        }
     }
 
     // MARK: - Siri start handling
@@ -152,25 +190,64 @@ struct AppShellView: View {
             try? await Task.sleep(nanoseconds: 1_200_000_000)
             guard scenePhase == .active else { return }
 
-            // One-shot consume.
             pendingSiriStart = false
 
-            // Always show Reflect tab (capture lives here).
             selectedTab = .reflect
             try? await Task.sleep(nanoseconds: 150_000_000)
 
-            // Attempt 1
             if captureCoordinator.phase == .idle {
                 captureCoordinator.startCapture()
             }
 
-            // Retry once if it immediately bounces back to idle.
             try? await Task.sleep(nanoseconds: 900_000_000)
             guard scenePhase == .active else { return }
             if captureCoordinator.phase == .idle {
                 captureCoordinator.startCapture()
             }
         }
+    }
+}
+
+// MARK: - UITabBar resolver
+
+private struct TabBarReader: UIViewControllerRepresentable {
+    let onResolve: (UITabBar) -> Void
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        ResolverViewController(onResolve: onResolve)
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+}
+
+private final class ResolverViewController: UIViewController {
+    private let onResolve: (UITabBar) -> Void
+    private var didResolve = false
+
+    init(onResolve: @escaping (UITabBar) -> Void) {
+        self.onResolve = onResolve
+        super.init(nibName: nil, bundle: nil)
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        resolveOnce()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        resolveOnce()
+    }
+
+    private func resolveOnce() {
+        guard !didResolve else { return }
+        guard let tabBar = tabBarController?.tabBar else { return }
+        didResolve = true
+        onResolve(tabBar)
     }
 }
 

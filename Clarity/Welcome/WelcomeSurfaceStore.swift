@@ -13,14 +13,40 @@ final class WelcomeSurfaceStore: ObservableObject {
 
     private let fm = FileManager.default
 
-    init(endpointURL: URL? = nil) {
-        self.endpointURL = endpointURL
+    init() {
+        func readEndpointString() -> String? {
+            // Accept either key to avoid silent mismatch.
+            let rawA = Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT") as? String
+            let rawB = Bundle.main.object(forInfoDictionaryKey: "WelcomeManifestEndpoint") as? String
+
+            // Prefer the all-caps key.
+            let raw = (rawA?.isEmpty == false) ? rawA : rawB
+            guard var s = raw else { return nil }
+
+            // Common failure modes: newline, leading/trailing spaces, or accidental prefix.
+            s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if let range = s.range(of: "endpointURL =") {
+                s = s[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            return s.isEmpty ? nil : s
+        }
+
+        if let urlString = readEndpointString(),
+           let url = URL(string: urlString) {
+            self.endpointURL = url
+        } else {
+            self.endpointURL = nil
+        }
+
+        print("WelcomeSurfaceStore.init endpointURL =", self.endpointURL?.absoluteString ?? "nil")
+
         loadCached()
     }
 
-    // MARK: - Public
-
     func refreshIfNeeded() async {
+        print("WelcomeSurfaceStore.refreshIfNeeded() called. endpointURL =", endpointURL ?? "nil")
         guard let endpointURL else { return }
 
         do {
@@ -28,6 +54,8 @@ final class WelcomeSurfaceStore: ObservableObject {
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
 
             let newManifest = try JSONDecoder().decode(WelcomeManifest.self, from: data)
+            print("WelcomeSurfaceStore received manifest:", newManifest)
+
             manifest = newManifest
             try persistManifest(data)
 
@@ -35,9 +63,10 @@ final class WelcomeSurfaceStore: ObservableObject {
                 await fetchAndCacheImage(from: imageURL)
             }
         } catch {
-            // silent: offline-first
+            print("WelcomeSurfaceStore error:", error)
         }
     }
+
 
     // MARK: - Private
 
