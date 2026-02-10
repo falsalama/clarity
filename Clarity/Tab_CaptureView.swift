@@ -101,12 +101,11 @@ struct Tab_CaptureView: View {
                                     Label("Delete", systemImage: "trash")
                                 }
 
-                                // Placeholder hook:
-                                // Wire this once we confirm a persisted boolean on TurnEntity (e.g. isStarred / isPinned).
                                 Button {
                                     starTurn(t)
                                 } label: {
-                                    Label("Star", systemImage: "star")
+                                    Label(t.isStarred ? "Unstar" : "Star",
+                                          systemImage: t.isStarred ? "star.slash" : "star")
                                 }
                                 .tint(.yellow)
                             }
@@ -141,8 +140,13 @@ struct Tab_CaptureView: View {
                 guard coordinator.isCarPlayConnected == false else { return }
 
                 coordinator.clearLiveTranscript()
-                path.append(id)
-                coordinator.lastCompletedTurnID = nil
+
+                // Small dwell so users can see Finalising/Processing before navigating.
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 350_000_000) // ~350 ms
+                    path.append(id)
+                    coordinator.lastCompletedTurnID = nil
+                }
             }
             .onChange(of: coordinator.uiError) { _, newValue in
                 guard let err = newValue else { return }
@@ -174,6 +178,14 @@ struct Tab_CaptureView: View {
                     path.append(newID)
                 }
                 .environmentObject(coordinator)
+            }
+            .onDisappear {
+                // When leaving the capture surface, if we’re not actively recording,
+                // collapse any lingering processing UI back to idle so the mic pill
+                // isn’t stuck on “Processing” when we return.
+                if coordinator.phase != .recording {
+                    coordinator.forceIdleIfProcessing()
+                }
             }
         }
     }
@@ -218,7 +230,7 @@ struct Tab_CaptureView: View {
     private var micButton: some View {
         CaptureButton(
             phase: coordinator.phase,
-            isEnabled: (coordinator.phase == .idle || coordinator.phase == .recording),
+            isEnabled: micButtonEnabled,
             level: coordinator.level
         ) {
             switch coordinator.phase {
@@ -230,7 +242,13 @@ struct Tab_CaptureView: View {
                 break
             }
         }
+        .padding(.top, 4)
     }
+
+    private var micButtonEnabled: Bool {
+        coordinator.phase == .idle || coordinator.phase == .recording
+    }
+
     // MARK: - Status
 
     private var statusPill: some View {
@@ -255,10 +273,10 @@ struct Tab_CaptureView: View {
     private var statusTextKey: String {
         switch coordinator.phase {
         case .idle: return "capture.ready"
-        case .recording: return "capture.listening"
-        case .finalising: return "capture.saving"
-        case .transcribing: return "capture.transcribing"
-        case .redacting: return "capture.redacting"
+        case .preparing: return "capture.preparing"
+        case .recording: return "capture.recording"
+        case .finalising: return "capture.finalising"
+        case .transcribing, .redacting: return "capture.processing"
         }
     }
 
@@ -280,9 +298,18 @@ struct Tab_CaptureView: View {
 
     private func captureRow(_ t: TurnEntity) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title(for: t))
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Text(title(for: t))
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                if t.isStarred {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                        .imageScale(.small)
+                        .accessibilityHidden(true)
+                }
+            }
 
             let preview = t.transcriptRedactedActive.trimmingCharacters(in: .whitespacesAndNewlines)
             if !preview.isEmpty {
@@ -309,8 +336,8 @@ struct Tab_CaptureView: View {
     }
 
     private func starTurn(_ t: TurnEntity) {
-        // Intentionally a no-op until we confirm a persisted flag on TurnEntity.
-        // Next step: implement `isStarred` (or reuse existing field) and toggle + save.
+        t.isStarred.toggle()
+        do { try modelContext.save() } catch { /* best-effort */ }
     }
 
     // MARK: - Errors

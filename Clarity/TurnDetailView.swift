@@ -897,17 +897,20 @@ private struct StatusPill: View {
 
     private var label: String? {
         switch stateRaw {
-        case "queued": return "Queued"
-        case "recording": return "Recording"
+        case "queued": return "Processing"
+        case "recording": return "recording"
+        case "processing", "stopping": return "Processing"
         case "transcribing", "transcribedRaw": return "Transcribing"
         case "redacting": return "Redacting"
         case "interrupted": return "Interrupted"
         case "failed": return "Failed"
-        case "captured": return "Captured"
+        case "captured": return "Processing"
         case "ready", .none: return nil
-        default: return nil
+        default: return "Processing"
         }
     }
+
+
 }
 
 // MARK: - Cloud Tap gating

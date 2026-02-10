@@ -26,6 +26,11 @@ final class TurnEntity {
     /// User-editable title. Empty string means "no manual title".
     var title: String = ""
 
+    // MARK: Flags
+
+    /// User mark to highlight important captures.
+    var isStarred: Bool = false
+
     // MARK: Audio
 
     var audioPath: String?

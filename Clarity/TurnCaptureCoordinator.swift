@@ -1,13 +1,19 @@
+// TurnCaptureCoordinator.swift
+
 import Foundation
 import SwiftData
 import Combine
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 @MainActor
 final class TurnCaptureCoordinator: ObservableObject {
 
     enum Phase: Equatable {
         case idle
+        case preparing
         case recording
         case finalising
         case transcribing
@@ -75,6 +81,12 @@ final class TurnCaptureCoordinator: ObservableObject {
     // Prevent duplicate learning updates for the same turn if transcripts arrive more than once
     private var learnedTurnIDs: Set<UUID> = []
 
+    // Post-stop pipeline control
+    private var postStopTask: Task<Void, Never>?
+    private var isPostStopActive: Bool = false
+    private let dwellFinalisingSeconds: Double = 1.0
+    private let dwellTranscribingSeconds: Double = 1.0
+
     init() {}
 
     func bind(modelContext: ModelContext, dictionary: RedactionDictionary, capsuleStore: CapsuleStore) {
@@ -99,7 +111,6 @@ final class TurnCaptureCoordinator: ObservableObject {
             isStoppingForLifecycle = false
 
         case .inactive:
-            // IMPORTANT:
             // Siri handoff / overlays often flip the app to .inactive briefly.
             // Do NOT stop capture on .inactive or Siri-start will "blink off".
             return
@@ -115,14 +126,13 @@ final class TurnCaptureCoordinator: ObservableObject {
     private func stopIfNeededForLifecycle() {
         guard !isStoppingForLifecycle else { return }
 
-        // Always restore idle on lifecycle stop
         stopIdleGuard()
         setIdleTimerDisabled(false)
 
         switch phase {
         case .idle:
             return
-        case .recording:
+        case .preparing, .recording:
             isStoppingForLifecycle = true
             stopCapture()
         case .finalising, .transcribing, .redacting:
@@ -130,6 +140,7 @@ final class TurnCaptureCoordinator: ObservableObject {
             recorder.stop()
             if transcriber.isTranscribing { transcriber.stop() }
             phase = .idle
+            isPostStopActive = false
         }
     }
 
@@ -139,13 +150,23 @@ final class TurnCaptureCoordinator: ObservableObject {
             startCapture()
         case .recording:
             stopCapture()
-        case .finalising, .transcribing, .redacting:
+        case .preparing, .finalising, .transcribing, .redacting:
             break
         }
     }
 
     func startCapture() {
-        guard phase == .idle else { return }
+        // Kill any lingering post-stop pipeline first.
+        postStopTask?.cancel()
+        postStopTask = nil
+        isPostStopActive = false
+
+        // If we’re not idle (e.g., stuck in processing UI), force-reset to idle.
+        if phase != .idle {
+            recorder.stop()
+            if transcriber.isTranscribing { transcriber.cancel() }
+            phase = .idle
+        }
 
         guard repo != nil, dictionary != nil else {
             setError(.notReady, debug: "Capture not ready.")
@@ -167,15 +188,15 @@ final class TurnCaptureCoordinator: ObservableObject {
 
         if transcriber.isTranscribing { transcriber.cancel() }
 
-        // Enter recording phase and immediately assert idle disabled.
-        phase = .recording
+        // Do NOT set .preparing for real capture; keep UI as-is until recording is actually live.
         setIdleTimerDisabled(true)
         startIdleGuard()
 
         Task { @MainActor in
+            await Task.yield()
+
             let ok = await transcriber.startSession()
             guard ok else {
-                // Failed to start speech; leave recording flow and restore idle.
                 stopIdleGuard()
                 setIdleTimerDisabled(false)
                 phase = .idle
@@ -189,19 +210,25 @@ final class TurnCaptureCoordinator: ObservableObject {
     }
 
     func stopCapture() {
-        guard phase == .recording else { return }
+        // Allow stop from preparing or recording.
+        guard phase == .recording || phase == .preparing else { return }
+        // If already in post-stop, ignore duplicate taps.
+        guard !isPostStopActive else { return }
+        isPostStopActive = true
 
+        // Freeze interim UI updates immediately
+        transcriber.resetUI()
+        liveTranscript = ""
+
+        // Immediately move UI away from "Recording"
         phase = .finalising
-        recorder.stop()
 
-        if transcriber.isTranscribing {
-            phase = .transcribing
-            transcriber.stop()
-        } else {
-            phase = .idle
-            stopIdleGuard()
-            setIdleTimerDisabled(false)
-        }
+        // Immediately stop engines to avoid tail updates and reduce blink risk
+        recorder.stop()
+        transcriber.stop()
+
+        // Start the post-stop pipeline right away (single owner)
+        startPostStopPipeline()
 
         // If we never created a turn (recording never truly started), clear pending URL.
         if activeTurnID == nil {
@@ -212,6 +239,40 @@ final class TurnCaptureCoordinator: ObservableObject {
     func clearLiveTranscript() {
         transcriber.hardResetAll()
         liveTranscript = ""
+    }
+
+    // NEW: collapse any non-recording processing state back to idle (used on view disappear)
+    func forceIdleIfProcessing() {
+        // Only act if we are not actively recording
+        guard phase != .recording else { return }
+
+        // Cancel post-stop pipeline
+        postStopTask?.cancel()
+        postStopTask = nil
+        isPostStopActive = false
+
+        // Stop recorder/transcriber best-effort
+        recorder.stop()
+        if transcriber.isTranscribing {
+            transcriber.cancel()
+        }
+
+        // Clear transient capture state
+        activeTurnID = nil
+        pendingCaptureURL = nil
+        lastHandledFilePath = nil
+        isHandlingFileURL = false
+
+        // Reset UI-related guards
+        stopIdleGuard()
+        setIdleTimerDisabled(false)
+
+        // Clear any transient UI errors for a clean return
+        uiError = nil
+        lastError = nil
+
+        // Return to idle
+        phase = .idle
     }
 
     private func clearErrors() {
@@ -260,13 +321,17 @@ final class TurnCaptureCoordinator: ObservableObject {
         transcriber.$liveTranscript
             .receive(on: RunLoop.main)
             .sink { [weak self] text in
-                self?.liveTranscript = text
+                guard let self else { return }
+                // Suppress late live updates during post-stop
+                if self.isPostStopActive { return }
+                self.liveTranscript = text
             }
             .store(in: &cancellables)
 
         transcriber.$lastTranscript
             .receive(on: RunLoop.main)
             .sink { [weak self] raw in
+                // This is the “final” streaming transcript result; allow it, post-stop or not.
                 self?.handleTranscriptArrived(raw)
             }
             .store(in: &cancellables)
@@ -293,7 +358,6 @@ final class TurnCaptureCoordinator: ObservableObject {
     }
 
     private func handleRecorderFileURL(_ url: URL) {
-        // Do NOT create a Turn yet. Just hold onto the URL.
         guard !isHandlingFileURL else { return }
 
         let path = url.path
@@ -304,20 +368,43 @@ final class TurnCaptureCoordinator: ObservableObject {
     }
 
     private func handleRecorderRecordingChanged(_ isRecording: Bool) {
-        // Mirror the device state promptly.
+        // Ignore any recorder state once post-stop pipeline has started.
+        if isPostStopActive { return }
+
         setIdleTimerDisabled(isRecording)
+
         if isRecording {
-            // Now we know the engine actually started.
             if phase != .recording { phase = .recording }
             startIdleGuard()
             createTurnIfNeededNowThatRecordingIsLive()
+            postStopTask?.cancel()
+            postStopTask = nil
             return
         }
 
-        // Recording stopped. Move to transcribing (unless already finished)
-        if phase == .finalising || phase == .recording {
-            phase = .transcribing
-            stopIdleGuard()
+        // Engine stopped without our explicit stop; start post-stop pipeline.
+        if phase == .recording || phase == .preparing {
+            stopCapture()
+        }
+    }
+
+    private func startPostStopPipeline() {
+        postStopTask?.cancel()
+        postStopTask = Task { @MainActor in
+            // Ensure finalising and stop the idle guard (idempotent)
+            self.phase = .finalising
+            self.stopIdleGuard()
+
+            // Dwell in Finalising
+            let finalisingNanos = UInt64((self.dwellFinalisingSeconds * 1_000_000_000).rounded())
+            try? await Task.sleep(nanoseconds: finalisingNanos)
+
+            // Move to Transcribing and dwell there
+            self.phase = .transcribing
+
+            let transcribingNanos = UInt64((self.dwellTranscribingSeconds * 1_000_000_000).rounded())
+            try? await Task.sleep(nanoseconds: transcribingNanos)
+            // Remain in .transcribing until transcript/error arrives.
         }
     }
 
@@ -327,13 +414,8 @@ final class TurnCaptureCoordinator: ObservableObject {
         guard let url = pendingCaptureURL else { return }
 
         let path = url.path
-        guard FileManager.default.fileExists(atPath: path) else {
-            // If the file still doesn't exist, don't create a Turn yet.
-            return
-        }
+        guard FileManager.default.fileExists(atPath: path) else { return }
 
-        // IMPORTANT:
-        // Store a relative pointer (stable across reinstalls), not an absolute container path.
         let stored = FileStore.storedAudioPath(forFilename: url.lastPathComponent)
 
         do {
@@ -347,11 +429,18 @@ final class TurnCaptureCoordinator: ObservableObject {
     private func handleTranscriptArrived(_ raw: String?) {
         guard let raw, !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard let id = activeTurnID, let repo, let dictionary else {
+            isPostStopActive = false
             phase = .idle
             stopIdleGuard()
             setIdleTimerDisabled(false)
+            activeTurnID = nil
+            pendingCaptureURL = nil
             return
         }
+
+        // Conclude the pipeline deterministically
+        postStopTask?.cancel()
+        postStopTask = nil
 
         phase = .redacting
 
@@ -362,6 +451,7 @@ final class TurnCaptureCoordinator: ObservableObject {
         do {
             try repo.markReady(
                 id: id,
+                endedAt: Date(),
                 transcriptRaw: raw,
                 transcriptRedactedActive: redacted,
                 redactionVersion: 1,
@@ -369,12 +459,10 @@ final class TurnCaptureCoordinator: ObservableObject {
                 titleIfAuto: autoTitle
             )
 
-            // Build validated WAL unconditionally and always persist locally.
             let now = Date()
             let validated = WALBuilder.buildValidated(from: redacted, now: now)
             try repo.updateWAL(id: id, snapshot: validated)
 
-            // Derive and apply learning observations only when learning is enabled (idempotent per turn).
             if let context = self.modelContext,
                let store = self.capsuleStore,
                store.capsule.learningEnabled,
@@ -384,10 +472,7 @@ final class TurnCaptureCoordinator: ObservableObject {
                 let observations = learner.deriveObservations(from: validated, redactedText: redacted)
                 try learner.apply(observations: observations, into: context, now: now)
 
-                // Mark learned for this turn to prevent duplicate increments
                 learnedTurnIDs.insert(id)
-
-                // Bridge to Capsule: project PatternStats -> Capsule.learnedTendencies (one-way)
                 LearningSync.sync(context: context, capsuleStore: store, now: now)
             }
 
@@ -399,22 +484,36 @@ final class TurnCaptureCoordinator: ObservableObject {
             transcriber.resetUI()
             liveTranscript = ""
 
-            // Kick off a full file-based pass to ensure long recordings are fully transcribed.
             runFileTranscriptionBackfill(for: id)
         } catch {
             setError(.couldntSaveTranscript, debug: "markReady failed: \(error.localizedDescription)")
             try? repo.markFailed(id: id, debug: lastError ?? "")
         }
 
-        phase = .idle
+        // Reset per-capture state so a quick new capture can start cleanly.
+        activeTurnID = nil
+        pendingCaptureURL = nil
+
+        isPostStopActive = false
+        // Intentionally do NOT set phase = .idle here to avoid a “Ready” blink
+        // while the UI begins navigation to the capture page. Let the view call
+        // forceIdleIfProcessing() on disappear to return to idle cleanly.
         stopIdleGuard()
         setIdleTimerDisabled(false)
     }
 
     private func handleTranscriptionError(_ message: String) {
+        // Conclude the pipeline deterministically.
+        postStopTask?.cancel()
+        postStopTask = nil
+
         if message == "No transcript captured.",
            let t = lastCompletionAt,
            Date().timeIntervalSince(t) < 3.0 {
+            activeTurnID = nil
+            pendingCaptureURL = nil
+
+            isPostStopActive = false
             phase = .idle
             stopIdleGuard()
             setIdleTimerDisabled(false)
@@ -438,6 +537,10 @@ final class TurnCaptureCoordinator: ObservableObject {
             try? repo.markFailed(id: id, debug: message)
         }
 
+        activeTurnID = nil
+        pendingCaptureURL = nil
+
+        isPostStopActive = false
         phase = .idle
         stopIdleGuard()
         setIdleTimerDisabled(false)
@@ -465,14 +568,12 @@ final class TurnCaptureCoordinator: ObservableObject {
     private func runFileTranscriptionBackfill(for id: UUID) {
         guard let repo, let dictionary else { return }
 
-        // Resolve audio URL
         let url: URL?
         if let u = pendingCaptureURL {
             url = u
         } else if let t = try? repo.fetch(id: id), let stored = t.audioPath, !stored.isEmpty {
             url = FileStore.existingAudioURL(from: stored)
-        }
-        else {
+        } else {
             url = nil
         }
         guard let audioURL = url else { return }
@@ -482,24 +583,21 @@ final class TurnCaptureCoordinator: ObservableObject {
                 let fullText = try await transcriber.transcribeFile(at: audioURL, onDevicePreferred: false)
                 guard !fullText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
-                // If unchanged, skip
                 guard let t = try repo.fetch(id: id) else { return }
                 if t.transcriptRaw == fullText { return }
 
-                // Replace transcript with full-pass result
                 let redacted = Redactor(tokens: dictionary.tokens).redact(fullText).redactedText
                 t.transcriptRaw = fullText
                 t.transcriptRedactedActive = redacted
                 t.redactionTimestamp = Date()
                 t.redactionVersion = max(t.redactionVersion, 1)
 
-                // Rebuild WAL snapshot (local only); avoid re-applying learning to prevent double counting.
                 let validated = WALBuilder.buildValidated(from: redacted, now: Date())
                 try repo.updateWAL(id: id, snapshot: validated)
 
                 try modelContext?.save()
             } catch {
-                // Silent: backfill is best-effort
+                // best-effort
             }
         }
     }
@@ -507,15 +605,13 @@ final class TurnCaptureCoordinator: ObservableObject {
     // MARK: - Idle timer (iOS only)
 
     private func startIdleGuard() {
-        // Cancel any previous guard
         idleGuardTask?.cancel()
         idleGuardTask = Task { [weak self] in
-            // Reassert every ~20s (shorter than typical auto-lock values), while recording.
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 20_000_000_000)
                 await MainActor.run {
                     guard let self else { return }
-                    if self.phase == .recording {
+                    if self.phase == .recording || self.phase == .preparing {
                         self.setIdleTimerDisabled(true)
                     } else {
                         self.idleGuardTask?.cancel()
@@ -543,21 +639,19 @@ final class TurnCaptureCoordinator: ObservableObject {
     private func warmUpIfNeeded() async {
         guard !hasWarmedUp else { return }
 
-        // Start a short, hidden session to prime recognizer and audio paths.
-        let ok = await transcriber.startSession(timeoutSeconds: 5)
+        // Silent, background warm-up: do not alter UI phase.
+        // Keep it short; cancel immediately if a real capture starts.
+        let ok = await transcriber.startSession(timeoutSeconds: 3)
         guard ok else {
-            hasWarmedUp = true // avoid retry loops; we can revisit if needed
+            hasWarmedUp = true
             return
         }
 
-        // No need to attach the recorder; we just want the recognizer spun up.
-        // Wait briefly to allow model initialisation.
-        do {
-            try await Task.sleep(nanoseconds: 1_500_000_000) // ~1.5s
-        } catch { }
+        // Brief dwell to let recognizer spin up.
+        do { try await Task.sleep(nanoseconds: 700_000_000) } catch { }
 
-        // If a real capture started meanwhile, transcriber might already be in use; bail safely.
-        if phase == .recording || phase == .transcribing || phase == .redacting {
+        // If a real capture started while warming up, don't override/cancel it.
+        if phase == .recording || phase == .transcribing || phase == .redacting || phase == .finalising {
             hasWarmedUp = true
             return
         }
