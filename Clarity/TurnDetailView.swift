@@ -93,11 +93,16 @@ struct TurnDetailView: View {
         .navigationTitle("Capture")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            if let t = turn, let updated = FileStore.normalisedStoredAudioPath(from: t.audioPath) {
+                t.audioPath = updated
+                try? modelContext.save()
+            }
             player.load(storedAudioPath: turn?.audioPath)
         }
         .onChange(of: turn?.audioPath) { _, _ in
             player.load(storedAudioPath: turn?.audioPath)
         }
+
         .onDisappear { player.stop() }
         .sheet(item: $sheetRoute) { route in
             switch route {

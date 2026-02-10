@@ -100,6 +100,19 @@ enum FileStore {
         let candidate = audioDir.appendingPathComponent(filename, isDirectory: false)
         return fm.fileExists(atPath: candidate.path) ? candidate : nil
     }
+    static func normalisedStoredAudioPath(from storedPath: String?) -> String? {
+        guard let storedPath, !storedPath.isEmpty else { return nil }
+
+        // Already preferred format
+        if storedPath.hasPrefix("Clarity/audio/") { return nil }
+
+        // If we can resolve it to an existing file, rewrite to preferred relative path
+        guard let url = existingAudioURL(from: storedPath) else { return nil }
+        let filename = url.lastPathComponent
+        guard !filename.isEmpty else { return nil }
+
+        return storedAudioPath(forFilename: filename)
+    }
 
     // MARK: - Deletes
 
