@@ -112,7 +112,6 @@ final class TurnCaptureCoordinator: ObservableObject {
         }
     }
 
-
     private func stopIfNeededForLifecycle() {
         guard !isStoppingForLifecycle else { return }
 
@@ -333,8 +332,12 @@ final class TurnCaptureCoordinator: ObservableObject {
             return
         }
 
+        // IMPORTANT:
+        // Store a relative pointer (stable across reinstalls), not an absolute container path.
+        let stored = FileStore.storedAudioPath(forFilename: url.lastPathComponent)
+
         do {
-            activeTurnID = try repo.createCaptureTurn(audioPath: path)
+            activeTurnID = try repo.createCaptureTurn(audioPath: stored)
         } catch {
             setError(.couldntStartCapture, debug: "createCaptureTurn failed: \(error.localizedDescription)")
             activeTurnID = nil
@@ -466,9 +469,10 @@ final class TurnCaptureCoordinator: ObservableObject {
         let url: URL?
         if let u = pendingCaptureURL {
             url = u
-        } else if let t = try? repo.fetch(id: id), let path = t.audioPath, !path.isEmpty {
-            url = URL(fileURLWithPath: path)
-        } else {
+        } else if let t = try? repo.fetch(id: id), let stored = t.audioPath, !stored.isEmpty {
+            url = FileStore.existingAudioURL(from: stored)
+        }
+        else {
             url = nil
         }
         guard let audioURL = url else { return }
@@ -562,3 +566,4 @@ final class TurnCaptureCoordinator: ObservableObject {
         hasWarmedUp = true
     }
 }
+

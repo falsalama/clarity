@@ -15,28 +15,41 @@ struct AppShellView: View {
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
 
+    /// App-level primary tabs.
+    /// - Reflect: capture + (soon) captures list entry point
+    /// - Focus: teaching / explore surface (v0: LearningView)
+    /// - Practice: tiny instruction surface (v0 placeholder for now)
+    /// - Profile: hub for Capsule + Settings (+ future Progress / Community)
     private enum AppTab: Hashable {
-        case capture, turns, capsule, settings
+        case reflect, focus, practice, profile
     }
-    @State private var selectedTab: AppTab = .capture
+
+    @State private var selectedTab: AppTab = .reflect
 
     var body: some View {
         TabView(selection: $selectedTab) {
+
+            // Reflect (for now: existing capture tab view)
             Tab_CaptureView()
-                .tabItem { Label("Capture", systemImage: "mic") }
-                .tag(AppTab.capture)
+                .tabItem { Label("Reflect", systemImage: "mic") }
+                .tag(AppTab.reflect)
 
-            NavigationStack { TurnsListView() }
-                .tabItem { Label("Captures", systemImage: "tray.full") }
-                .tag(AppTab.turns)
+            // Focus (for now: reuse existing LearningView as a v0 shell)
+            NavigationStack { FocusView() }
 
-            NavigationStack { CapsuleView() }
-                .tabItem { Label("Capsule", systemImage: "capsule") }
-                .tag(AppTab.capsule)
+                .tabItem { Label("Focus", systemImage: "book.closed") }
+                .tag(AppTab.focus)
 
-            NavigationStack { SettingsView() }
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-                .tag(AppTab.settings)
+            // Practice (temporary placeholder, replaced next with real PracticeView.swift)
+            NavigationStack { PracticeView() }
+
+                .tabItem { Label("Practice", systemImage: "leaf") }
+                .tag(AppTab.practice)
+
+            // Profile (new hub)
+            NavigationStack { ProfileHubView() }
+                .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                .tag(AppTab.profile)
         }
         .environmentObject(cloudTap)
         .environmentObject(capsuleStore)
@@ -99,8 +112,8 @@ struct AppShellView: View {
             // One-shot consume.
             pendingSiriStart = false
 
-            // Always show Capture tab.
-            selectedTab = .capture
+            // Always show Reflect tab (capture lives here).
+            selectedTab = .reflect
             try? await Task.sleep(nanoseconds: 150_000_000)
 
             // Attempt 1
@@ -110,6 +123,7 @@ struct AppShellView: View {
 
             // Retry once if it immediately bounces back to idle.
             try? await Task.sleep(nanoseconds: 900_000_000)
+
             guard scenePhase == .active else { return }
             if captureCoordinator.phase == .idle {
                 captureCoordinator.startCapture()
@@ -117,3 +131,23 @@ struct AppShellView: View {
         }
     }
 }
+
+// Temporary placeholder. Next step: replace with a real PracticeView.swift
+private struct PracticePlaceholderView: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Text("Practice")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Text("Coming next: a very small instruction surface (v0).")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .navigationTitle("Practice")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+

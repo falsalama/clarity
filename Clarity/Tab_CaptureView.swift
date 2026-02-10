@@ -20,7 +20,7 @@ struct Tab_CaptureView: View {
     // Sheet toggle for typing text
     @State private var showPasteSheet: Bool = false
 
-    // MARK: - Turn count query (completed turns: has redacted text)
+    // Completed turns count (badge)
     @Query private var completedTurns: [TurnEntity]
 
     init() {
@@ -33,101 +33,100 @@ struct Tab_CaptureView: View {
     }
 
     private enum Layout {
-        static let vStackSpacing: CGFloat = 16          // was 18
-        static let headerSpacing: CGFloat = 4           // was 6
-        static let headerTopPadding: CGFloat = 4        // was 6
+        static let headerTopPadding: CGFloat = 4
 
-        static let micCoverSize: CGFloat = 120
-        static let micDownSpacerMin: CGFloat = 12       // was 18
-        static let belowStatusSpacerMin: CGFloat = 6    // was 8
+        static let micSize: CGFloat = 128
+        static let micStrokeOpacity: Double = 0.22
 
-        static let typeButtonVerticalPadding: CGFloat = 12
-        static let errorTopPadding: CGFloat = 6
-
-        static let statusDotSize: CGFloat = 6
         static let statusPillSpacing: CGFloat = 8
         static let statusPillHPadding: CGFloat = 12
         static let statusPillVPadding: CGFloat = 8
         static let statusAnimDuration: Double = 0.15
 
-        static let chipsTopPadding: CGFloat = 4         // was 8
-        static let chipsSpacing: CGFloat = 8            // was 10
-        static let chipHPadding: CGFloat = 12           // was 14
-        static let chipVPadding: CGFloat = 8            // was 10
+        static let chipsTopPadding: CGFloat = 6
+        static let chipsSpacing: CGFloat = 8
+        static let chipHPadding: CGFloat = 12
+        static let chipVPadding: CGFloat = 8
 
-        // Badge placement
-        static let badgeTopPadding: CGFloat = 10
-        static let badgeTrailingPadding: CGFloat = 14
+        static let badgeTopPadding: CGFloat = 4
+        static let badgeTrailingPadding: CGFloat = 4
+
+        static let sectionCorner: CGFloat = 16
     }
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
-                Color.clear.ignoresSafeArea()
+            List {
+                // Top capture surface (kept as a single surface)
+                Section {
+                    VStack(spacing: 12) {
+                        header
+                        promptChips
+                        micButton
+                        statusPill
+                            .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
+                        typeTextButton
 
-                VStack(spacing: Layout.vStackSpacing) {
-                    header
-
-                    promptChips
-
-                    Spacer(minLength: Layout.micDownSpacerMin)
-
-                    ZStack {
-                        Circle()
-                            .fill(Color(.systemBackground))
-                            .frame(width: Layout.micCoverSize, height: Layout.micCoverSize)
-
-                        CaptureButton(
-                            phase: coordinator.phase,
-                            isEnabled: !primaryButtonDisabled,
-                            level: coordinator.level,
-                            action: coordinator.toggleCapture
-                        )
-                    }
-
-                    // Status pill without layout shift
-                    ZStack {
-                        if coordinator.phase != .idle {
-                            statusPill
-                                .transition(.opacity)
+                        if let uiErrorKey = userFacingErrorKey {
+                            Text(LocalizedStringKey(uiErrorKey))
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.top, 4)
                         }
                     }
-                    .frame(height: 0)
-                    .overlay {
-                        if coordinator.phase != .idle {
-                            statusPill
-                        }
-                    }
-                    .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
+                    .padding(.vertical, 6)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+                    .listRowSeparator(.hidden)
+                } header: {
+                    EmptyView()
+                }
 
-                    Spacer(minLength: Layout.belowStatusSpacerMin)
-
-                    Button {
-                        showPasteSheet = true
-                    } label: {
-                        Text("capture.type_text")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Layout.typeButtonVerticalPadding)
-                            .background(Color(red: 0.08, green: 0.24, blue: 0.60))
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(Text("capture.type_text.a11y.label"))
-                    .accessibilityHint(Text("capture.type_text.a11y.hint"))
-
-                    if let uiErrorKey = userFacingErrorKey {
-                        Text(LocalizedStringKey(uiErrorKey))
+                // Inline captures list (swipe actions belong in List)
+                Section {
+                    if completedTurns.isEmpty {
+                        Text("Nothing here yet.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                            .padding(.top, Layout.errorTopPadding)
-                            .multilineTextAlignment(.center)
+                            .listRowSeparator(.hidden)
+                    } else {
+                        ForEach(Array(completedTurns.prefix(25))) { t in
+                            NavigationLink(value: t.id) {
+                                captureRow(t)
+                            }
+                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                Button(role: .destructive) {
+                                    deleteTurn(t)
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+
+                                // Placeholder hook:
+                                // Wire this once we confirm a persisted boolean on TurnEntity (e.g. isStarred / isPinned).
+                                Button {
+                                    starTurn(t)
+                                } label: {
+                                    Label("Star", systemImage: "star")
+                                }
+                                .tint(.yellow)
+                            }
+                            // More obvious separators
+                            .listRowSeparator(.visible)
+                            .listRowSeparatorTint(.secondary.opacity(0.45))
+                        }
                     }
+                } header: {
+                    HStack {
+                        Text("Captures")
+                        Spacer()
+                        Text("\(completedTurns.count)")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.headline)
+                    .textCase(nil)
                 }
-                .padding()
             }
-            // Overlay badge so it doesn't affect layout
+            .listStyle(.plain)
             .overlay(alignment: .topTrailing) {
                 turnCountBadge(count: completedTurns.count)
                     .padding(.top, Layout.badgeTopPadding)
@@ -153,12 +152,10 @@ struct Tab_CaptureView: View {
                     permissionAlertTitleKey = "perm.mic.title"
                     permissionAlertMessageKey = "perm.mic.message"
                     showPermissionAlert = true
-
                 case .speechDeniedOrNotAuthorised, .speechUnavailable:
                     permissionAlertTitleKey = "perm.speech.title"
                     permissionAlertMessageKey = "perm.speech.message"
                     showPermissionAlert = true
-
                 default:
                     break
                 }
@@ -168,7 +165,7 @@ struct Tab_CaptureView: View {
                 isPresented: $showPermissionAlert
             ) {
                 Button(String(localized: "perm.button.open_settings")) { openAppSettings() }
-                Button(String(localized: "perm.button.ok"), role: .cancel) {}
+                Button(String(localized: "perm.button.cancel"), role: .cancel) {}
             } message: {
                 Text(LocalizedStringKey(permissionAlertMessageKey))
             }
@@ -176,25 +173,18 @@ struct Tab_CaptureView: View {
                 PasteTextTurnSheet { newID in
                     path.append(newID)
                 }
+                .environmentObject(coordinator)
             }
         }
     }
 
-    // MARK: - Header (kept centred)
+    // MARK: - Header
 
     private var header: some View {
-        VStack(spacing: Layout.headerSpacing) {
-            Text(String(localized: "app.title"))
-                .font(.title2.weight(.semibold))
-                .multilineTextAlignment(.center)
-
-            Text("Tap to speak or type a problem you want clarity on.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, Layout.headerTopPadding)
+        Text("Reflect")
+            .font(.title2.weight(.semibold))
+            .padding(.top, Layout.headerTopPadding)
+            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     // MARK: - Prompt chips
@@ -219,13 +209,29 @@ struct Tab_CaptureView: View {
             .padding(.vertical, Layout.chipVPadding)
             .background(.thinMaterial)
             .clipShape(Capsule())
-            .onTapGesture {
-                showPasteSheet = true
-            }
-            .accessibilityLabel(Text(text))
+            .onTapGesture { showPasteSheet = true }
+            .accessibilityAddTraits(.isButton)
     }
 
-    // MARK: - Status pill
+    // MARK: - Mic button (primary)
+
+    private var micButton: some View {
+        CaptureButton(
+            phase: coordinator.phase,
+            isEnabled: (coordinator.phase == .idle || coordinator.phase == .recording),
+            level: coordinator.level
+        ) {
+            switch coordinator.phase {
+            case .idle:
+                coordinator.startCapture()
+            case .recording:
+                coordinator.stopCapture()
+            default:
+                break
+            }
+        }
+    }
+    // MARK: - Status
 
     private var statusPill: some View {
         HStack(spacing: Layout.statusPillSpacing) {
@@ -235,7 +241,7 @@ struct Tab_CaptureView: View {
 
             if coordinator.phase == .recording {
                 Circle()
-                    .frame(width: Layout.statusDotSize, height: Layout.statusDotSize)
+                    .frame(width: 6, height: 6)
                     .foregroundStyle(.secondary)
                     .opacity(0.85)
             }
@@ -256,14 +262,58 @@ struct Tab_CaptureView: View {
         }
     }
 
-    private var primaryButtonDisabled: Bool {
-        switch coordinator.phase {
-        case .idle, .recording:
-            return false
-        default:
-            return true
+    // MARK: - Type text
+
+    private var typeTextButton: some View {
+        Button { showPasteSheet = true } label: {
+            Text("Type text")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8) // less padding (requested)
         }
+        .buttonStyle(.bordered)
+        .disabled(coordinator.phase != .idle)
+        .accessibilityLabel(Text("Type text"))
     }
+
+    // MARK: - Capture row
+
+    private func captureRow(_ t: TurnEntity) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title(for: t))
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(1)
+
+            let preview = t.transcriptRedactedActive.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !preview.isEmpty {
+                Text(preview)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 2)
+    }
+
+    private func title(for t: TurnEntity) -> String {
+        let v = t.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return v.isEmpty ? "Capture" : v
+    }
+
+    // MARK: - Swipe actions
+
+    private func deleteTurn(_ t: TurnEntity) {
+        modelContext.delete(t)
+        do { try modelContext.save() } catch { /* keep silent for now */ }
+    }
+
+    private func starTurn(_ t: TurnEntity) {
+        // Intentionally a no-op until we confirm a persisted flag on TurnEntity.
+        // Next step: implement `isStarred` (or reuse existing field) and toggle + save.
+    }
+
+    // MARK: - Errors
 
     private var userFacingErrorKey: String? {
         guard let err = coordinator.uiError else { return nil }
@@ -282,12 +332,10 @@ struct Tab_CaptureView: View {
         }
     }
 
-    // MARK: - Top-right badge (overlay; no layout impact)
+    // MARK: - Badge
 
     private func turnCountBadge(count: Int) -> some View {
         let shown = min(max(count, 0), 999)
-
-        // Warmer yellow-gold (less green)
         let goldFill = Color(red: 0.96, green: 0.82, blue: 0.26)
 
         return Text("\(shown)")
