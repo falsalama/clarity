@@ -5,84 +5,101 @@ struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
-    @StateObject private var cloudTap = CloudTapSettings()
-    @StateObject private var capsuleStore = CapsuleStore()
-    @StateObject private var redactionDictionary = RedactionDictionary()
+    // Injected from ClarityApp.swift
+    @EnvironmentObject private var cloudTap: CloudTapSettings
+    @EnvironmentObject private var providerSettings: ContemplationProviderSettings
+    @EnvironmentObject private var capsuleStore: CapsuleStore
+    @EnvironmentObject private var redactionDictionary: RedactionDictionary
+
+    // First-run welcome splash gate
+    @AppStorage("hasSeenWelcomeOverlay_v7") private var hasSeenWelcomeOverlay: Bool = false
+
+    // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
-    @StateObject private var providerSettings = ContemplationProviderSettings()
+    @StateObject private var welcomeSurface = WelcomeSurfaceStore()
 
     @State private var didBind = false
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
 
-    /// App-level primary tabs.
-    /// - Reflect: capture + (soon) captures list entry point
-    /// - Focus: teaching / explore surface (v0: LearningView)
-    /// - Practice: tiny instruction surface (v0 placeholder for now)
-    /// - Profile: hub for Capsule + Settings (+ future Progress / Community)
-    private enum AppTab: Hashable {
-        case reflect, focus, practice, profile
-    }
+    // Splash state
+    @State private var showWelcomeSplash: Bool = false
+    @State private var initialTabWhenSplashShown: AppTab? = nil
+    @State private var ignoreTabChangesUntil: Date = .distantPast
 
+    private enum AppTab: Hashable { case reflect, focus, practice, profile }
     @State private var selectedTab: AppTab = .reflect
 
     var body: some View {
         TabView(selection: $selectedTab) {
 
-            // Reflect (for now: existing capture tab view)
-            Tab_CaptureView()
+            tabRoot(Tab_CaptureView())
                 .tabItem { Label("Reflect", systemImage: "mic") }
                 .tag(AppTab.reflect)
 
-            // Focus (for now: reuse existing LearningView as a v0 shell)
-            NavigationStack { FocusView() }
-
+            tabRoot(NavigationStack { FocusView() })
                 .tabItem { Label("Focus", systemImage: "book.closed") }
                 .tag(AppTab.focus)
 
-            // Practice (temporary placeholder, replaced next with real PracticeView.swift)
-            NavigationStack { PracticeView() }
-
+            tabRoot(NavigationStack { PracticeView() })
                 .tabItem { Label("Practice", systemImage: "leaf") }
                 .tag(AppTab.practice)
 
-            // Profile (new hub)
-            NavigationStack { ProfileHubView() }
+            tabRoot(NavigationStack { ProfileHubView() })
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
                 .tag(AppTab.profile)
         }
-        .environmentObject(cloudTap)
-        .environmentObject(capsuleStore)
-        .environmentObject(redactionDictionary)
         .environmentObject(captureCoordinator)
-        .environmentObject(providerSettings)
+        .environmentObject(welcomeSurface)
         .onAppear {
-            guard !didBind else { return }
-            didBind = true
+            if !didBind {
+                didBind = true
 
-            captureCoordinator.bind(
-                modelContext: modelContext,
-                dictionary: redactionDictionary,
-                capsuleStore: capsuleStore
-            )
+                captureCoordinator.bind(
+                    modelContext: modelContext,
+                    dictionary: redactionDictionary,
+                    capsuleStore: capsuleStore
+                )
 
-            LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
+                LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
 
-            // If Siri set the flag before the UI was ready, mark pending.
-            if SiriLaunchFlag.consumeStartCaptureRequest() {
-                pendingSiriStart = true
+                // If Siri set the flag before the UI was ready, mark pending.
+                if SiriLaunchFlag.consumeStartCaptureRequest() {
+                    pendingSiriStart = true
+                }
+
+                // If we already appear and we're active, try.
+                if scenePhase == .active {
+                    scheduleSiriStartIfNeeded()
+                }
+
+                // Best-effort refresh of daily welcome surface.
+                Task { await welcomeSurface.refreshIfNeeded() }
             }
 
-            // If we already appear and we're active, try.
-            if scenePhase == .active {
-                scheduleSiriStartIfNeeded()
+            if !hasSeenWelcomeOverlay {
+                showWelcomeSplash = true
+                initialTabWhenSplashShown = selectedTab
+                ignoreTabChangesUntil = Date().addingTimeInterval(0.35)
+            } else {
+                showWelcomeSplash = false
             }
         }
-        .onChange(of: scenePhase) {
-            captureCoordinator.handleScenePhaseChange(scenePhase)
+        .onChange(of: selectedTab) { _, newTab in
+            guard showWelcomeSplash else { return }
+            guard Date() >= ignoreTabChangesUntil else { return }
 
-            if scenePhase == .active {
+            // Dismiss only if the user actually changed tabs.
+            if let initial = initialTabWhenSplashShown, newTab != initial {
+                dismissWelcomeSplash()
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            captureCoordinator.handleScenePhaseChange(newPhase)
+
+            if newPhase == .active {
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
+                Task { await welcomeSurface.refreshIfNeeded() }
 
                 // If Siri sets the flag while we're running, mark pending.
                 if SiriLaunchFlag.consumeStartCaptureRequest() {
@@ -98,15 +115,41 @@ struct AppShellView: View {
         }
     }
 
+    // MARK: - Tab wrapper (overlay lives INSIDE the tab content so the tab bar always stays on top)
+
+    private func tabRoot<Content: View>(_ content: Content) -> some View {
+        ZStack {
+            content
+
+            if showWelcomeSplash {
+                // Tap anywhere dismisses (no fade). This overlay sits under the UIKit tab bar by construction.
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { dismissWelcomeSplash() }
+                    .ignoresSafeArea()
+
+                WelcomeOverlayView(opacity: 1.0)
+                    .environmentObject(welcomeSurface)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea()
+            }
+        }
+    }
+
+    private func dismissWelcomeSplash() {
+        showWelcomeSplash = false
+        hasSeenWelcomeOverlay = true
+        initialTabWhenSplashShown = nil
+    }
+
+    // MARK: - Siri start handling
+
     private func scheduleSiriStartIfNeeded() {
         guard pendingSiriStart else { return }
 
         siriTask?.cancel()
         siriTask = Task { @MainActor in
-            // Require the app to remain ACTIVE for a short window.
-            // If scenePhase flips, this task will be cancelled by onChange.
             try? await Task.sleep(nanoseconds: 1_200_000_000)
-
             guard scenePhase == .active else { return }
 
             // One-shot consume.
@@ -123,31 +166,11 @@ struct AppShellView: View {
 
             // Retry once if it immediately bounces back to idle.
             try? await Task.sleep(nanoseconds: 900_000_000)
-
             guard scenePhase == .active else { return }
             if captureCoordinator.phase == .idle {
                 captureCoordinator.startCapture()
             }
         }
-    }
-}
-
-// Temporary placeholder. Next step: replace with a real PracticeView.swift
-private struct PracticePlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 10) {
-            Text("Practice")
-                .font(.title2)
-                .fontWeight(.semibold)
-
-            Text("Coming next: a very small instruction surface (v0).")
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .padding()
-        .navigationTitle("Practice")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

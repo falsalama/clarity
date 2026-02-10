@@ -60,7 +60,7 @@ struct Tab_CaptureView: View {
                 // Top capture surface (kept as a single surface)
                 Section {
                     VStack(spacing: 12) {
-                        header
+                        // header removed; use navigationTitle instead
                         promptChips
                         micButton
                         statusPill
@@ -126,11 +126,17 @@ struct Tab_CaptureView: View {
                 }
             }
             .listStyle(.plain)
-            .overlay(alignment: .topTrailing) {
-                turnCountBadge(count: completedTurns.count)
-                    .padding(.top, Layout.badgeTopPadding)
-                    .padding(.trailing, Layout.badgeTrailingPadding)
-                    .accessibilityLabel(Text("Completed turns: \(completedTurns.count)"))
+            .navigationTitle("Reflect")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
+                        AchievementsView(openCount: min(108, completedTurns.count))
+                    } label: {
+                        turnCountBadge(count: min(108, completedTurns.count))
+                    }
+                    .accessibilityLabel(Text("Achievements: \(min(108, completedTurns.count)) of 108"))
+                }
             }
             .navigationDestination(for: UUID.self) { id in
                 TurnDetailView(turnID: id)
@@ -140,13 +146,8 @@ struct Tab_CaptureView: View {
                 guard coordinator.isCarPlayConnected == false else { return }
 
                 coordinator.clearLiveTranscript()
-
-                // Small dwell so users can see Finalising/Processing before navigating.
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 350_000_000) // ~350 ms
-                    path.append(id)
-                    coordinator.lastCompletedTurnID = nil
-                }
+                path.append(id)
+                coordinator.lastCompletedTurnID = nil
             }
             .onChange(of: coordinator.uiError) { _, newValue in
                 guard let err = newValue else { return }
@@ -179,24 +180,7 @@ struct Tab_CaptureView: View {
                 }
                 .environmentObject(coordinator)
             }
-            .onDisappear {
-                // When leaving the capture surface, if we’re not actively recording,
-                // collapse any lingering processing UI back to idle so the mic pill
-                // isn’t stuck on “Processing” when we return.
-                if coordinator.phase != .recording {
-                    coordinator.forceIdleIfProcessing()
-                }
-            }
         }
-    }
-
-    // MARK: - Header
-
-    private var header: some View {
-        Text("Reflect")
-            .font(.title2.weight(.semibold))
-            .padding(.top, Layout.headerTopPadding)
-            .frame(maxWidth: .infinity, alignment: .center)
     }
 
     // MARK: - Prompt chips
@@ -274,9 +258,8 @@ struct Tab_CaptureView: View {
         switch coordinator.phase {
         case .idle: return "capture.ready"
         case .preparing: return "capture.preparing"
-        case .recording: return "capture.recording"
-        case .finalising: return "capture.finalising"
-        case .transcribing, .redacting: return "capture.processing"
+        case .recording: return "capture.listening"
+        case .finalising, .transcribing, .redacting: return "capture.processing"
         }
     }
 
@@ -362,7 +345,7 @@ struct Tab_CaptureView: View {
     // MARK: - Badge
 
     private func turnCountBadge(count: Int) -> some View {
-        let shown = min(max(count, 0), 999)
+        let shown = min(max(count, 0), 108)
         let goldFill = Color(red: 0.96, green: 0.82, blue: 0.26)
 
         return Text("\(shown)")
@@ -386,4 +369,3 @@ struct Tab_CaptureView: View {
     Tab_CaptureView()
         .environmentObject(TurnCaptureCoordinator())
 }
-

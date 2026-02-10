@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// ProfileHubView
 /// - Purpose: one place for "about me / configuration" surfaces.
@@ -9,6 +10,17 @@ import SwiftUI
 /// - Keep the tab bar action-oriented (Reflect / Focus / Practice).
 /// - Keep identity/configuration in a single hub (Profile).
 struct ProfileHubView: View {
+    // Achievements counter (shared definition: completed turns)
+    @Query private var completedTurns: [TurnEntity]
+
+    init() {
+        _completedTurns = Query(
+            filter: #Predicate<TurnEntity> { turn in
+                !turn.transcriptRedactedActive.isEmpty
+            }
+        )
+    }
+
     var body: some View {
         List {
             Section {
@@ -62,6 +74,17 @@ struct ProfileHubView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    AchievementsView(openCount: min(108, completedTurns.count))
+                } label: {
+                    AchievementsCounterCapsule(count: min(108, completedTurns.count))
+                }
+                .accessibilityLabel(Text("Achievements: \(min(108, completedTurns.count)) of 108"))
+            }
+        }
     }
 }
+
 

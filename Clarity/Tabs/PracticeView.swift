@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// PracticeView (v0)
 /// - Goal: a tiny, non-performative instruction surface.
@@ -6,6 +7,8 @@ import SwiftUI
 /// - Keeps the tone permissive and light.
 /// - Future: could rotate a few micro-practices; could optionally log “returned”.
 struct PracticeView: View {
+    // Achievements counter (shared definition: completed turns)
+    @Query private var completedTurns: [TurnEntity]
     // v0: fixed micro-practice. Keep it simple and safe.
     private let title = "Practice"
     private let instruction = """
@@ -15,6 +18,14 @@ Just notice the next inhale, then the next exhale.
 """
 
     @State private var isExpanded = true
+
+    init() {
+        _completedTurns = Query(
+            filter: #Predicate<TurnEntity> { turn in
+                !turn.transcriptRedactedActive.isEmpty
+            }
+        )
+    }
 
     var body: some View {
         ScrollView {
@@ -62,6 +73,16 @@ Just notice the next inhale, then the next exhale.
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    AchievementsView(openCount: min(108, completedTurns.count))
+                } label: {
+                    AchievementsCounterCapsule(count: min(108, completedTurns.count))
+                }
+                .accessibilityLabel(Text("Achievements: \(min(108, completedTurns.count)) of 108"))
+            }
+        }
         .onChange(of: isExpanded) { _, newValue in
             // v0 behaviour: just collapse/expand the card. Nothing else.
             // (Keeping this hook in case we later want haptics/logging.)
@@ -69,4 +90,5 @@ Just notice the next inhale, then the next exhale.
         }
     }
 }
+
 

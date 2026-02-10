@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// FocusView (v0)
 /// - Purpose: a gentle “thinking / understanding” surface.
@@ -6,6 +7,9 @@ import SwiftUI
 /// - One short teaching at a time, optionally reflected on.
 /// - Routes back into Reflect via normal capture (later we can prefill).
 struct FocusView: View {
+
+    // Achievements counter (shared definition: completed turns)
+    @Query private var completedTurns: [TurnEntity]
 
     // v0: static rotation kept in-app.
     // Later this can come from local JSON or Cloud Tap.
@@ -45,6 +49,12 @@ Nothing is lost.
         // Simple deterministic pick for now.
         // Later: date-based or Cloud Tap–driven.
         _teaching = State(initialValue: teachings.randomElement()!)
+
+        _completedTurns = Query(
+            filter: #Predicate<TurnEntity> { turn in
+                !turn.transcriptRedactedActive.isEmpty
+            }
+        )
     }
 
     var body: some View {
@@ -86,6 +96,16 @@ Nothing is lost.
         }
         .navigationTitle("Focus")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    AchievementsView(openCount: min(108, completedTurns.count))
+                } label: {
+                    AchievementsCounterCapsule(count: min(108, completedTurns.count))
+                }
+                .accessibilityLabel(Text("Achievements: \(min(108, completedTurns.count)) of 108"))
+            }
+        }
     }
 }
 
@@ -94,4 +114,5 @@ private struct Teaching {
     let body: String
     let prompt: String
 }
+
 
