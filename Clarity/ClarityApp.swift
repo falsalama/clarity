@@ -40,6 +40,9 @@ struct ClarityApp: App {
                 configurations: config
             )
 
+            // IMPORTANT: make container available to CarPlay scene delegate.
+            AppServices.modelContainer = self.container
+
             print("SwiftData store URL =", storeURL.path)
         } catch {
             fatalError("SwiftData container init failed: \(error)")
