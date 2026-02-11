@@ -12,9 +12,25 @@ final class LocalAudioPlayer: ObservableObject {
     private var player: AVAudioPlayer?
     private var tickTask: Task<Void, Never>?
 
-    func load(url: URL) {
+    /// Preferred entry point: pass the stored path from SwiftData (absolute, file://, or relative).
+    func load(storedAudioPath: String?) {
         stop()
 
+        guard let url = FileStore.existingAudioURL(from: storedAudioPath) else {
+            setPlaybackError("Audio file not found.")
+            return
+        }
+
+        load(resolvedURL: url)
+    }
+
+    /// Convenience: if a caller already has a correct resolved URL, this still works.
+    func load(url: URL) {
+        stop()
+        load(resolvedURL: url)
+    }
+
+    private func load(resolvedURL url: URL) {
         // Guard: file must exist and be non-empty
         let path = url.path
         guard FileManager.default.fileExists(atPath: path) else {
@@ -52,8 +68,6 @@ final class LocalAudioPlayer: ObservableObject {
             currentTime = 0
 
             let ns = error as NSError
-            // Show something useful but not noisy.
-            // 2003334207 often appears when the file can't be opened/decoded.
             if ns.code == 2003334207 {
                 lastError = "Playback error: couldn't open audio."
             } else {

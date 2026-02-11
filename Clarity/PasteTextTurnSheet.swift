@@ -85,6 +85,14 @@ struct PasteTextTurnSheet: View {
                 captureContext: .unknown
             )
 
+            // Auto-title for text captures (only if user hasn't named it)
+            if let t = try? repo.fetch(id: id),
+               t.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let auto = autoTitle(from: redacted), !auto.isEmpty {
+                t.title = auto
+                try? modelContext.save()
+            }
+
             // Build validated WAL unconditionally and always persist locally.
             let now = Date()
             let validated = WALBuilder.buildValidated(from: redacted, now: now)
@@ -105,5 +113,23 @@ struct PasteTextTurnSheet: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // Same heuristic as audio auto-title: first 7 words, max 56 chars, from redacted text.
+    private func autoTitle(from text: String) -> String? {
+        let cleaned = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: " ")
+
+        guard !cleaned.isEmpty else { return nil }
+
+        let words = cleaned
+            .split(whereSeparator: \.isWhitespace)
+            .prefix(7)
+            .map(String.init)
+
+        let title = words.joined(separator: " ")
+        let capped = String(title.prefix(56))
+        return capped.isEmpty ? nil : capped
     }
 }

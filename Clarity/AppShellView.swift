@@ -1,48 +1,66 @@
+// AppShellView.swift
+
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct AppShellView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
 
-    @StateObject private var cloudTap = CloudTapSettings()
-    @StateObject private var capsuleStore = CapsuleStore()
-    @StateObject private var redactionDictionary = RedactionDictionary()
+    // Injected from ClarityApp.swift
+    @EnvironmentObject private var cloudTap: CloudTapSettings
+    @EnvironmentObject private var providerSettings: ContemplationProviderSettings
+    @EnvironmentObject private var capsuleStore: CapsuleStore
+    @EnvironmentObject private var redactionDictionary: RedactionDictionary
+    @EnvironmentObject private var welcomeSurface: WelcomeSurfaceStore
+
+    // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
-    @StateObject private var providerSettings = ContemplationProviderSettings()
 
     @State private var didBind = false
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
 
-    private enum AppTab: Hashable {
-        case capture, turns, capsule, settings
-    }
-    @State private var selectedTab: AppTab = .capture
+    // Tab bar fade (launch-only)
+    @State private var tabBar: UITabBar? = nil
+    @State private var didFadeTabBarThisLaunch: Bool = false
+
+    private enum AppTab: Hashable { case home, reflect, focus, practice, profile }
+    @State private var selectedTab: AppTab = .home
 
     var body: some View {
         TabView(selection: $selectedTab) {
+
+            NavigationStack { HomeView() }
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(AppTab.home)
+
             Tab_CaptureView()
-                .tabItem { Label("Capture", systemImage: "mic") }
-                .tag(AppTab.capture)
+                .tabItem { Label("Reflect", systemImage: "mic") }
+                .tag(AppTab.reflect)
 
-            NavigationStack { TurnsListView() }
-                .tabItem { Label("Captures", systemImage: "tray.full") }
-                .tag(AppTab.turns)
+            NavigationStack { FocusView() }
+                .tabItem { Label("Focus", systemImage: "book.closed") }
+                .tag(AppTab.focus)
 
-            NavigationStack { CapsuleView() }
-                .tabItem { Label("Capsule", systemImage: "capsule") }
-                .tag(AppTab.capsule)
+            NavigationStack { PracticeView() }
+                .tabItem { Label("Practice", systemImage: "leaf") }
+                .tag(AppTab.practice)
 
-            NavigationStack { SettingsView() }
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-                .tag(AppTab.settings)
+            NavigationStack { ProfileHubView() }
+                .tabItem { Label("Profile", systemImage: "person.crop.circle") }
+                .tag(AppTab.profile)
         }
-        .environmentObject(cloudTap)
-        .environmentObject(capsuleStore)
-        .environmentObject(redactionDictionary)
         .environmentObject(captureCoordinator)
-        .environmentObject(providerSettings)
+        .environmentObject(welcomeSurface)
+        .background(
+            TabBarReader { bar in
+                self.tabBar = bar
+                self.fadeTabBarInIfNeeded()
+            }
+            .frame(width: 0, height: 0)
+        )
         .onAppear {
             guard !didBind else { return }
             didBind = true
@@ -55,60 +73,74 @@ struct AppShellView: View {
 
             LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
 
-            // If Siri set the flag before the UI was ready, mark pending.
             if SiriLaunchFlag.consumeStartCaptureRequest() {
                 pendingSiriStart = true
+                selectedTab = .reflect
             }
 
-            // If we already appear and we're active, try.
             if scenePhase == .active {
                 scheduleSiriStartIfNeeded()
             }
-        }
-        .onChange(of: scenePhase) {
-            captureCoordinator.handleScenePhaseChange(scenePhase)
 
-            if scenePhase == .active {
+            fadeTabBarInIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            captureCoordinator.handleScenePhaseChange(newPhase)
+
+            if newPhase == .active {
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
 
-                // If Siri sets the flag while we're running, mark pending.
                 if SiriLaunchFlag.consumeStartCaptureRequest() {
                     pendingSiriStart = true
+                    selectedTab = .reflect
                 }
 
                 scheduleSiriStartIfNeeded()
             } else {
-                // Cancel attempts while Siri/OS is bouncing lifecycle.
                 siriTask?.cancel()
                 siriTask = nil
             }
         }
     }
 
+    // MARK: - Tab bar fade
+
+    private func fadeTabBarInIfNeeded() {
+        guard !didFadeTabBarThisLaunch else { return }
+        guard let bar = tabBar else { return }
+        didFadeTabBarThisLaunch = true
+
+        DispatchQueue.main.async {
+            bar.alpha = 0.0
+            UIView.animate(
+                withDuration: 0.55,
+                delay: 0.08,
+                options: [.curveEaseOut, .beginFromCurrentState]
+            ) {
+                bar.alpha = 1.0
+            }
+        }
+    }
+
+    // MARK: - Siri start handling
+
     private func scheduleSiriStartIfNeeded() {
         guard pendingSiriStart else { return }
 
         siriTask?.cancel()
         siriTask = Task { @MainActor in
-            // Require the app to remain ACTIVE for a short window.
-            // If scenePhase flips, this task will be cancelled by onChange.
             try? await Task.sleep(nanoseconds: 1_200_000_000)
-
             guard scenePhase == .active else { return }
 
-            // One-shot consume.
             pendingSiriStart = false
 
-            // Always show Capture tab.
-            selectedTab = .capture
+            selectedTab = .reflect
             try? await Task.sleep(nanoseconds: 150_000_000)
 
-            // Attempt 1
             if captureCoordinator.phase == .idle {
                 captureCoordinator.startCapture()
             }
 
-            // Retry once if it immediately bounces back to idle.
             try? await Task.sleep(nanoseconds: 900_000_000)
             guard scenePhase == .active else { return }
             if captureCoordinator.phase == .idle {
@@ -117,3 +149,47 @@ struct AppShellView: View {
         }
     }
 }
+
+// MARK: - UITabBar resolver
+
+private struct TabBarReader: UIViewControllerRepresentable {
+    let onResolve: (UITabBar) -> Void
+
+    func makeUIViewController(context: Context) -> UIViewController {
+        ResolverViewController(onResolve: onResolve)
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
+}
+
+private final class ResolverViewController: UIViewController {
+    private let onResolve: (UITabBar) -> Void
+    private var didResolve = false
+
+    init(onResolve: @escaping (UITabBar) -> Void) {
+        self.onResolve = onResolve
+        super.init(nibName: nil, bundle: nil)
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        resolveOnce()
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        resolveOnce()
+    }
+
+    private func resolveOnce() {
+        guard !didResolve else { return }
+        guard let bar = tabBarController?.tabBar else { return }
+        didResolve = true
+        onResolve(bar)
+    }
+}
+

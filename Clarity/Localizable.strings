@@ -4,7 +4,11 @@
 /* Capture */
 "capture.tagline" = "Capture first. Reflect later.";
 "capture.ready" = "Ready";
-"capture.listening" = "Listening…";
+"capture.preparing" = "Preparing…";
+"capture.recording" = "Recording…";    /* new: used by status pill */
+"capture.finalising" = "Finalising…";   /* new: used by status pill */
+"capture.processing" = "Processing…";   /* new: used by status pill */
+"capture.listening" = "Listening…";     /* legacy */
 "capture.saving" = "Saving…";
 "capture.transcribing" = "Transcribing…";
 "capture.redacting" = "Redacting…";
@@ -41,6 +45,7 @@
 "perm.mic.message" = "Enable Microphone access in Settings to record.";
 "perm.speech.title" = "Speech Recognition access needed";
 "perm.speech.message" = "Enable Speech Recognition in Settings to transcribe.";
+"perm.button.cancel" = "Cancel";
 
 /* Settings */
 "settings.title" = "Settings";
