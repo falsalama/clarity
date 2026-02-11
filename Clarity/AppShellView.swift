@@ -1,3 +1,5 @@
+// AppShellView.swift
+
 import SwiftUI
 import SwiftData
 import UIKit
@@ -11,114 +13,86 @@ struct AppShellView: View {
     @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var capsuleStore: CapsuleStore
     @EnvironmentObject private var redactionDictionary: RedactionDictionary
-
-    // First-run welcome splash gate
-    @AppStorage("hasSeenWelcomeOverlay_v9") private var hasSeenWelcomeOverlay: Bool = false
-
-    // DEBUG ONLY — keep false in normal builds
-    private let FORCE_SPLASH_DEBUG: Bool = true
+    @EnvironmentObject private var welcomeSurface: WelcomeSurfaceStore
 
     // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
-    @StateObject private var welcomeSurface = WelcomeSurfaceStore()
 
     @State private var didBind = false
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
 
-    // Splash state
-    @State private var showWelcomeSplash: Bool = false
-    @State private var initialTabWhenSplashShown: AppTab? = nil
-    @State private var ignoreTabChangesUntil: Date = .distantPast
-
-    // Tab bar fade-in
+    // Tab bar fade (launch-only)
     @State private var tabBar: UITabBar? = nil
-    @State private var didRunTabBarFadeThisLaunch: Bool = false
+    @State private var didFadeTabBarThisLaunch: Bool = false
 
-    private enum AppTab: Hashable { case reflect, focus, practice, profile }
-    @State private var selectedTab: AppTab = .reflect
+    private enum AppTab: Hashable { case home, reflect, focus, practice, profile }
+    @State private var selectedTab: AppTab = .home
 
     var body: some View {
         TabView(selection: $selectedTab) {
 
-            tabRoot(Tab_CaptureView())
+            NavigationStack { HomeView() }
+                .tabItem { Label("Home", systemImage: "house") }
+                .tag(AppTab.home)
+
+            Tab_CaptureView()
                 .tabItem { Label("Reflect", systemImage: "mic") }
                 .tag(AppTab.reflect)
 
-            tabRoot(NavigationStack { FocusView() })
+            NavigationStack { FocusView() }
                 .tabItem { Label("Focus", systemImage: "book.closed") }
                 .tag(AppTab.focus)
 
-            tabRoot(NavigationStack { PracticeView() })
+            NavigationStack { PracticeView() }
                 .tabItem { Label("Practice", systemImage: "leaf") }
                 .tag(AppTab.practice)
 
-            tabRoot(NavigationStack { ProfileHubView() })
+            NavigationStack { ProfileHubView() }
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
                 .tag(AppTab.profile)
         }
         .environmentObject(captureCoordinator)
         .environmentObject(welcomeSurface)
-
-        // Bind + show splash once
+        .background(
+            TabBarReader { bar in
+                self.tabBar = bar
+                self.fadeTabBarInIfNeeded()
+            }
+            .frame(width: 0, height: 0)
+        )
         .onAppear {
-            if !didBind {
-                didBind = true
+            guard !didBind else { return }
+            didBind = true
 
-                captureCoordinator.bind(
-                    modelContext: modelContext,
-                    dictionary: redactionDictionary,
-                    capsuleStore: capsuleStore
-                )
+            captureCoordinator.bind(
+                modelContext: modelContext,
+                dictionary: redactionDictionary,
+                capsuleStore: capsuleStore
+            )
 
-                LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
+            LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
 
-                if SiriLaunchFlag.consumeStartCaptureRequest() {
-                    pendingSiriStart = true
-                }
-
-                if scenePhase == .active {
-                    scheduleSiriStartIfNeeded()
-                }
+            if SiriLaunchFlag.consumeStartCaptureRequest() {
+                pendingSiriStart = true
+                selectedTab = .reflect
             }
 
-            // Splash gate
-            if FORCE_SPLASH_DEBUG || !hasSeenWelcomeOverlay {
-                showWelcomeSplash = true
-                initialTabWhenSplashShown = selectedTab
-                ignoreTabChangesUntil = Date().addingTimeInterval(0.35)
-                maybeStartTabBarFade()
-            } else {
-                showWelcomeSplash = false
-                tabBar?.alpha = 1.0
+            if scenePhase == .active {
+                scheduleSiriStartIfNeeded()
             }
+
+            fadeTabBarInIfNeeded()
         }
-
-        // Fetch manifest + image (runs once per view lifetime)
-        .task {
-            await welcomeSurface.refreshIfNeeded()
-        }
-
-        // Dismiss splash when user switches tab (optional behaviour)
-        .onChange(of: selectedTab) { _, newTab in
-            guard showWelcomeSplash || FORCE_SPLASH_DEBUG else { return }
-            guard Date() >= ignoreTabChangesUntil else { return }
-
-            if let initial = initialTabWhenSplashShown, newTab != initial {
-                dismissWelcomeSplash()
-            }
-        }
-
-        // Refresh when app becomes active
         .onChange(of: scenePhase) { _, newPhase in
             captureCoordinator.handleScenePhaseChange(newPhase)
 
             if newPhase == .active {
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
-                Task { await welcomeSurface.refreshIfNeeded() }
 
                 if SiriLaunchFlag.consumeStartCaptureRequest() {
                     pendingSiriStart = true
+                    selectedTab = .reflect
                 }
 
                 scheduleSiriStartIfNeeded()
@@ -129,52 +103,20 @@ struct AppShellView: View {
         }
     }
 
-    // MARK: - Tab wrapper (overlay lives INSIDE tab content so tab bar stays on top)
+    // MARK: - Tab bar fade
 
-    private func tabRoot<Content: View>(_ content: Content) -> some View {
-        ZStack {
-            content
-
-            if showWelcomeSplash || FORCE_SPLASH_DEBUG {
-                Color.clear
-                    .contentShape(Rectangle())
-                    .onTapGesture { dismissWelcomeSplash() }
-                    .ignoresSafeArea()
-
-                WelcomeOverlayView(opacity: 1.0)
-                    .environmentObject(welcomeSurface)
-                    .allowsHitTesting(false)
-                    .ignoresSafeArea()
-            }
-        }
-        .background(
-            TabBarReader { bar in
-                self.tabBar = bar
-                self.maybeStartTabBarFade()
-            }
-            .frame(width: 0, height: 0)
-        )
-    }
-
-    private func dismissWelcomeSplash() {
-        showWelcomeSplash = false
-        if !FORCE_SPLASH_DEBUG {
-            hasSeenWelcomeOverlay = true
-        }
-        initialTabWhenSplashShown = nil
-        tabBar?.alpha = 1.0
-    }
-
-    private func maybeStartTabBarFade() {
-        guard (showWelcomeSplash || FORCE_SPLASH_DEBUG) else { return }
-        guard !didRunTabBarFadeThisLaunch else { return }
+    private func fadeTabBarInIfNeeded() {
+        guard !didFadeTabBarThisLaunch else { return }
         guard let bar = tabBar else { return }
-
-        didRunTabBarFadeThisLaunch = true
+        didFadeTabBarThisLaunch = true
 
         DispatchQueue.main.async {
-            bar.alpha = 0.12
-            UIView.animate(withDuration: 0.65, delay: 0.05, options: [.curveEaseOut, .beginFromCurrentState]) {
+            bar.alpha = 0.0
+            UIView.animate(
+                withDuration: 0.55,
+                delay: 0.08,
+                options: [.curveEaseOut, .beginFromCurrentState]
+            ) {
                 bar.alpha = 1.0
             }
         }
@@ -245,9 +187,9 @@ private final class ResolverViewController: UIViewController {
 
     private func resolveOnce() {
         guard !didResolve else { return }
-        guard let tabBar = tabBarController?.tabBar else { return }
+        guard let bar = tabBarController?.tabBar else { return }
         didResolve = true
-        onResolve(tabBar)
+        onResolve(bar)
     }
 }
 

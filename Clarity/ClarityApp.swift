@@ -1,21 +1,17 @@
-// ClarityApp.swift
 import SwiftUI
 import SwiftData
 
 @main
 struct ClarityApp: App {
 
-    // App lifecycle
     @Environment(\.scenePhase) private var scenePhase
 
-    // App state
     @StateObject private var cloudTap = CloudTapSettings()
     @StateObject private var providerSettings = ContemplationProviderSettings()
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
     @StateObject private var welcomeSurfaceStore = WelcomeSurfaceStore()
 
-    // SwiftData
     private let container: ModelContainer
 
     init() {
@@ -58,13 +54,8 @@ struct ClarityApp: App {
                 .environmentObject(capsuleStore)
                 .environmentObject(redactionDictionary)
                 .environmentObject(welcomeSurfaceStore)
-                .task {
-                    await welcomeSurfaceStore.refreshIfNeeded()
-                }
         }
         .modelContainer(container)
-
-
     }
 
     private static func storeURL(filename: String) throws -> URL {
