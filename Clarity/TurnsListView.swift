@@ -29,6 +29,9 @@ struct TurnsListView: View {
 #endif
                                         }
                                     }
+                                    Button(t.isStarred ? "Unstar" : "Star") {
+                                        toggleStar(t)
+                                    }
                                 }
                         }
                     }
@@ -84,6 +87,13 @@ struct TurnsListView: View {
                     .font(.headline)
                     .lineLimit(1)
 
+                if t.isStarred {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                        .imageScale(.small)
+                        .accessibilityHidden(true)
+                }
+
                 Spacer()
 
                 if let pill = statePillLabel(for: t.stateRaw) {
@@ -107,6 +117,11 @@ struct TurnsListView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private func toggleStar(_ t: TurnEntity) {
+        t.isStarred.toggle()
+        try? modelContext.save()
     }
 
     private func delete(_ offsets: IndexSet) {
@@ -184,4 +199,3 @@ struct TurnsListView: View {
         return nil
     }
 }
-

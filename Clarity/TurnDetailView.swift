@@ -36,15 +36,10 @@ struct TurnDetailView: View {
 
     // MARK: - Audio
 
-    private var audioURL: URL? {
-        guard let path = turn?.audioPath, !path.isEmpty else { return nil }
-        guard FileManager.default.fileExists(atPath: path) else { return nil }
-        return URL(fileURLWithPath: path)
-    }
-
     private var isAudioMissing: Bool {
-        guard let path = turn?.audioPath, !path.isEmpty else { return false }
-        return FileManager.default.fileExists(atPath: path) == false
+        // Missing means: there is a stored reference, but we cannot resolve it to a real file.
+        guard let stored = turn?.audioPath, !stored.isEmpty else { return false }
+        return FileStore.existingAudioURL(from: stored) == nil
     }
 
     // MARK: - Talk gating
@@ -98,12 +93,16 @@ struct TurnDetailView: View {
         .navigationTitle("Capture")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if let url = audioURL { player.load(url: url) }
+            if let t = turn, let updated = FileStore.normalisedStoredAudioPath(from: t.audioPath) {
+                t.audioPath = updated
+                try? modelContext.save()
+            }
+            player.load(storedAudioPath: turn?.audioPath)
         }
         .onChange(of: turn?.audioPath) { _, _ in
-            if let url = audioURL { player.load(url: url) }
-            else { player.stop() }
+            player.load(storedAudioPath: turn?.audioPath)
         }
+
         .onDisappear { player.stop() }
         .sheet(item: $sheetRoute) { route in
             switch route {
@@ -298,10 +297,10 @@ struct TurnDetailView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            if let url = audioURL {
+            if !isAudioMissing, (turn?.audioPath?.isEmpty == false) {
                 HStack(spacing: 12) {
                     Button {
-                        if player.duration == 0 { player.load(url: url) }
+                        if player.duration == 0 { player.load(storedAudioPath: turn?.audioPath) }
                         player.toggle()
                     } label: {
                         Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
@@ -898,17 +897,20 @@ private struct StatusPill: View {
 
     private var label: String? {
         switch stateRaw {
-        case "queued": return "Queued"
-        case "recording": return "Recording"
+        case "queued": return "Processing"
+        case "recording": return "recording"
+        case "processing", "stopping": return "Processing"
         case "transcribing", "transcribedRaw": return "Transcribing"
         case "redacting": return "Redacting"
         case "interrupted": return "Interrupted"
         case "failed": return "Failed"
-        case "captured": return "Captured"
+        case "captured": return "Processing"
         case "ready", .none: return nil
-        default: return nil
+        default: return "Processing"
         }
     }
+
+
 }
 
 // MARK: - Cloud Tap gating
@@ -921,3 +923,4 @@ private enum CloudTool: String, CaseIterable, Identifiable {
     case talkItThrough = "Talk it through"
     var id: String { rawValue }
 }
+

@@ -13,5 +13,25 @@
 	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlheHB3aGltd2t0cXF4eXppdGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDQ3NTIsImV4cCI6MjA4NTA4MDc1Mn0.-WyjZU2okWufyAmWxdC6TRarsopMBUlx6HR5ttlS77M.</string>
 	<key>SupabaseURL</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co</string>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict>
+			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>CPTemplateApplicationScene</string>
+					<key>UISceneDelegateClassName</key>
+					<string>$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate</string>
+				</dict>
+			</array>
+		</dict>
+	</dict>
+	<key>WELCOME_MANIFEST_ENDPOINT</key>
+	<string>endpointURL = https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/welcome-manifest
+</string>
 </dict>
 </plist>

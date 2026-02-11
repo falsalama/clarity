@@ -23,9 +23,16 @@ final class AudioRecorder: ObservableObject {
 
     private var recordingStartedAt: Date? = nil
 
+    // Cancels late permission callbacks / late starts.
+    private var startToken: UInt64 = 0
+
     // MARK: - Public
 
     func start() {
+        // New intent to start; invalidate any prior pending permission callbacks.
+        startToken &+= 1
+        let token = startToken
+
         lastError = nil
         lastDurationSeconds = 0
         recordingStartedAt = nil
@@ -34,12 +41,14 @@ final class AudioRecorder: ObservableObject {
         if #available(iOS 17.0, *) {
             switch AVAudioApplication.shared.recordPermission {
             case .granted:
-                startRecordingNow()
+                startRecordingNow(ifTokenMatches: token)
             case .undetermined:
                 AVAudioApplication.requestRecordPermission { [weak self] granted in
                     guard let self else { return }
                     Task { @MainActor in
-                        if granted { self.startRecordingNow() }
+                        // Ignore late callbacks if a stop/new-start happened.
+                        guard self.startToken == token else { return }
+                        if granted { self.startRecordingNow(ifTokenMatches: token) }
                         else { self.lastError = "Microphone permission not granted." }
                     }
                 }
@@ -52,12 +61,13 @@ final class AudioRecorder: ObservableObject {
             let session = AVAudioSession.sharedInstance()
             switch session.recordPermission {
             case .granted:
-                startRecordingNow()
+                startRecordingNow(ifTokenMatches: token)
             case .undetermined:
                 session.requestRecordPermission { [weak self] granted in
                     guard let self else { return }
                     Task { @MainActor in
-                        if granted { self.startRecordingNow() }
+                        guard self.startToken == token else { return }
+                        if granted { self.startRecordingNow(ifTokenMatches: token) }
                         else { self.lastError = "Microphone permission not granted." }
                     }
                 }
@@ -71,12 +81,13 @@ final class AudioRecorder: ObservableObject {
         let status = AVCaptureDevice.authorizationStatus(for: .audio)
         switch status {
         case .authorized:
-            startRecordingNow()
+            startRecordingNow(ifTokenMatches: token)
         case .notDetermined:
             AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
                 guard let self else { return }
                 Task { @MainActor in
-                    if granted { self.startRecordingNow() }
+                    guard self.startToken == token else { return }
+                    if granted { self.startRecordingNow(ifTokenMatches: token) }
                     else { self.lastError = "Microphone permission not granted." }
                 }
             }
@@ -89,7 +100,8 @@ final class AudioRecorder: ObservableObject {
     }
 
     func stop() {
-        guard isRecording else { return }
+        // Always invalidate any pending permission callbacks / late starts.
+        startToken &+= 1
 
         stopMetering()
 
@@ -101,11 +113,13 @@ final class AudioRecorder: ObservableObject {
         }
         recordingStartedAt = nil
 
-        let input = engine.inputNode
-        input.removeTap(onBus: 0)
+        // Remove tap if present (safe to call even if no tap installed).
+        engine.inputNode.removeTap(onBus: 0)
 
-        engine.stop()
-        engine.reset()
+        if engine.isRunning {
+            engine.stop()
+            engine.reset()
+        }
 
         audioFile = nil
         isRecording = false
@@ -118,7 +132,10 @@ final class AudioRecorder: ObservableObject {
 
     // MARK: - Internals
 
-    private func startRecordingNow() {
+    private func startRecordingNow(ifTokenMatches token: UInt64) {
+        // If stop() (or a new start) happened before we got here, ignore.
+        guard startToken == token else { return }
+
         do {
 #if os(iOS)
             let session = AVAudioSession.sharedInstance()
@@ -168,6 +185,12 @@ final class AudioRecorder: ObservableObject {
 
             engine.prepare()
             try engine.start()
+
+            // If stop() happened during engine.start(), don't “resurrect” recording.
+            guard startToken == token else {
+                stop() // cleans up engine/tap/session safely
+                return
+            }
 
             // Mark started only once engine is actually running
             isRecording = true
@@ -226,7 +249,6 @@ final class AudioRecorder: ObservableObject {
 
         return 0
     }
-
 
     private func makeNewRecordingURL(extension ext: String) throws -> URL {
         let fm = FileManager.default

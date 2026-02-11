@@ -149,7 +149,7 @@ final class TurnRepository {
         guard let entity = try fetch(id: id) else { return }
 
         // Best-effort local audio delete
-        FileStore.removeIfExists(atPath: entity.audioPath)
+        FileStore.removeAudioIfExists(storedPath: entity.audioPath)
 
         context.delete(entity)
         try context.save()

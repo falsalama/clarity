@@ -51,13 +51,13 @@ struct CaptureButton: View {
 
                 // Icon swap (mic → stop)
                 if phase == .recording {
-                    Image(systemName: "stop.circle.fill")
-                        .font(.system(size: 40, weight: .semibold))
+                    Image(systemName: "stop.circle")
+                        .font(.system(size: 40, weight: .regular))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(Color.red.opacity(0.95))
                 } else {
-                    Image(systemName: "mic.fill")
-                        .font(.system(size: 30, weight: .semibold))
+                    Image(systemName: "mic")
+                        .font(.system(size: 35, weight: .regular))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.primary)
                 }

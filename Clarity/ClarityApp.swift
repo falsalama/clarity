@@ -1,20 +1,28 @@
-// ClarityApp.swift
 import SwiftUI
 import SwiftData
 
 @main
 struct ClarityApp: App {
+
+    @Environment(\.scenePhase) private var scenePhase
+
     @StateObject private var cloudTap = CloudTapSettings()
     @StateObject private var providerSettings = ContemplationProviderSettings()
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
+    @StateObject private var welcomeSurfaceStore = WelcomeSurfaceStore()
 
     private let container: ModelContainer
 
     init() {
-        print("CloudTapBaseURL =", Bundle.main.object(forInfoDictionaryKey: "CloudTapBaseURL") ?? "nil")
-        print("SupabaseURL =", Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") ?? "nil")
-        print("SupabaseAnonKey =", (Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String)?.prefix(12) ?? "nil")
+        print("CloudTapBaseURL =",
+              Bundle.main.object(forInfoDictionaryKey: "CloudTapBaseURL") ?? "nil")
+        print("SupabaseURL =",
+              Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") ?? "nil")
+        print("SupabaseAnonKey =",
+              (Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String)?.prefix(12) ?? "nil")
+        print("WelcomeManifestEndpoint =",
+              Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT") ?? "nil")
 
         do {
             let storeURL = try Self.storeURL(filename: "clarity.store")
@@ -32,6 +40,9 @@ struct ClarityApp: App {
                 configurations: config
             )
 
+            // IMPORTANT: make container available to CarPlay scene delegate.
+            AppServices.modelContainer = self.container
+
             print("SwiftData store URL =", storeURL.path)
         } catch {
             fatalError("SwiftData container init failed: \(error)")
@@ -45,6 +56,7 @@ struct ClarityApp: App {
                 .environmentObject(providerSettings)
                 .environmentObject(capsuleStore)
                 .environmentObject(redactionDictionary)
+                .environmentObject(welcomeSurfaceStore)
         }
         .modelContainer(container)
     }
@@ -66,3 +78,4 @@ struct ClarityApp: App {
         return dir.appendingPathComponent(filename)
     }
 }
+
