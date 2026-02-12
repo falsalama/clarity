@@ -1,10 +1,10 @@
-// WelcomeSurfaceStore.swift
+// HomeSurfaceStore.swift
 
 import Foundation
 import Combine
 
 @MainActor
-final class WelcomeSurfaceStore: ObservableObject {
+final class HomeSurfaceStore: ObservableObject {
     @Published private(set) var manifest: WelcomeManifest? = nil
     @Published private(set) var cachedImageFileURL: URL? = nil
 
@@ -15,7 +15,6 @@ final class WelcomeSurfaceStore: ObservableObject {
 
     init() {
         endpointURL = Self.readEndpointURLFromPlist()
-        print("WelcomeSurfaceStore.init endpointURL =", endpointURL?.absoluteString ?? "nil")
         loadCached()
     }
 
@@ -35,7 +34,7 @@ final class WelcomeSurfaceStore: ObservableObject {
                 await fetchAndCacheImage(from: imageURL)
             }
         } catch {
-            print("WelcomeSurfaceStore error:", error)
+            // best-effort
         }
     }
 
@@ -43,18 +42,20 @@ final class WelcomeSurfaceStore: ObservableObject {
 
     private static func readEndpointURLFromPlist() -> URL? {
         func readEndpointString() -> String? {
-            // Accept either key to avoid silent mismatch.
-            let rawA = Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT") as? String
-            let rawB = Bundle.main.object(forInfoDictionaryKey: "WelcomeManifestEndpoint") as? String
+            // New preferred keys
+            let rawA = Bundle.main.object(forInfoDictionaryKey: "HOME_SURFACE_ENDPOINT") as? String
+            let rawB = Bundle.main.object(forInfoDictionaryKey: "HomeSurfaceEndpoint") as? String
 
-            // Prefer the all-caps key if present.
-            let raw = (rawA?.isEmpty == false) ? rawA : rawB
-            guard var s = raw else { return nil }
+            // Backward-compatible with previous welcome keys
+            let rawC = Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT") as? String
+            let rawD = Bundle.main.object(forInfoDictionaryKey: "WelcomeManifestEndpoint") as? String
 
-            // Common failure modes: newline, leading/trailing spaces, or accidental prefix.
+            // Priority: new keys first, then old
+            let raw = [rawA, rawB, rawC, rawD].first { ($0?.isEmpty == false) }
+
+            guard var s = raw ?? nil else { return nil }
             s = s.trimmingCharacters(in: .whitespacesAndNewlines)
 
-            // If someone pasted "endpointURL = https://..." into plist, strip the prefix.
             if let range = s.range(of: "endpointURL =") {
                 s = String(s[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
             }
@@ -69,13 +70,20 @@ final class WelcomeSurfaceStore: ObservableObject {
         return url
     }
 
+    // Prefer the new directory, but fall back to the old welcome directory if needed.
     private func baseDir() -> URL {
         let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = appSupport.appendingPathComponent("WelcomeSurface", isDirectory: true)
-        if !fm.fileExists(atPath: dir.path) {
-            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let newDir = appSupport.appendingPathComponent("HomeSurface", isDirectory: true)
+        let oldDir = appSupport.appendingPathComponent("WelcomeSurface", isDirectory: true)
+
+        if fm.fileExists(atPath: newDir.path) == false {
+            // If old exists and new doesn't, use old (no migration step needed to read)
+            if fm.fileExists(atPath: oldDir.path) {
+                return oldDir
+            }
+            try? fm.createDirectory(at: newDir, withIntermediateDirectories: true)
         }
-        return dir
+        return newDir
     }
 
     private func manifestPath() -> URL {
