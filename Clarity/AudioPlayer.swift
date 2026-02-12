@@ -1,163 +1,248 @@
+// AudioPlayer.swift
+
 import Foundation
 import AVFoundation
 import Combine
+#if os(iOS)
+import MediaPlayer
+#endif
 
-@MainActor
+/// Local file playback with CarPlay-compatible Now Playing + remote controls.
+/// Swift 6–clean: no global @MainActor isolation; hops to MainActor only for UI state.
 final class LocalAudioPlayer: ObservableObject {
-    @Published private(set) var isPlaying: Bool = false
-    @Published private(set) var duration: TimeInterval = 0
-    @Published private(set) var currentTime: TimeInterval = 0
-    @Published private(set) var lastError: String? = nil
 
-    private var player: AVAudioPlayer?
-    private var tickTask: Task<Void, Never>?
+    // MARK: - Published (UI-facing)
 
-    /// Preferred entry point: pass the stored path from SwiftData (absolute, file://, or relative).
+    @MainActor @Published private(set) var isPlaying: Bool = false
+    @MainActor @Published private(set) var duration: TimeInterval = 0
+    @MainActor @Published private(set) var currentTime: TimeInterval = 0
+    @MainActor @Published private(set) var lastError: String? = nil
+
+    // MARK: - Core
+
+    private var player: AVPlayer?
+    private var timeObserver: Any?
+    private var endObserver: NSObjectProtocol?
+
+    private var title: String = "Capture"
+
+#if os(iOS)
+    private var remoteInstalled = false
+#endif
+
+    deinit { teardown() }
+
+    // MARK: - Public
+
     func load(storedAudioPath: String?) {
         stop()
 
-        guard let url = FileStore.existingAudioURL(from: storedAudioPath) else {
-            setPlaybackError("Audio file not found.")
+        guard let url = FileStore.existingAudioURL(from: storedAudioPath),
+              FileManager.default.fileExists(atPath: url.path)
+        else {
+            setError("Audio file not found.")
             return
         }
 
-        load(resolvedURL: url)
-    }
+        title = normalizedTitle(from: url)
 
-    /// Convenience: if a caller already has a correct resolved URL, this still works.
-    func load(url: URL) {
-        stop()
-        load(resolvedURL: url)
-    }
+        let item = AVPlayerItem(url: url)
+        player = AVPlayer(playerItem: item)
 
-    private func load(resolvedURL url: URL) {
-        // Guard: file must exist and be non-empty
-        let path = url.path
-        guard FileManager.default.fileExists(atPath: path) else {
-            setPlaybackError("Audio file not found.")
-            return
-        }
-
-        do {
-            let attrs = try FileManager.default.attributesOfItem(atPath: path)
-            if let size = attrs[.size] as? NSNumber, size.int64Value <= 0 {
-                setPlaybackError("Audio file is empty.")
-                return
-            }
-        } catch {
-            // If we can't read attrs, continue and let AVAudioPlayer validate.
-        }
-
-        do {
 #if os(iOS)
-            // Playback session for local audio
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [])
-            try session.setActive(true, options: [])
+        configureAudioSession()
+        installRemoteCommandsIfNeeded()
 #endif
-            let p = try AVAudioPlayer(contentsOf: url)
-            p.prepareToPlay()
 
-            player = p
-            duration = max(0, p.duration)
-            currentTime = max(0, p.currentTime)
-            lastError = nil
-        } catch {
-            player = nil
-            duration = 0
-            currentTime = 0
+        attachTimeObserver()
+        attachEndObserver(item)
 
-            let ns = error as NSError
-            if ns.code == 2003334207 {
-                lastError = "Playback error: couldn't open audio."
-            } else {
-                lastError = "Playback error: \(ns.localizedDescription)"
-            }
-        }
+        Task { await refreshDuration() }
+        updateNowPlaying()
     }
-
-    func toggle() { isPlaying ? pause() : play() }
 
     func play() {
-        guard lastError == nil else { return }
         guard let player else { return }
-        guard player.duration > 0 else {
-            setPlaybackError("Audio unavailable.")
-            return
-        }
-        guard player.play() else {
-            setPlaybackError("Playback failed.")
-            return
-        }
-
-        isPlaying = true
-        startTicking()
+        player.play()
+        setPlaying(true)
     }
 
     func pause() {
-        player?.pause()
-        isPlaying = false
-        stopTicking()
-        syncTime()
+        guard let player else { return }
+        player.pause()
+        setPlaying(false)
+    }
+
+    func toggle() {
+        if player?.timeControlStatus == .playing { pause() } else { play() }
+    }
+
+    func seek(to seconds: TimeInterval) {
+        guard let player else { return }
+        let clamped = max(0, seconds)
+        player.seek(to: CMTime(seconds: clamped, preferredTimescale: 600),
+                    toleranceBefore: .zero,
+                    toleranceAfter: .zero)
+        Task { @MainActor in currentTime = clamped }
+        updateNowPlaying(elapsed: clamped)
     }
 
     func stop() {
-        player?.stop()
-        player = nil
-        isPlaying = false
-        duration = 0
-        currentTime = 0
-        lastError = nil
-        stopTicking()
-    }
-
-    func seek(to time: TimeInterval) {
-        guard let player else { return }
-        let t = max(0, min(time, player.duration))
-        player.currentTime = t
-        currentTime = t
-    }
-
-    private func startTicking() {
-        stopTicking()
-        tickTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 200_000_000) // 0.2s
-                await MainActor.run {
-                    guard let p = self.player else { return }
-
-                    self.currentTime = p.currentTime
-                    self.duration = p.duration
-
-                    if !p.isPlaying {
-                        self.isPlaying = false
-                        self.stopTicking()
-                    }
-                }
-            }
+        teardown()
+#if os(iOS)
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+#endif
+        Task { @MainActor in
+            isPlaying = false
+            duration = 0
+            currentTime = 0
+            lastError = nil
         }
     }
 
-    private func stopTicking() {
-        tickTask?.cancel()
-        tickTask = nil
+    // MARK: - Observers
+
+    private func attachTimeObserver() {
+        guard let player, timeObserver == nil else { return }
+
+        let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
+            guard let self else { return }
+            let seconds = max(0, time.seconds.isFinite ? time.seconds : 0)
+            Task { @MainActor in self.currentTime = seconds }
+            self.updateNowPlaying(elapsed: seconds)
+        }
     }
 
-    private func syncTime() {
-        guard let p = player else { return }
-        currentTime = p.currentTime
-        duration = p.duration
+    private func attachEndObserver(_ item: AVPlayerItem) {
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            self.setPlaying(false)
+        }
     }
 
-    private func setPlaybackError(_ message: String) {
-        player?.stop()
+    private func teardown() {
+        if let token = timeObserver, let player {
+            player.removeTimeObserver(token)
+        }
+        timeObserver = nil
+
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        endObserver = nil
+
+        player?.pause()
         player = nil
-        isPlaying = false
-        duration = 0
-        currentTime = 0
-        lastError = message
-        stopTicking()
     }
-}
 
+    // MARK: - State helpers
+
+    private func setPlaying(_ playing: Bool) {
+        Task { @MainActor in self.isPlaying = playing }
+        updateNowPlaying()
+    }
+
+    private func setError(_ message: String) {
+        Task { @MainActor in
+            lastError = message
+            isPlaying = false
+        }
+    }
+
+    private func refreshDuration() async {
+        guard let item = player?.currentItem else { return }
+        do {
+            let d = try await item.asset.load(.duration)
+            let seconds = max(0, d.seconds.isFinite ? d.seconds : 0)
+            await MainActor.run { duration = seconds }
+            updateNowPlaying()
+        } catch {
+            // non-fatal
+        }
+    }
+
+    private func normalizedTitle(from url: URL) -> String {
+        let raw = url.deletingPathExtension().lastPathComponent
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return t.isEmpty ? "Capture" : t
+    }
+
+    // MARK: - CarPlay / system integration
+
+#if os(iOS)
+
+    private func configureAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        // Playback + explicit output routing allowances (CarPlay/Bluetooth/AirPlay output).
+        // (Options are documented by Apple; allowAirPlay is explicit, Bluetooth options are category options too.) :contentReference[oaicite:1]{index=1}
+        let options: AVAudioSession.CategoryOptions = [
+            .allowAirPlay,
+            .allowBluetoothA2DP
+        ]
+        try? session.setCategory(.playback, mode: .default, options: options)
+        try? session.setActive(true, options: [])
+    }
+
+    private func installRemoteCommandsIfNeeded() {
+        guard !remoteInstalled else { return }
+        remoteInstalled = true
+
+        let cc = MPRemoteCommandCenter.shared()
+
+        // Prevent duplicate handlers if this object is recreated.
+        cc.playCommand.removeTarget(nil)
+        cc.pauseCommand.removeTarget(nil)
+        cc.togglePlayPauseCommand.removeTarget(nil)
+        cc.changePlaybackPositionCommand.removeTarget(nil)
+
+        cc.playCommand.isEnabled = true
+        cc.pauseCommand.isEnabled = true
+        cc.togglePlayPauseCommand.isEnabled = true
+        cc.changePlaybackPositionCommand.isEnabled = true
+
+        cc.playCommand.addTarget { [weak self] _ in
+            self?.play()
+            return .success
+        }
+
+        cc.pauseCommand.addTarget { [weak self] _ in
+            self?.pause()
+            return .success
+        }
+
+        cc.togglePlayPauseCommand.addTarget { [weak self] _ in
+            self?.toggle()
+            return .success
+        }
+
+        cc.changePlaybackPositionCommand.addTarget { [weak self] event in
+            guard let e = event as? MPChangePlaybackPositionCommandEvent else {
+                return .commandFailed
+            }
+            self?.seek(to: e.positionTime)
+            return .success
+        }
+    }
+
+    private func updateNowPlaying(elapsed: TimeInterval? = nil) {
+        let elapsedTime = elapsed ?? (player?.currentTime().seconds ?? 0)
+        let playbackRate: Double = (player?.timeControlStatus == .playing) ? 1.0 : 0.0
+        let dur = player?.currentItem?.duration.seconds ?? 0
+
+        let info: [String: Any] = [
+            MPMediaItemPropertyTitle: title,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, elapsedTime),
+            MPNowPlayingInfoPropertyPlaybackRate: playbackRate,
+            MPMediaItemPropertyPlaybackDuration: max(0, dur.isFinite ? dur : 0)
+        ]
+
+        MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+#endif
+}

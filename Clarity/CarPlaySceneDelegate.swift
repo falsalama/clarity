@@ -1,44 +1,71 @@
+// CarPlaySceneDelegate.swift
+
 import Foundation
 import CarPlay
 import SwiftData
 import UIKit
 
+/// CarPlay entry point for Clarity (audio category).
+/// Root UI is a tab bar:
+/// - Captures (library list)
+/// - Now Playing (system template)
+///
+/// With a tab bar root, we do NOT push Now Playing on selection.
+/// Selection starts playback; user can switch to the Now Playing tab.
 final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 
     private let player = LocalAudioPlayer()
+
+    private weak var interfaceController: CPInterfaceController?
+    private var tabBarTemplate: CPTabBarTemplate?
 
     func templateApplicationScene(
         _ templateApplicationScene: CPTemplateApplicationScene,
         didConnect interfaceController: CPInterfaceController
     ) {
-        let list = makeRootListTemplate(interfaceController: interfaceController)
+        self.interfaceController = interfaceController
 
-        // iOS 14+ API (non-deprecated)
-        interfaceController.setRootTemplate(list, animated: true, completion: nil)
+        let captures = makeCapturesListTemplate()
+        let nowPlaying = makeNowPlayingTemplate()
+
+        let tabs = CPTabBarTemplate(templates: [captures, nowPlaying])
+        tabBarTemplate = tabs
+
+        interfaceController.setRootTemplate(tabs, animated: true, completion: nil)
     }
 
     func templateApplicationScene(
         _ templateApplicationScene: CPTemplateApplicationScene,
         didDisconnectInterfaceController interfaceController: CPInterfaceController
     ) {
-        // no-op for now
+        self.interfaceController = nil
+        self.tabBarTemplate = nil
     }
 
     // MARK: - Templates
 
-    private func makeRootListTemplate(interfaceController: CPInterfaceController) -> CPListTemplate {
-        let items = loadCaptureItems(interfaceController: interfaceController)
+    private func makeCapturesListTemplate() -> CPListTemplate {
+        let items = loadCaptureItems()
 
         let section = CPListSection(items: items)
-        let template = CPListTemplate(title: "Clarity", sections: [section])
+        let template = CPListTemplate(title: "Captures", sections: [section])
 
-        template.tabTitle = "Clarity"
+        template.tabTitle = "Captures"
         template.tabImage = UIImage(systemName: "waveform")
 
         return template
     }
 
-    private func loadCaptureItems(interfaceController: CPInterfaceController) -> [CPListItem] {
+    private func makeNowPlayingTemplate() -> CPNowPlayingTemplate {
+        let template = CPNowPlayingTemplate.shared
+        template.tabTitle = "Now Playing"
+        template.tabImage = UIImage(systemName: "play.circle")
+        return template
+    }
+
+    // MARK: - Data → List items
+
+    private func loadCaptureItems() -> [CPListItem] {
         guard let container = AppServices.modelContainer else {
             return [CPListItem(text: "Data unavailable", detailText: "Model container not ready")]
         }
@@ -64,25 +91,29 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         }
 
         return turns.prefix(50).map { t in
-            let title = t.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Capture" : t.title
+            let title = normalizedTitle(for: t)
             let detail = formatCarPlayDetail(for: t)
 
             let item = CPListItem(text: title, detailText: detail)
 
             item.handler = { [weak self] _, completion in
-                defer { completion() }
+                completion()
                 guard let self else { return }
 
-                self.player.load(storedAudioPath: t.audioPath)
-
-                if self.player.lastError == nil {
+                // Start playback; user can switch to Now Playing tab.
+                Task { @MainActor in
+                    self.player.load(storedAudioPath: t.audioPath)
                     self.player.play()
-                    interfaceController.pushTemplate(CPNowPlayingTemplate.shared, animated: true, completion: nil)
                 }
             }
 
             return item
         }
+    }
+
+    private func normalizedTitle(for t: TurnEntity) -> String {
+        let raw = t.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return raw.isEmpty ? "Capture" : raw
     }
 
     private func formatCarPlayDetail(for t: TurnEntity) -> String {
@@ -114,4 +145,3 @@ private extension DateFormatter {
         return f
     }()
 }
-

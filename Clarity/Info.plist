@@ -19,6 +19,19 @@
 		<true/>
 		<key>UISceneConfigurations</key>
 		<dict>
+			<key>UIWindowSceneSessionRoleApplication</key>
+			<array>
+				<dict>
+					<key>UISceneClassName</key>
+					<string>UIWindowScene</string>
+					<key>UISceneDelegateClassName</key>
+					<string></string>
+					<key>UISceneConfigurationName</key>
+					<string>Default Configuration</string>
+					<key>UISceneStoryboardFile</key>
+					<string></string>
+				</dict>
+			</array>
 			<key>CPTemplateApplicationSceneSessionRoleApplication</key>
 			<array>
 				<dict>
