@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Renders a simple 108-petal ring around a minimal "moon seat".
-///
-/// Intentionally symbolic and restrained.
 struct Bloom108View: View {
     let openCount: Int
+    let portraitRecipe: PortraitRecipe
+    let onPortraitTap: () -> Void
 
     private let petalCount = 108
 
@@ -17,7 +16,6 @@ struct Bloom108View: View {
             let petalWidth = size * 0.035
 
             ZStack {
-                // Petals
                 ForEach(0..<petalCount, id: \.self) { i in
                     let angle = (Double(i) / Double(petalCount)) * 2.0 * Double.pi
                     let isOpen = i < min(max(openCount, 0), petalCount)
@@ -34,12 +32,19 @@ struct Bloom108View: View {
                         .scaleEffect(isOpen ? 1.0 : 0.92)
                 }
 
-                // Moon seat (very simple: a soft disc + a small base)
                 VStack(spacing: 8) {
-                    Circle()
-                        .fill(.primary.opacity(0.06))
-                        .overlay(Circle().stroke(.primary.opacity(0.10), lineWidth: 1))
-                        .frame(width: size * 0.26, height: size * 0.26)
+                    Button(action: onPortraitTap) {
+                        ZStack {
+                            Circle()
+                                .fill(.primary.opacity(0.06))
+                                .overlay(Circle().stroke(.primary.opacity(0.10), lineWidth: 1))
+
+                            PortraitView(recipe: portraitRecipe)
+                                .padding(size * 0.02)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: size * 0.26, height: size * 0.26)
 
                     RoundedRectangle(cornerRadius: size * 0.06, style: .continuous)
                         .fill(.primary.opacity(0.05))
@@ -62,29 +67,13 @@ struct Bloom108View: View {
 private struct PetalShape: Shape {
     func path(in rect: CGRect) -> Path {
         var p = Path()
-
+        let w = rect.width
         let h = rect.height
-        let midX = rect.midX
-
-        // A simple pointed teardrop.
-        p.move(to: CGPoint(x: midX, y: rect.minY))
-        p.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.minY + h * 0.55),
-            control: CGPoint(x: rect.maxX, y: rect.minY + h * 0.15)
-        )
-        p.addQuadCurve(
-            to: CGPoint(x: midX, y: rect.maxY),
-            control: CGPoint(x: rect.maxX, y: rect.maxY)
-        )
-        p.addQuadCurve(
-            to: CGPoint(x: rect.minX, y: rect.minY + h * 0.55),
-            control: CGPoint(x: rect.minX, y: rect.maxY)
-        )
-        p.addQuadCurve(
-            to: CGPoint(x: midX, y: rect.minY),
-            control: CGPoint(x: rect.minX, y: rect.minY + h * 0.15)
-        )
-
+        p.move(to: CGPoint(x: w * 0.5, y: 0))
+        p.addQuadCurve(to: CGPoint(x: w, y: h * 0.65), control: CGPoint(x: w, y: h * 0.20))
+        p.addQuadCurve(to: CGPoint(x: w * 0.5, y: h), control: CGPoint(x: w * 0.75, y: h * 0.98))
+        p.addQuadCurve(to: CGPoint(x: 0, y: h * 0.65), control: CGPoint(x: w * 0.25, y: h * 0.98))
+        p.addQuadCurve(to: CGPoint(x: w * 0.5, y: 0), control: CGPoint(x: 0, y: h * 0.20))
         return p
     }
 }

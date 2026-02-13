@@ -1,3 +1,5 @@
+// SwiftDataModels.swift
+
 import Foundation
 import SwiftData
 
@@ -120,9 +122,15 @@ final class TurnEntity {
     var userFacingErrorKey: String?
     var errorDebugMessage: String?
 
-    // MARK: - Initialiser
+    // MARK: Init
 
-    init(id: UUID = UUID()) {
+    /// SwiftData-friendly default init.
+    init() {
+        self.id = UUID()
+    }
+
+    /// Convenience init for explicit IDs.
+    init(id: UUID) {
         self.id = id
     }
 }
@@ -226,57 +234,41 @@ final class CapsuleEntity {
         self.learnedJSON = Data()
     }
 }
+// MARK: - UserProfileEntity (singleton)
 
+@Model
+final class UserProfileEntity {
+    /// Singleton key. Use a constant so we only ever store one row.
+    var id: String
+
+    /// Display name is optional (future use).
+    var displayName: String?
+
+    /// JSON-encoded PortraitRecipe (tiny).
+    var portraitRecipeJSON: Data
+
+    var updatedAt: Date
+
+    init(
+        id: String = "singleton",
+        displayName: String? = nil,
+        portraitRecipeJSON: Data = PortraitRecipe.default.encode(),
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.portraitRecipeJSON = portraitRecipeJSON
+        self.updatedAt = updatedAt
+    }
+}
 // MARK: - PatternStatsEntity (Learning; add-only schema)
 
 @Model
 final class PatternStatsEntity {
 
-    @Attribute(.unique)
-    var id: UUID
+    // MARK: Kind
 
-    // Kind of pattern (allowed: style_preference, workflow_preference, topic_recurrence, resolution_pattern, constraints_sensitivity, narrative_pattern, lens_preference, constraint_trigger, contraction_pattern, release_pattern)
-    var kindRaw: String
-
-    // Pattern key (e.g., "bullets", "concise", "options_first", "topic:taxes")
-    var key: String
-
-    // Decayed score (0...1 or any non-negative real); we’ll keep Double flexible
-    var score: Double
-
-    // Observed count (integer, bounded)
-    var count: Int
-
-    // First and last observation timestamps
-    var firstSeenAt: Date
-    var lastSeenAt: Date
-
-    // Decay control (days)
-    var halfLifeDays: Double
-
-    init(
-        id: UUID = UUID(),
-        kindRaw: String,
-        key: String,
-        score: Double = 0,
-        count: Int = 0,
-        firstSeenAt: Date = Date(),
-        lastSeenAt: Date = Date(),
-        halfLifeDays: Double = 14.0
-    ) {
-        self.id = id
-        self.kindRaw = kindRaw
-        self.key = key
-        self.score = score
-        self.count = count
-        self.firstSeenAt = firstSeenAt
-        self.lastSeenAt = lastSeenAt
-        self.halfLifeDays = halfLifeDays
-    }
-}
-
-extension PatternStatsEntity {
-    enum Kind: String, CaseIterable {
+    enum Kind: String, CaseIterable, Codable {
         case style_preference
         case workflow_preference
         case topic_recurrence
@@ -289,8 +281,122 @@ extension PatternStatsEntity {
         case release_pattern
     }
 
+    // MARK: Identity
+
+    @Attribute(.unique)
+    var id: UUID
+
+    // MARK: Stored fields
+
+    /// Kind of pattern (stored as raw String for migration safety)
+    var kindRaw: String
+
+    /// Pattern key (e.g., "bullets", "concise", "options_first", "topic:taxes")
+    var key: String
+
+    /// Decayed score (0...1 or any non-negative real)
+    var score: Double
+
+    /// Observed count
+    var count: Int
+
+    /// First and last observation timestamps
+    var firstSeenAt: Date
+    var lastSeenAt: Date
+
+    /// Decay control (days)
+    var halfLifeDays: Double
+
+    // MARK: Computed bridge
+
     var kind: Kind {
         get { Kind(rawValue: kindRaw) ?? .style_preference }
         set { kindRaw = newValue.rawValue }
+    }
+
+    // MARK: Init
+
+    init(
+        id: UUID = UUID(),
+        kindRaw: String,
+        key: String,
+        score: Double,
+        count: Int,
+        firstSeenAt: Date,
+        lastSeenAt: Date,
+        halfLifeDays: Double
+    ) {
+        self.id = id
+        self.kindRaw = kindRaw
+        self.key = key
+        self.score = score
+        self.count = count
+        self.firstSeenAt = firstSeenAt
+        self.lastSeenAt = lastSeenAt
+        self.halfLifeDays = halfLifeDays
+    }
+
+    convenience init(
+        id: UUID = UUID(),
+        kind: Kind,
+        key: String,
+        score: Double,
+        count: Int,
+        firstSeenAt: Date,
+        lastSeenAt: Date,
+        halfLifeDays: Double
+    ) {
+        self.init(
+            id: id,
+            kindRaw: kind.rawValue,
+            key: key,
+            score: score,
+            count: count,
+            firstSeenAt: firstSeenAt,
+            lastSeenAt: lastSeenAt,
+            halfLifeDays: halfLifeDays
+        )
+    }
+}
+
+// MARK: - FocusCompletionEntity (Done taps)
+
+@Model
+final class FocusCompletionEntity {
+
+    @Attribute(.unique)
+    var id: UUID
+
+    /// Calendar-day key (local timezone), e.g. "2026-02-12"
+    @Attribute(.unique)
+    var dayKey: String
+
+    var completedAt: Date
+
+    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+        self.id = id
+        self.dayKey = dayKey
+        self.completedAt = completedAt
+    }
+}
+
+// MARK: - PracticeCompletionEntity (Done taps)
+
+@Model
+final class PracticeCompletionEntity {
+
+    @Attribute(.unique)
+    var id: UUID
+
+    /// Calendar-day key (local timezone), e.g. "2026-02-12"
+    @Attribute(.unique)
+    var dayKey: String
+
+    var completedAt: Date
+
+    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+        self.id = id
+        self.dayKey = dayKey
+        self.completedAt = completedAt
     }
 }

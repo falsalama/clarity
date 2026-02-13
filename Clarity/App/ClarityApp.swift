@@ -1,3 +1,5 @@
+// ClarityApp.swift
+
 import SwiftUI
 import SwiftData
 
@@ -10,7 +12,7 @@ struct ClarityApp: App {
     @StateObject private var providerSettings = ContemplationProviderSettings()
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
-    @StateObject private var welcomeSurfaceStore = WelcomeSurfaceStore()
+    @StateObject private var homeSurfaceStore = HomeSurfaceStore()
 
     private let container: ModelContainer
 
@@ -21,8 +23,12 @@ struct ClarityApp: App {
               Bundle.main.object(forInfoDictionaryKey: "SupabaseURL") ?? "nil")
         print("SupabaseAnonKey =",
               (Bundle.main.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String)?.prefix(12) ?? "nil")
-        print("WelcomeManifestEndpoint =",
-              Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT") ?? "nil")
+        print("HomeSurfaceEndpoint =",
+              Bundle.main.object(forInfoDictionaryKey: "HOME_SURFACE_ENDPOINT")
+              ?? Bundle.main.object(forInfoDictionaryKey: "HomeSurfaceEndpoint")
+              ?? Bundle.main.object(forInfoDictionaryKey: "WelcomeManifestEndpoint")
+              ?? Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT")
+              ?? "nil")
 
         do {
             let storeURL = try Self.storeURL(filename: "clarity.store")
@@ -37,6 +43,8 @@ struct ClarityApp: App {
                 RedactionRecordEntity.self,
                 CapsuleEntity.self,
                 PatternStatsEntity.self,
+                FocusCompletionEntity.self,
+                PracticeCompletionEntity.self,
                 configurations: config
             )
 
@@ -56,7 +64,7 @@ struct ClarityApp: App {
                 .environmentObject(providerSettings)
                 .environmentObject(capsuleStore)
                 .environmentObject(redactionDictionary)
-                .environmentObject(welcomeSurfaceStore)
+                .environmentObject(homeSurfaceStore)
         }
         .modelContainer(container)
     }
@@ -78,4 +86,3 @@ struct ClarityApp: App {
         return dir.appendingPathComponent(filename)
     }
 }
-

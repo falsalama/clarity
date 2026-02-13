@@ -13,7 +13,7 @@ struct AppShellView: View {
     @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var capsuleStore: CapsuleStore
     @EnvironmentObject private var redactionDictionary: RedactionDictionary
-    @EnvironmentObject private var welcomeSurface: WelcomeSurfaceStore
+    @EnvironmentObject private var homeSurface: HomeSurfaceStore
 
     // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
@@ -22,12 +22,13 @@ struct AppShellView: View {
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
 
-    // Tab bar fade (launch-only)
-    @State private var tabBar: UITabBar? = nil
-    @State private var didFadeTabBarThisLaunch: Bool = false
-
     private enum AppTab: Hashable { case home, reflect, focus, practice, profile }
     @State private var selectedTab: AppTab = .home
+
+    init() {
+        // Ensure the tab bar is opaque and styled from the very first frame.
+        Self.configureGlobalTabBarAppearance()
+    }
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -52,15 +53,12 @@ struct AppShellView: View {
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
                 .tag(AppTab.profile)
         }
+        // Make the tab bar opaque and consistent so it doesn’t flip with background changes.
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(Color(.systemBackground).opacity(0.92), for: .tabBar)
+        .toolbarColorScheme(nil, for: .tabBar) // inherit system light/dark (not content behind)
         .environmentObject(captureCoordinator)
-        .environmentObject(welcomeSurface)
-        .background(
-            TabBarReader { bar in
-                self.tabBar = bar
-                self.fadeTabBarInIfNeeded()
-            }
-            .frame(width: 0, height: 0)
-        )
+        .environmentObject(homeSurface)
         .onAppear {
             guard !didBind else { return }
             didBind = true
@@ -82,7 +80,9 @@ struct AppShellView: View {
                 scheduleSiriStartIfNeeded()
             }
 
-            fadeTabBarInIfNeeded()
+            // Start daily scheduling + refresh once at launch
+            homeSurface.startDailyAutoRefresh()
+            Task { await homeSurface.refreshNow() }
         }
         .onChange(of: scenePhase) { _, newPhase in
             captureCoordinator.handleScenePhaseChange(newPhase)
@@ -96,29 +96,31 @@ struct AppShellView: View {
                 }
 
                 scheduleSiriStartIfNeeded()
+
+                // Refresh when returning to foreground (not on tab switches)
+                homeSurface.startDailyAutoRefresh()
+                Task { await homeSurface.refreshNow() }
+
             } else {
                 siriTask?.cancel()
                 siriTask = nil
+                homeSurface.stopDailyAutoRefresh()
             }
         }
     }
 
-    // MARK: - Tab bar fade
+    // MARK: - Fixed tab bar appearance
 
-    private func fadeTabBarInIfNeeded() {
-        guard !didFadeTabBarThisLaunch else { return }
-        guard let bar = tabBar else { return }
-        didFadeTabBarThisLaunch = true
+    private static func configureGlobalTabBarAppearance() {
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundEffect = nil
+        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.92)
+        appearance.shadowColor = UIColor.black.withAlphaComponent(0.08)
 
-        DispatchQueue.main.async {
-            bar.alpha = 0.0
-            UIView.animate(
-                withDuration: 0.55,
-                delay: 0.08,
-                options: [.curveEaseOut, .beginFromCurrentState]
-            ) {
-                bar.alpha = 1.0
-            }
+        UITabBar.appearance().standardAppearance = appearance
+        if #available(iOS 15.0, *) {
+            UITabBar.appearance().scrollEdgeAppearance = appearance
         }
     }
 
@@ -149,47 +151,3 @@ struct AppShellView: View {
         }
     }
 }
-
-// MARK: - UITabBar resolver
-
-private struct TabBarReader: UIViewControllerRepresentable {
-    let onResolve: (UITabBar) -> Void
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        ResolverViewController(onResolve: onResolve)
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
-}
-
-private final class ResolverViewController: UIViewController {
-    private let onResolve: (UITabBar) -> Void
-    private var didResolve = false
-
-    init(onResolve: @escaping (UITabBar) -> Void) {
-        self.onResolve = onResolve
-        super.init(nibName: nil, bundle: nil)
-        view.isUserInteractionEnabled = false
-        view.backgroundColor = .clear
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        resolveOnce()
-    }
-
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        resolveOnce()
-    }
-
-    private func resolveOnce() {
-        guard !didResolve else { return }
-        guard let bar = tabBarController?.tabBar else { return }
-        didResolve = true
-        onResolve(bar)
-    }
-}
-

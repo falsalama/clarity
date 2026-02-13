@@ -57,73 +57,8 @@ struct Tab_CaptureView: View {
     var body: some View {
         NavigationStack(path: $path) {
             List {
-                // Top capture surface (kept as a single surface)
-                Section {
-                    VStack(spacing: 12) {
-                        // header removed; use navigationTitle instead
-                        promptChips
-                        micButton
-                        statusPill
-                            .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
-                        typeTextButton
-
-                        if let uiErrorKey = userFacingErrorKey {
-                            Text(LocalizedStringKey(uiErrorKey))
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.top, 4)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                    .listRowSeparator(.hidden)
-                } header: {
-                    EmptyView()
-                }
-
-                // Inline captures list (swipe actions belong in List)
-                Section {
-                    if completedTurns.isEmpty {
-                        Text("Nothing here yet.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .listRowSeparator(.hidden)
-                    } else {
-                        ForEach(Array(completedTurns.prefix(25))) { t in
-                            NavigationLink(value: t.id) {
-                                captureRow(t)
-                            }
-                            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                Button(role: .destructive) {
-                                    deleteTurn(t)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-
-                                Button {
-                                    starTurn(t)
-                                } label: {
-                                    Label(t.isStarred ? "Unstar" : "Star",
-                                          systemImage: t.isStarred ? "star.slash" : "star")
-                                }
-                                .tint(.yellow)
-                            }
-                            // More obvious separators
-                            .listRowSeparator(.visible)
-                            .listRowSeparatorTint(.secondary.opacity(0.45))
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Captures")
-                        Spacer()
-                        Text("\(completedTurns.count)")
-                            .foregroundStyle(.secondary)
-                    }
-                    .font(.headline)
-                    .textCase(nil)
-                }
+                captureSurfaceSection
+                capturesSection
             }
             .listStyle(.plain)
             .navigationTitle("Reflect")
@@ -131,11 +66,19 @@ struct Tab_CaptureView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
-                        AchievementsView(openCount: min(108, completedTurns.count))
+                        ProgressScreen()
                     } label: {
-                        turnCountBadge(count: min(108, completedTurns.count))
+                        // Reflect tab badge: soft white (not gold).
+                        TopCounterBadge(
+                            count: min(108, completedTurns.count),
+                            fill: Color.white.opacity(0.92),
+                            textColor: .black
+                        )
+                        .overlay(
+                            Capsule().stroke(.black.opacity(0.08), lineWidth: 1)
+                        )
                     }
-                    .accessibilityLabel(Text("Achievements: \(min(108, completedTurns.count)) of 108"))
+                    .accessibilityLabel(Text("Progress: \(min(108, completedTurns.count)) of 108"))
                 }
             }
             .navigationDestination(for: UUID.self) { id in
@@ -180,6 +123,77 @@ struct Tab_CaptureView: View {
                 }
                 .environmentObject(coordinator)
             }
+        }
+    }
+
+    // MARK: - Sections
+
+    private var captureSurfaceSection: some View {
+        Section {
+            VStack(spacing: 12) {
+                promptChips
+                micButton
+                statusPill
+                    .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
+                typeTextButton
+
+                if let uiErrorKey = userFacingErrorKey {
+                    Text(LocalizedStringKey(uiErrorKey))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 4)
+                }
+            }
+            .padding(.vertical, 6)
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .listRowSeparator(.hidden)
+        } header: {
+            EmptyView()
+        }
+    }
+
+    private var capturesSection: some View {
+        Section {
+            let items: [TurnEntity] = Array(completedTurns.prefix(25))
+            if items.isEmpty {
+                Text("Nothing here yet.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .listRowSeparator(.hidden)
+            } else {
+                ForEach(items) { t in
+                    NavigationLink(value: t.id) {
+                        captureRow(t)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            deleteTurn(t)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+
+                        Button {
+                            starTurn(t)
+                        } label: {
+                            Label(t.isStarred ? "Unstar" : "Star",
+                                  systemImage: t.isStarred ? "star.slash" : "star")
+                        }
+                        .tint(.yellow)
+                    }
+                    .listRowSeparator(.visible)
+                    .listRowSeparatorTint(.secondary.opacity(0.45))
+                }
+            }
+        } header: {
+            HStack {
+                Text("Captures")
+                Spacer()
+                Text("\(completedTurns.count)")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.headline)
+            .textCase(nil)
         }
     }
 
@@ -340,21 +354,6 @@ struct Tab_CaptureView: View {
         default:
             return nil
         }
-    }
-
-    // MARK: - Badge
-
-    private func turnCountBadge(count: Int) -> some View {
-        let shown = min(max(count, 0), 108)
-        let goldFill = Color(red: 0.96, green: 0.82, blue: 0.26)
-
-        return Text("\(shown)")
-            .font(.footnote.weight(.semibold))
-            .foregroundStyle(.black)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(goldFill.opacity(0.90))
-            .clipShape(Capsule())
     }
 
     private func openAppSettings() {
