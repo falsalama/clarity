@@ -3,10 +3,11 @@
 import SwiftUI
 import SwiftData
 
-/// PracticeView (v2)
+/// PracticeView (v2.1)
 /// - One small practice at a time.
 /// - Deterministic: advances one step per day *only after* the user marks Done.
 /// - Lock: after Done, the practice does not change until the next day.
+/// - Content: remote-first (Supabase/Edge via CloudTapService) with local fallback.
 /// - Uses PracticeProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct PracticeView: View {
 
@@ -43,7 +44,12 @@ struct PracticeView: View {
     )
     private var programStates: [PracticeProgramStateEntity]
 
-    // MARK: - Practice list (v1 seed)
+    // MARK: - Remote content (DB-fed)
+
+    private let cloudTap = CloudTapService()
+    @State private var remoteItems: [PracticeItem]? = nil
+
+    // MARK: - Practice list (local fallback seed)
 
     private let items: [PracticeItem] = [
         PracticeItem(
@@ -71,6 +77,11 @@ No analysis. Just a clean label.
 """
         )
     ]
+
+    private var activeItems: [PracticeItem] {
+        if let remoteItems, !remoteItems.isEmpty { return remoteItems }
+        return items
+    }
 
     // Expand/collapse body
     @State private var isExpanded = true
@@ -130,6 +141,9 @@ No analysis. Just a clean label.
                 countedThisAppear = true
             }
         }
+        .task {
+            await loadRemotePracticeStepsIfNeeded()
+        }
         .onDisappear {
             countedThisAppear = false
         }
@@ -137,6 +151,7 @@ No analysis. Just a clean label.
             if newValue == .active {
                 ensureProgramStateExists()
                 applyDailyAdvanceIfNeeded()
+                Task { await loadRemotePracticeStepsIfNeeded() }
             }
         }
     }
@@ -160,9 +175,10 @@ No analysis. Just a clean label.
     }
 
     private var currentItem: PracticeItem {
-        guard !items.isEmpty else { return PracticeItem(title: "Practice", body: "—") }
-        let idx = max(0, min(currentIndex, items.count - 1))
-        return items[idx]
+        let list = activeItems
+        guard !list.isEmpty else { return PracticeItem(title: "Practice", body: "—") }
+        let idx = max(0, min(currentIndex, list.count - 1))
+        return list[idx]
     }
 
     // MARK: - Sections
@@ -300,8 +316,9 @@ No analysis. Just a clean label.
               pendingFromDay < todayKey
         else { return }
 
-        if !items.isEmpty {
-            let next = min(state.currentIndex + 1, items.count - 1) // hold last if list is shorter
+        let list = activeItems
+        if !list.isEmpty {
+            let next = min(state.currentIndex + 1, list.count - 1) // hold last if list is shorter
             state.currentIndex = next
         }
 
@@ -309,6 +326,35 @@ No analysis. Just a clean label.
         state.updatedAt = Date()
 
         do { try modelContext.save() } catch { /* best-effort */ }
+    }
+
+    // MARK: - Remote load
+
+    @MainActor
+    private func loadRemotePracticeStepsIfNeeded() async {
+        if let remoteItems, !remoteItems.isEmpty { return }
+
+        do {
+            let resp = try await cloudTap.practiceSteps(programme: "core")
+
+            let mapped: [PracticeItem] = resp.steps
+                .sorted(by: { $0.stepIndex < $1.stepIndex })
+                .map { step in
+                    PracticeItem(title: step.title, body: step.body)
+                }
+
+            if !mapped.isEmpty {
+                remoteItems = mapped
+                // Re-clamp index if remote list is shorter than local seed (rare, but safe)
+                if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
+                    state.currentIndex = max(0, mapped.count - 1)
+                    state.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+        } catch {
+            // best-effort: keep local seed
+        }
     }
 
     // MARK: - Day key helper
@@ -335,4 +381,3 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
-

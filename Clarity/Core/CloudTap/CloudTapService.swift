@@ -51,6 +51,16 @@ final class CloudTapService {
         try await postJSON(reqBody, to: "cloudtap-talkitthrough")
     }
 
+    // MARK: - Steps (DB-fed content)
+
+    func focusSteps(programme: String = "core") async throws -> CloudTapStepsResponse {
+        try await getJSON(from: "focus-steps", query: [URLQueryItem(name: "programme", value: programme)])
+    }
+
+    func practiceSteps(programme: String = "core") async throws -> CloudTapStepsResponse {
+        try await getJSON(from: "practice-steps", query: [URLQueryItem(name: "programme", value: programme)])
+    }
+
     private func postJSON<T: Encodable, U: Decodable>(_ body: T, to endpoint: String) async throws -> U {
         let cfg = try resolveConfig()
         let url = resolveURL(base: cfg.baseURL, endpoint: endpoint)
@@ -73,6 +83,47 @@ final class CloudTapService {
         #if DEBUG
         Self.logLearnedCuesPresence(in: req.httpBody)
         #endif
+
+        do {
+            let (data, resp) = try await session.data(for: req)
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+
+            guard (200..<300).contains(code) else {
+                let bodyText = String(data: data, encoding: .utf8) ?? ""
+                throw CloudTapError.http(code, bodyText)
+            }
+
+            do {
+                return try JSONDecoder().decode(U.self, from: data)
+            } catch {
+                throw CloudTapError.decoding
+            }
+        } catch let e as CloudTapError {
+            throw e
+        } catch {
+            throw CloudTapError.network(String(describing: error))
+        }
+    }
+
+    private func getJSON<U: Decodable>(
+        from endpoint: String,
+        query: [URLQueryItem] = []
+    ) async throws -> U {
+        let cfg = try resolveConfig()
+        var url = resolveURL(base: cfg.baseURL, endpoint: endpoint)
+
+        if !query.isEmpty, var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            comps.queryItems = query
+            if let u = comps.url { url = u }
+        }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.timeoutInterval = 30
+
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue("Bearer \(cfg.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
+        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
 
         do {
             let (data, resp) = try await session.data(for: req)

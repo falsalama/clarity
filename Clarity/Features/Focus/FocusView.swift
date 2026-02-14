@@ -3,10 +3,11 @@
 import SwiftUI
 import SwiftData
 
-/// FocusView (v2.1)
+/// FocusView (v2.2)
 /// - One short teaching at a time.
 /// - Deterministic: advances one step per day *only after* the user marks Done.
 /// - Lock: after Done, the teaching does not change until the next day.
+/// - Content: remote-first (Supabase/Edge via CloudTapService) with local fallback.
 /// - Uses FocusProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct FocusView: View {
 
@@ -40,7 +41,12 @@ struct FocusView: View {
     @Query(filter: #Predicate<FocusProgramStateEntity> { $0.id == "singleton" })
     private var programStates: [FocusProgramStateEntity]
 
-    // MARK: - Teaching list (v1 seed)
+    // MARK: - Remote content (DB-fed)
+
+    private let cloudTap = CloudTapService()
+    @State private var remoteTeachings: [Teaching]? = nil
+
+    // MARK: - Teaching list (local fallback seed)
 
     private let teachings: [Teaching] = [
         Teaching(
@@ -71,6 +77,11 @@ Nothing is lost.
             prompt: "What eases when effort softens?"
         )
     ]
+
+    private var activeTeachings: [Teaching] {
+        if let remoteTeachings, !remoteTeachings.isEmpty { return remoteTeachings }
+        return teachings
+    }
 
     // MARK: - Init
 
@@ -127,11 +138,15 @@ Nothing is lost.
                 countedThisAppear = true
             }
         }
+        .task {
+            await loadRemoteFocusStepsIfNeeded()
+        }
         .onDisappear { countedThisAppear = false }
         .onChange(of: scenePhase) { _, newValue in
             if newValue == .active {
                 ensureProgramStateExists()
                 applyDailyAdvanceIfNeeded()
+                Task { await loadRemoteFocusStepsIfNeeded() }
             }
         }
     }
@@ -155,9 +170,10 @@ Nothing is lost.
     }
 
     private var currentTeaching: Teaching {
-        guard !teachings.isEmpty else { return Teaching(title: "Focus", body: "—", prompt: "") }
-        let idx = max(0, min(currentIndex, teachings.count - 1))
-        return teachings[idx]
+        let list = activeTeachings
+        guard !list.isEmpty else { return Teaching(title: "Focus", body: "—", prompt: "") }
+        let idx = max(0, min(currentIndex, list.count - 1))
+        return list[idx]
     }
 
     // MARK: - Sections
@@ -172,11 +188,14 @@ Nothing is lost.
             Text(teaching.body)
                 .font(.body)
 
-            Divider()
+            let prompt = teaching.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !prompt.isEmpty {
+                Divider()
 
-            Text(teaching.prompt)
-                .font(.callout)
-                .foregroundStyle(.secondary)
+                Text(prompt)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
 
             Divider()
 
@@ -287,8 +306,9 @@ Nothing is lost.
         else { return }
 
         // Advance exactly once, then clear the pending marker.
-        if !teachings.isEmpty {
-            let next = min(state.currentIndex + 1, teachings.count - 1) // hold last if list is shorter
+        let list = activeTeachings
+        if !list.isEmpty {
+            let next = min(state.currentIndex + 1, list.count - 1) // hold last if list is shorter
             state.currentIndex = next
         }
 
@@ -296,6 +316,50 @@ Nothing is lost.
         state.updatedAt = Date()
 
         do { try modelContext.save() } catch { /* best-effort */ }
+    }
+
+    // MARK: - Remote load
+
+    @MainActor
+    private func loadRemoteFocusStepsIfNeeded() async {
+        // Don’t repeatedly fetch if we already have remote content.
+        if let remoteTeachings, !remoteTeachings.isEmpty { return }
+
+        do {
+            let resp = try await cloudTap.focusSteps(programme: "core")
+
+            let mapped: [Teaching] = resp.steps
+                .sorted(by: { $0.stepIndex < $1.stepIndex })
+                .map { step in
+                    let (body, prompt) = Self.splitBodyAndPrompt(step.body)
+                    return Teaching(title: step.title, body: body, prompt: prompt)
+                }
+
+            if !mapped.isEmpty {
+                remoteTeachings = mapped
+                // Re-clamp index if remote list is shorter than local seed (rare, but safe)
+                if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
+                    state.currentIndex = max(0, mapped.count - 1)
+                    state.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            }
+        } catch {
+            // best-effort: keep local seed
+        }
+    }
+
+    private static func splitBodyAndPrompt(_ body: String) -> (String, String) {
+        // Accept either:
+        // - a separate paragraph containing "Prompt: ..."
+        // - no prompt at all
+        let marker = "\n\nPrompt:"
+        if let r = body.range(of: marker) {
+            let main = String(body[..<r.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let prompt = String(body[r.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (main, prompt.isEmpty ? "" : prompt)
+        }
+        return (body.trimmingCharacters(in: .whitespacesAndNewlines), "")
     }
 
     // MARK: - Day key helper
@@ -322,4 +386,5 @@ private extension String {
     var nilIfBlank: String? {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
+
 }
