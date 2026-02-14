@@ -61,13 +61,14 @@ struct PortraitView: View {
     }
 
     private var faceShape: some Shape {
+        // Same outer rect size for all options; only adjust facial width/aspect ratio.
         switch recipe.faceShape {
-        case .slim:
-            return AnyShape(Ellipse().inset(by: 2))
-        case .standard:
-            return AnyShape(Circle())
-        case .round:
-            return AnyShape(Circle().inset(by: -2))
+        case .slim:      // label kept: "thinner"
+            return AnyShape(ScaledEllipse(xScale: 0.86, yScale: 1.00))
+        case .standard:  // label kept: "medium"
+            return AnyShape(ScaledEllipse(xScale: 0.93, yScale: 1.00))
+        case .round:     // label kept: "round"
+            return AnyShape(ScaledEllipse(xScale: 1.00, yScale: 1.00))
         }
     }
 
@@ -78,55 +79,69 @@ struct PortraitView: View {
     }
 
     private var browsLayer: some View {
-        let opacity = Color.primary.opacity(0.18)
+        let tint = Color.primary.opacity(0.18)
         let y: CGFloat = -16
 
+        // New expression set:
+        // - serene
+        // - littleSmile
+        // - bigSmile
         switch recipe.expression {
-        case .neutral:
+        case .serene:
             return AnyView(
                 HStack(spacing: 18) {
-                    Capsule().fill(opacity).frame(width: 16, height: 2)
-                    Capsule().fill(opacity).frame(width: 16, height: 2)
-                }.offset(y: y)
+                    Capsule().fill(tint).frame(width: 16, height: 2)
+                    Capsule().fill(tint).frame(width: 16, height: 2)
+                }
+                .offset(y: y)
             )
 
-        case .soft:
+        case .littleSmile:
             return AnyView(
                 HStack(spacing: 18) {
-                    Capsule().fill(opacity).frame(width: 16, height: 2).rotationEffect(.degrees(-8))
-                    Capsule().fill(opacity).frame(width: 16, height: 2).rotationEffect(.degrees(8))
-                }.offset(y: y)
+                    Capsule().fill(tint).frame(width: 16, height: 2).rotationEffect(.degrees(-6))
+                    Capsule().fill(tint).frame(width: 16, height: 2).rotationEffect(.degrees(6))
+                }
+                .offset(y: y)
             )
 
-        case .fierce:
+        case .bigSmile:
             return AnyView(
                 HStack(spacing: 18) {
-                    Capsule().fill(opacity).frame(width: 16, height: 2).rotationEffect(.degrees(14))
-                    Capsule().fill(opacity).frame(width: 16, height: 2).rotationEffect(.degrees(-14))
-                }.offset(y: y)
+                    Capsule().fill(tint).frame(width: 16, height: 2).rotationEffect(.degrees(-10))
+                    Capsule().fill(tint).frame(width: 16, height: 2).rotationEffect(.degrees(10))
+                }
+                .offset(y: y)
             )
         }
     }
 
     private var mouthLayer: some View {
-        let base = Color.primary.opacity(0.25)
+        let stroke = Color.primary.opacity(0.25)
 
         switch recipe.expression {
-        case .neutral:
+        case .serene:
             return AnyView(
-                Capsule().fill(base).frame(width: 18, height: 3).offset(y: 14)
+                SmileArc(curvature: 0.10)
+                    .stroke(stroke, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 22, height: 12)
+                    .offset(y: 16)
             )
-        case .soft:
+
+        case .littleSmile:
             return AnyView(
-                Capsule().fill(base).frame(width: 18, height: 3)
-                    .rotationEffect(.degrees(-6))
-                    .offset(y: 14)
+                SmileArc(curvature: 0.30)
+                    .stroke(stroke, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 24, height: 14)
+                    .offset(y: 16)
             )
-        case .fierce:
+
+        case .bigSmile:
             return AnyView(
-                Capsule().fill(base).frame(width: 18, height: 3)
-                    .rotationEffect(.degrees(10))
-                    .offset(y: 14)
+                SmileArc(curvature: 0.55)
+                    .stroke(stroke, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .frame(width: 26, height: 16)
+                    .offset(y: 16)
             )
         }
     }
@@ -137,6 +152,7 @@ struct PortraitView: View {
         let robeMain = PortraitPalette.robe(recipe.robeColour)
 
         return ZStack {
+            // Base robe shapes
             switch recipe.robeStyle {
             case .lay:
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -163,26 +179,51 @@ struct PortraitView: View {
                     .fill(.black.opacity(0.10))
                     .frame(width: 44, height: 10)
                     .offset(y: 22)
+            }
 
-            case .ngakpa:
-                let maroon = PortraitPalette.robe(.maroon)
-                let offWhite = PortraitPalette.robe(.white)
+            // Two-tone sash: show a white diagonal band when the robe colour is Maroon/White.
+            if recipe.robeColour == .maroon {
+                twoToneBand
+                    .mask(robeMask(for: recipe.robeStyle))
+            }
+        }
+    }
 
+    // The diagonal white band used for Maroon/White two-tone robes.
+    private var twoToneBand: some View {
+        ZStack {
+            // Fill
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .fill(Color.white)
+                .frame(width: 140, height: 12)
+                .rotationEffect(.degrees(-24))
+                .offset(x: 6, y: 28)
+
+            // Subtle edge to separate from robe colour
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
+                .stroke(Color.black.opacity(0.06), lineWidth: 1)
+                .frame(width: 140, height: 12)
+                .rotationEffect(.degrees(-24))
+                .offset(x: 6, y: 28)
+        }
+    }
+
+    // Mask that matches the overall robe silhouette per style,
+    // so the band stays inside the robe shape.
+    private func robeMask(for style: RobeStyleID) -> some View {
+        switch style {
+        case .lay:
+            return AnyView(
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(maroon)
+                    .frame(width: 120, height: 62)
+                    .offset(y: 38)
+            )
+        case .robeA, .robeB:
+            return AnyView(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .frame(width: 120, height: 66)
                     .offset(y: 40)
-
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(offWhite.opacity(0.95))
-                    .frame(width: 34, height: 52)
-                    .offset(x: -22, y: 44)
-
-                Rectangle()
-                    .fill(.black.opacity(0.10))
-                    .frame(width: 44, height: 10)
-                    .offset(y: 22)
-            }
+            )
         }
     }
 
@@ -413,12 +454,12 @@ struct PortraitView: View {
         }
 
         switch style {
-        case .round, .roundThin:
-            return AnyView(roundFrame())
-        case .square, .squareThin:
-            return AnyView(squareFrame())
-        case .hex:
-            return AnyView(hexFrame())
+            case .round, .roundThin:
+                return AnyView(roundFrame())
+            case .square, .squareThin:
+                return AnyView(squareFrame())
+            case .hex:
+                return AnyView(hexFrame())
         }
     }
 
@@ -499,6 +540,40 @@ private struct AnyShape: Shape {
     }
 
     func path(in rect: CGRect) -> Path { _path(rect) }
+}
+
+private struct ScaledEllipse: Shape, Sendable {
+    let xScale: CGFloat
+    let yScale: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width * xScale
+        let h = rect.height * yScale
+        let r = CGRect(
+            x: rect.midX - w / 2,
+            y: rect.midY - h / 2,
+            width: w,
+            height: h
+        )
+        return Ellipse().path(in: r)
+    }
+}
+
+private struct SmileArc: Shape, Sendable {
+    /// 0.0 = flat, 1.0 = very smiley
+    let curvature: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let left = CGPoint(x: rect.minX, y: rect.midY)
+        let right = CGPoint(x: rect.maxX, y: rect.midY)
+        let lift = rect.height * curvature
+        let control = CGPoint(x: rect.midX, y: rect.midY + lift)
+
+        var p = Path()
+        p.move(to: left)
+        p.addQuadCurve(to: right, control: control)
+        return p
+    }
 }
 
 private struct Hexagon: Shape {

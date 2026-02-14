@@ -45,6 +45,9 @@ struct ClarityApp: App {
                 PatternStatsEntity.self,
                 FocusCompletionEntity.self,
                 PracticeCompletionEntity.self,
+                UserProfileEntity.self,
+                FocusProgramStateEntity.self,
+                PracticeProgramStateEntity.self,   // <-- add this
                 configurations: config
             )
 

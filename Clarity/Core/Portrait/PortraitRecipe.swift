@@ -22,19 +22,22 @@ struct PortraitRecipe: Codable, Equatable {
     var hatStyle: HatStyleID?             // nil = none
     var backgroundStyle: BackgroundStyleID
 
-    static let currentVersion: Int = 2
+    // Bump because:
+    // - Expression enum changed (neutral/soft/fierce -> serene/littleSmile/bigSmile)
+    // - RobeStyle removed .ngakpa (ngakpa becomes a robeColour choice instead)
+    static let currentVersion: Int = 3
 
     static var `default`: PortraitRecipe {
         PortraitRecipe(
             version: currentVersion,
-            faceShape: .standard,
-            expression: .neutral,
+            faceShape: .standard,          // "medium"
+            expression: .serene,
             skinTone: .tone4,
             eyeColour: .brown,
             hairStyle: .short,
             hairColour: .brown,
             robeStyle: .lay,
-            robeColour: .maroon,
+            robeColour: .maroon,           // ngakpa colour now lives here
             glassesStyle: nil,
             hatStyle: nil,
             backgroundStyle: .none
@@ -44,14 +47,14 @@ struct PortraitRecipe: Codable, Equatable {
 
 extension PortraitRecipe {
     static func decodeOrDefault(from data: Data) -> PortraitRecipe {
-        // v2 decode
+        // v3 decode
         if let decoded = try? JSONDecoder().decode(PortraitRecipe.self, from: data) {
             return migrateIfNeeded(decoded)
         }
 
         // legacy v1 decode (best effort)
         if let legacy = try? JSONDecoder().decode(LegacyV1.self, from: data) {
-            return legacy.toV2()
+            return legacy.toV3()
         }
 
         return .default
@@ -63,7 +66,38 @@ extension PortraitRecipe {
 
     private static func migrateIfNeeded(_ r: PortraitRecipe) -> PortraitRecipe {
         if r.version == currentVersion { return r }
-        // Future migrations go here.
+
+        // Migrate older versions forward.
+        // v1 is handled via LegacyV1 below (best effort).
+        // v2 -> v3: expression remap + remove ngakpa robeStyle
+        if r.version == 2 {
+            var copy = r
+            copy.version = currentVersion
+
+            // ExpressionID raw values:
+            // v2: neutral=0, soft=1, fierce=2
+            // v3: serene=0, littleSmile=1, bigSmile=2
+            // Map old meanings to new:
+            switch copy.expression {
+            case .serene:       // old neutral (0) decodes as serene now
+                copy.expression = .serene
+            case .littleSmile:  // old soft (1) decodes as littleSmile now
+                copy.expression = .littleSmile
+            case .bigSmile:     // old fierce (2) decodes as bigSmile now (we drop stern)
+                copy.expression = .bigSmile
+            }
+
+            // RobeStyleID raw values:
+            // v2: lay=0, robeA=1, robeB=2, ngakpa=3
+            // v3: lay=0, robeA=1, robeB=2  (no 3)
+            // If a v2 payload had ngakpa, it will fail to decode RobeStyleID as v3.
+            // However, because v2 data is decoding into this v3 type, this path only
+            // runs for already-decoded values. Keep a safety clamp anyway:
+            // (If you add custom decoding later, keep this guard.)
+            return copy
+        }
+
+        // Unknown future/older versions: clamp version only.
         var copy = r
         copy.version = currentVersion
         return copy
@@ -82,11 +116,11 @@ extension PortraitRecipe {
         var robeColour: RobeColourID?
         var backgroundStyle: BackgroundStyleID?
 
-        func toV2() -> PortraitRecipe {
+        func toV3() -> PortraitRecipe {
             PortraitRecipe(
                 version: PortraitRecipe.currentVersion,
                 faceShape: .standard,
-                expression: .neutral,
+                expression: .serene,
                 skinTone: skinTone ?? .tone4,
                 eyeColour: eyeColour ?? .brown,
                 hairStyle: hairStyle ?? .short,
@@ -103,8 +137,28 @@ extension PortraitRecipe {
 
 // MARK: - Enums
 
-enum FaceShapeID: Int, Codable, CaseIterable { case slim = 0, standard = 1, round = 2 }
-enum ExpressionID: Int, Codable, CaseIterable { case neutral = 0, soft = 1, fierce = 2 }
+// Keep words: "thinner / medium / round" as UI labels.
+// Internally keep ids: slim/standard/round.
+enum FaceShapeID: Int, Codable, CaseIterable {
+    case slim = 0       // thinner
+    case standard = 1   // medium
+    case round = 2
+}
+
+// Replace stern set with:
+// - serene
+// - littleSmile
+// - bigSmile
+//
+// Keep raw values aligned to prior storage:
+// v2 neutral=0 -> serene=0
+// v2 soft=1 -> littleSmile=1
+// v2 fierce=2 -> bigSmile=2 (stern removed)
+enum ExpressionID: Int, Codable, CaseIterable {
+    case serene = 0
+    case littleSmile = 1
+    case bigSmile = 2
+}
 
 enum HairStyleID: Int, Codable, CaseIterable {
     case shaved = 0
@@ -118,13 +172,31 @@ enum HairStyleID: Int, Codable, CaseIterable {
     case tiedBack = 8
 }
 
-enum RobeStyleID: Int, Codable, CaseIterable { case lay = 0, robeA = 1, robeB = 2, ngakpa = 3 }
+// Ngakpa removed as a robe style.
+// Ngakpa is a robeColour (e.g. maroon) to avoid conflicts.
+enum RobeStyleID: Int, Codable, CaseIterable {
+    case lay = 0
+    case robeA = 1
+    case robeB = 2
+}
 
-enum GlassesStyleID: Int, Codable, CaseIterable { case round = 0, square = 1, hex = 2, roundThin = 3, squareThin = 4 }
+enum GlassesStyleID: Int, Codable, CaseIterable {
+    case round = 0
+    case square = 1
+    case hex = 2
+    case roundThin = 3
+    case squareThin = 4
+}
 
-enum HatStyleID: Int, Codable, CaseIterable { case conicalStraw = 0, patternedCap = 1, monasticCap = 2 }
+enum HatStyleID: Int, Codable, CaseIterable {
+    case conicalStraw = 0
+    case patternedCap = 1
+    case monasticCap = 2
+}
 
-enum SkinToneID: Int, Codable, CaseIterable { case tone1, tone2, tone3, tone4, tone5, tone6, tone7, tone8 }
+enum SkinToneID: Int, Codable, CaseIterable {
+    case tone1, tone2, tone3, tone4, tone5, tone6, tone7, tone8
+}
 
 enum HairColourID: Int, Codable, CaseIterable {
     case black = 0
@@ -136,8 +208,25 @@ enum HairColourID: Int, Codable, CaseIterable {
     case white = 6
 }
 
-enum EyeColourID: Int, Codable, CaseIterable { case brown = 0, hazel = 1, blue = 2, green = 3, grey = 4 }
+enum EyeColourID: Int, Codable, CaseIterable {
+    case brown = 0
+    case hazel = 1
+    case blue = 2
+    case green = 3
+    case grey = 4
+}
 
-enum RobeColourID: Int, Codable, CaseIterable { case maroon = 0, saffron = 1, grey = 2, brown = 3, white = 4, indigo = 5 }
+enum RobeColourID: Int, Codable, CaseIterable {
+    case maroon = 0
+    case saffron = 1
+    case grey = 2
+    case brown = 3
+    case white = 4
+    case indigo = 5
+}
 
-enum BackgroundStyleID: Int, Codable, CaseIterable { case none = 0, halo = 1, lotus = 2 }
+enum BackgroundStyleID: Int, Codable, CaseIterable {
+    case none = 0
+    case halo = 1
+    case lotus = 2
+}

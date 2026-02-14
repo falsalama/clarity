@@ -3,17 +3,17 @@ import Foundation
 enum PortraitCatalogue {
     static func title(for face: FaceShapeID) -> String {
         switch face {
-        case .slim: return "Slim"
-        case .standard: return "Standard"
+        case .slim: return "Thinner"
+        case .standard: return "Medium"
         case .round: return "Round"
         }
     }
 
     static func title(for expression: ExpressionID) -> String {
         switch expression {
-        case .neutral: return "Neutral"
-        case .soft: return "Soft"
-        case .fierce: return "Fierce"
+        case .serene: return "Serene"
+        case .littleSmile: return "Little smile"
+        case .bigSmile: return "Big smile"
         }
     }
 
@@ -36,7 +36,6 @@ enum PortraitCatalogue {
         case .lay: return "Lay"
         case .robeA: return "Robe A"
         case .robeB: return "Robe B"
-        case .ngakpa: return "Ngakpa (two-tone)"
         }
     }
 
@@ -90,7 +89,7 @@ enum PortraitCatalogue {
 
     static func title(for robeColour: RobeColourID) -> String {
         switch robeColour {
-        case .maroon: return "Maroon"
+        case .maroon: return "Maroon/White"
         case .saffron: return "Saffron"
         case .grey: return "Grey"
         case .brown: return "Brown"

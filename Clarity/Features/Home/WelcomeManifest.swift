@@ -7,5 +7,8 @@ struct WelcomeManifest: Codable, Equatable {
     let message: String
     let imageURL: String?
     let attribution: String?
-}
 
+    // Optional, server-driven tab subtitles (camelCase to match current decoder)
+    let focusSubtitle: String?
+    let practiceSubtitle: String?
+}

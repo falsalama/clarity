@@ -234,11 +234,13 @@ final class CapsuleEntity {
         self.learnedJSON = Data()
     }
 }
+
 // MARK: - UserProfileEntity (singleton)
 
 @Model
 final class UserProfileEntity {
     /// Singleton key. Use a constant so we only ever store one row.
+    @Attribute(.unique)
     var id: String
 
     /// Display name is optional (future use).
@@ -261,6 +263,7 @@ final class UserProfileEntity {
         self.updatedAt = updatedAt
     }
 }
+
 // MARK: - PatternStatsEntity (Learning; add-only schema)
 
 @Model
@@ -398,5 +401,61 @@ final class PracticeCompletionEntity {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+    }
+}
+
+// MARK: - FocusProgramStateEntity (linear programme pointer; singleton)
+
+/// Stores where the user is in the Focus path.
+/// - `currentIndex`: 0-based index into your Focus items list.
+/// - `pendingAdvanceDayKey`: when Done is tapped, we set this to "today".
+///   We only advance to the next item once the day changes.
+@Model
+final class FocusProgramStateEntity {
+
+    /// Always `"singleton"`
+    @Attribute(.unique)
+    var id: String
+
+    var currentIndex: Int
+    var pendingAdvanceDayKey: String?
+    var updatedAt: Date
+
+    init(
+        id: String = "singleton",
+        currentIndex: Int = 0,
+        pendingAdvanceDayKey: String? = nil,
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.currentIndex = currentIndex
+        self.pendingAdvanceDayKey = pendingAdvanceDayKey
+        self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - PracticeProgramStateEntity (linear programme pointer; singleton)
+
+@Model
+final class PracticeProgramStateEntity {
+
+    /// Always `"singleton"`
+    @Attribute(.unique)
+    var id: String
+
+    var currentIndex: Int
+    var pendingAdvanceDayKey: String?
+    var updatedAt: Date
+
+    init(
+        id: String = "singleton",
+        currentIndex: Int = 0,
+        pendingAdvanceDayKey: String? = nil,
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.currentIndex = currentIndex
+        self.pendingAdvanceDayKey = pendingAdvanceDayKey
+        self.updatedAt = updatedAt
     }
 }

@@ -3,20 +3,44 @@
 import SwiftUI
 import SwiftData
 
-/// FocusView (v1)
+/// FocusView (v2.1)
 /// - One short teaching at a time.
-/// - Adds a light “Done” action (one per day) to count Focus completions.
+/// - Deterministic: advances one step per day *only after* the user marks Done.
+/// - Lock: after Done, the teaching does not change until the next day.
+/// - Uses FocusProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct FocusView: View {
 
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
+    @EnvironmentObject private var homeSurface: HomeSurfaceStore
+
+    // MARK: - “Subtitle under title”
+    @AppStorage("FocusSubtitleSeenCount") private var focusSubtitleSeenCount = 0
+    @State private var countedThisAppear = false
+    private let focusSubtitleShowLimit = 3
+
+    private var shouldShowFocusSubtitle: Bool {
+        focusSubtitleSeenCount < focusSubtitleShowLimit
+    }
+
+    private var focusSubtitleText: String? {
+        guard shouldShowFocusSubtitle else { return nil }
+        let server = homeSurface.manifest?.focusSubtitle?.nilIfBlank
+        return server ?? "Carry one short teaching today."
+    }
 
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
-    @Query private var todayFocusCompletions: [FocusCompletionEntity]
+
+    // Singleton program state row (id == "singleton")
+    @Query(filter: #Predicate<FocusProgramStateEntity> { $0.id == "singleton" })
+    private var programStates: [FocusProgramStateEntity]
+
+    // MARK: - Teaching list (v1 seed)
 
     private let teachings: [Teaching] = [
         Teaching(
@@ -48,13 +72,9 @@ Nothing is lost.
         )
     ]
 
-    @State private var teaching: Teaching
-
     // MARK: - Init
 
     init() {
-        _teaching = State(initialValue: teachings.randomElement()!)
-
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
                 !turn.transcriptRedactedActive.isEmpty
@@ -64,13 +84,6 @@ Nothing is lost.
         _focusCompletions = Query(
             sort: [SortDescriptor(\FocusCompletionEntity.completedAt, order: .reverse)]
         )
-
-        let key = FocusView.dayKey(for: Date())
-        _todayFocusCompletions = Query(
-            filter: #Predicate<FocusCompletionEntity> { item in
-                item.dayKey == key
-            }
-        )
     }
 
     // MARK: - View
@@ -78,28 +91,81 @@ Nothing is lost.
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-
                 teachingCard
-
                 optionalHint
-
                 Spacer(minLength: 24)
             }
             .padding()
         }
-        .navigationTitle("Focus")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Focus")
+                        .font(.headline)
+                    if let s = focusSubtitleText {
+                        Text(s)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 achievementsLink
             }
         }
+        .onAppear {
+            ensureProgramStateExists()
+            applyDailyAdvanceIfNeeded()
+
+            if shouldShowFocusSubtitle && !countedThisAppear {
+                focusSubtitleSeenCount += 1
+                countedThisAppear = true
+            }
+        }
+        .onDisappear { countedThisAppear = false }
+        .onChange(of: scenePhase) { _, newValue in
+            if newValue == .active {
+                ensureProgramStateExists()
+                applyDailyAdvanceIfNeeded()
+            }
+        }
+    }
+
+    // MARK: - Teaching selection (stateful)
+
+    private var programState: FocusProgramStateEntity? {
+        programStates.first
+    }
+
+    private var todayKey: String {
+        Self.dayKey(for: Date())
+    }
+
+    private var isDoneToday: Bool {
+        focusCompletions.contains(where: { $0.dayKey == todayKey })
+    }
+
+    private var currentIndex: Int {
+        programState?.currentIndex ?? 0
+    }
+
+    private var currentTeaching: Teaching {
+        guard !teachings.isEmpty else { return Teaching(title: "Focus", body: "—", prompt: "") }
+        let idx = max(0, min(currentIndex, teachings.count - 1))
+        return teachings[idx]
     }
 
     // MARK: - Sections
 
     private var teachingCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let teaching = currentTeaching
+
+        return VStack(alignment: .leading, spacing: 12) {
             Text(teaching.title)
                 .font(.title3.weight(.semibold))
 
@@ -132,7 +198,7 @@ Nothing is lost.
             Button {
                 markDoneToday()
             } label: {
-                Text(doneButtonTitle)
+                Text("Done")
                     .font(.callout.weight(.semibold))
             }
             .buttonStyle(.bordered)
@@ -172,29 +238,63 @@ Nothing is lost.
     }
 
     private var focusFill: Color {
-        // Muted gold
         Color(red: 0.92, green: 0.80, blue: 0.34).opacity(0.92)
     }
 
-    // MARK: - Done state
-
-    private var isDoneToday: Bool {
-        !todayFocusCompletions.isEmpty
-    }
-
-    private var doneButtonTitle: String {
-        isDoneToday ? "Done" : "Done"
-    }
+    // MARK: - Done state text
 
     private var doneStateText: String {
-        isDoneToday ? "Marked done for today." : "Mark as done for today."
+        isDoneToday ? "Done for today. Come back tomorrow." : "Mark as done for today."
     }
 
     private func markDoneToday() {
         guard !isDoneToday else { return }
 
-        let key = Self.dayKey(for: Date())
+        let key = todayKey
         modelContext.insert(FocusCompletionEntity(dayKey: key))
+
+        // Mark “pending advance” for tomorrow (matches SwiftDataModels.swift).
+        if let state = programState {
+            state.pendingAdvanceDayKey = key
+            state.updatedAt = Date()
+        } else {
+            let state = FocusProgramStateEntity(
+                id: "singleton",
+                currentIndex: 0,
+                pendingAdvanceDayKey: key,
+                updatedAt: Date()
+            )
+            modelContext.insert(state)
+        }
+
+        do { try modelContext.save() } catch { /* best-effort */ }
+    }
+
+    // MARK: - Progression (advance on next day after Done)
+
+    private func ensureProgramStateExists() {
+        guard programState == nil else { return }
+        modelContext.insert(FocusProgramStateEntity())
+        do { try modelContext.save() } catch { /* best-effort */ }
+    }
+
+    private func applyDailyAdvanceIfNeeded() {
+        guard let state = programState else { return }
+
+        // pendingAdvanceDayKey is treated as “pending advance from this day”.
+        guard let pendingFromDay = state.pendingAdvanceDayKey,
+              pendingFromDay < todayKey
+        else { return }
+
+        // Advance exactly once, then clear the pending marker.
+        if !teachings.isEmpty {
+            let next = min(state.currentIndex + 1, teachings.count - 1) // hold last if list is shorter
+            state.currentIndex = next
+        }
+
+        state.pendingAdvanceDayKey = nil
+        state.updatedAt = Date()
+
         do { try modelContext.save() } catch { /* best-effort */ }
     }
 
@@ -216,4 +316,10 @@ private struct Teaching {
     let title: String
     let body: String
     let prompt: String
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
+    }
 }
