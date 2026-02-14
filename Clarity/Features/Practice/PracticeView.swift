@@ -3,11 +3,12 @@
 import SwiftUI
 import SwiftData
 
-/// PracticeView (v2.1)
+/// PracticeView (v2.2)
 /// - One small practice at a time.
 /// - Deterministic: advances one step per day *only after* the user marks Done.
 /// - Lock: after Done, the practice does not change until the next day.
 /// - Content: remote-first (Supabase/Edge via CloudTapService) with local fallback.
+/// - Mantra: optional per-step mantra shown above tab bar, fades in only after Done.
 /// - Uses PracticeProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct PracticeView: View {
 
@@ -50,7 +51,6 @@ struct PracticeView: View {
     @State private var remoteItems: [PracticeItem]? = nil
 
     // MARK: - Practice list (local fallback seed)
-    // Keep these for now as a safety fallback. We can replace with a single "Loading…" item later.
 
     private let items: [PracticeItem] = [
         PracticeItem(
@@ -59,7 +59,8 @@ struct PracticeView: View {
 Take three natural breaths.
 Nothing to fix. Nothing to achieve.
 Just notice the next inhale, then the next exhale.
-"""
+""",
+            mantra: nil
         ),
         PracticeItem(
             title: "Soften the jaw",
@@ -67,7 +68,8 @@ Just notice the next inhale, then the next exhale.
 Let the jaw unclench.
 Let the tongue rest.
 Notice what changes when the face stops bracing.
-"""
+""",
+            mantra: nil
         ),
         PracticeItem(
             title: "Name the feeling",
@@ -75,7 +77,8 @@ Notice what changes when the face stops bracing.
 Silently name what is most present.
 “Pressure”, “tired”, “open”, “restless”, “fine”.
 No analysis. Just a clean label.
-"""
+""",
+            mantra: nil
         )
     ]
 
@@ -111,6 +114,9 @@ No analysis. Just a clean label.
                 Spacer(minLength: 24)
             }
             .padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            mantraStrip
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -177,9 +183,36 @@ No analysis. Just a clean label.
 
     private var currentItem: PracticeItem {
         let list = activeItems
-        guard !list.isEmpty else { return PracticeItem(title: "Practice", body: "—") }
+        guard !list.isEmpty else { return PracticeItem(title: "Practice", body: "—", mantra: nil) }
         let idx = max(0, min(currentIndex, list.count - 1))
         return list[idx]
+    }
+
+    // MARK: - Mantra strip
+
+    private var currentMantra: String? {
+        let raw = currentItem.mantra?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let raw, !raw.isEmpty else { return nil }
+        return raw
+    }
+
+    private var mantraStrip: some View {
+        Group {
+            if let m = currentMantra {
+                Text(m)
+                    .font(.system(size: 40, weight: .bold, design: .serif))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal)
+                    .padding(.bottom, 10)
+                    .opacity(isDoneToday ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.25), value: isDoneToday)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: - Sections
@@ -319,7 +352,7 @@ No analysis. Just a clean label.
 
         let list = activeItems
         if !list.isEmpty {
-            let next = min(state.currentIndex + 1, list.count - 1) // hold last if list is shorter
+            let next = min(state.currentIndex + 1, list.count - 1)
             state.currentIndex = next
         }
 
@@ -341,7 +374,11 @@ No analysis. Just a clean label.
             let mapped: [PracticeItem] = resp.steps
                 .sorted(by: { $0.stepIndex < $1.stepIndex })
                 .map { step in
-                    PracticeItem(title: step.title, body: step.body)
+                    PracticeItem(
+                        title: step.title,
+                        body: step.body,
+                        mantra: step.mantra
+                    )
                 }
 
             if !mapped.isEmpty {
@@ -351,7 +388,6 @@ No analysis. Just a clean label.
                 print("Practice: loaded \(mapped.count) steps from DB")
                 #endif
 
-                // Re-clamp index if remote list is shorter than local seed (rare, but safe)
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
                     state.updatedAt = Date()
@@ -362,7 +398,6 @@ No analysis. Just a clean label.
             #if DEBUG
             print("Practice: fetch failed, using fallback: \(error)")
             #endif
-            // best-effort: keep local seed
         }
     }
 
@@ -383,6 +418,7 @@ No analysis. Just a clean label.
 private struct PracticeItem {
     let title: String
     let body: String
+    let mantra: String?
 }
 
 private extension String {

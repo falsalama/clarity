@@ -13,6 +13,8 @@ struct CloudTapStep: Decodable {
     let stepIndex: Int
     let title: String
     let body: String
+    let mantra: String?
     let tags: [String]?
     let version: Int?
 }
+

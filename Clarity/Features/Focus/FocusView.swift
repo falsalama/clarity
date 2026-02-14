@@ -3,11 +3,12 @@
 import SwiftUI
 import SwiftData
 
-/// FocusView (v2.2)
+/// FocusView (v2.3)
 /// - One short teaching at a time.
 /// - Deterministic: advances one step per day *only after* the user marks Done.
 /// - Lock: after Done, the teaching does not change until the next day.
 /// - Content: remote-first (Supabase/Edge via CloudTapService) with local fallback.
+/// - Mantra: optional per-step mantra shown above tab bar, fades in only after Done.
 /// - Uses FocusProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct FocusView: View {
 
@@ -48,7 +49,6 @@ struct FocusView: View {
     @State private var remoteTeachings: [Teaching]? = nil
 
     // MARK: - Teaching list (local fallback seed)
-    // Keep these for now as a safety fallback. We can replace with a single "Loading…" item later.
 
     private let teachings: [Teaching] = [
         Teaching(
@@ -58,7 +58,8 @@ Notice where the mind goes when it is not being directed.
 There is no need to stop it or improve it.
 Just see how it moves on its own.
 """,
-            prompt: "What do you notice about how your attention moves?"
+            prompt: "What do you notice about how your attention moves?",
+            mantra: nil
         ),
         Teaching(
             title: "Working with change",
@@ -67,7 +68,8 @@ Everything that appears also changes.
 This includes thoughts, moods, and situations.
 Nothing needs to be held in place.
 """,
-            prompt: "Where do you notice change happening right now?"
+            prompt: "Where do you notice change happening right now?",
+            mantra: nil
         ),
         Teaching(
             title: "Softening effort",
@@ -76,7 +78,8 @@ Often we add effort on top of experience.
 See what happens if effort relaxes slightly.
 Nothing is lost.
 """,
-            prompt: "What eases when effort softens?"
+            prompt: "What eases when effort softens?",
+            mantra: nil
         )
     ]
 
@@ -109,6 +112,9 @@ Nothing is lost.
                 Spacer(minLength: 24)
             }
             .padding()
+        }
+        .safeAreaInset(edge: .bottom) {
+            mantraStrip
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -173,9 +179,36 @@ Nothing is lost.
 
     private var currentTeaching: Teaching {
         let list = activeTeachings
-        guard !list.isEmpty else { return Teaching(title: "Focus", body: "—", prompt: "") }
+        guard !list.isEmpty else { return Teaching(title: "Focus", body: "—", prompt: "", mantra: nil) }
         let idx = max(0, min(currentIndex, list.count - 1))
         return list[idx]
+    }
+
+    // MARK: - Mantra strip
+
+    private var currentMantra: String? {
+        let raw = currentTeaching.mantra?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let raw, !raw.isEmpty else { return nil }
+        return raw
+    }
+
+    private var mantraStrip: some View {
+        Group {
+            if let m = currentMantra {
+                Text(m)
+                    .font(.system(size: 40, weight: .bold, design: .serif))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal)
+                    .padding(.bottom, 10)
+                    .opacity(isDoneToday ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.25), value: isDoneToday)
+                    .allowsHitTesting(false)
+            }
+        }
     }
 
     // MARK: - Sections
@@ -274,7 +307,6 @@ Nothing is lost.
         let key = todayKey
         modelContext.insert(FocusCompletionEntity(dayKey: key))
 
-        // Mark “pending advance” for tomorrow (matches SwiftDataModels.swift).
         if let state = programState {
             state.pendingAdvanceDayKey = key
             state.updatedAt = Date()
@@ -302,15 +334,13 @@ Nothing is lost.
     private func applyDailyAdvanceIfNeeded() {
         guard let state = programState else { return }
 
-        // pendingAdvanceDayKey is treated as “pending advance from this day”.
         guard let pendingFromDay = state.pendingAdvanceDayKey,
               pendingFromDay < todayKey
         else { return }
 
-        // Advance exactly once, then clear the pending marker.
         let list = activeTeachings
         if !list.isEmpty {
-            let next = min(state.currentIndex + 1, list.count - 1) // hold last if list is shorter
+            let next = min(state.currentIndex + 1, list.count - 1)
             state.currentIndex = next
         }
 
@@ -324,7 +354,6 @@ Nothing is lost.
 
     @MainActor
     private func loadRemoteFocusStepsIfNeeded() async {
-        // Don’t repeatedly fetch if we already have remote content.
         if let remoteTeachings, !remoteTeachings.isEmpty { return }
 
         do {
@@ -334,7 +363,12 @@ Nothing is lost.
                 .sorted(by: { $0.stepIndex < $1.stepIndex })
                 .map { step in
                     let (body, prompt) = Self.splitBodyAndPrompt(step.body)
-                    return Teaching(title: step.title, body: body, prompt: prompt)
+                    return Teaching(
+                        title: step.title,
+                        body: body,
+                        prompt: prompt,
+                        mantra: step.mantra
+                    )
                 }
 
             if !mapped.isEmpty {
@@ -344,7 +378,6 @@ Nothing is lost.
                 print("Focus: loaded \(mapped.count) steps from DB")
                 #endif
 
-                // Re-clamp index if remote list is shorter than local seed (rare, but safe)
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
                     state.updatedAt = Date()
@@ -355,14 +388,10 @@ Nothing is lost.
             #if DEBUG
             print("Focus: fetch failed, using fallback: \(error)")
             #endif
-            // best-effort: keep local seed
         }
     }
 
     private static func splitBodyAndPrompt(_ body: String) -> (String, String) {
-        // Accept either:
-        // - a separate paragraph containing "Prompt: ..."
-        // - no prompt at all
         let marker = "\n\nPrompt:"
         if let r = body.range(of: marker) {
             let main = String(body[..<r.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -390,6 +419,7 @@ private struct Teaching {
     let title: String
     let body: String
     let prompt: String
+    let mantra: String?
 }
 
 private extension String {
