@@ -50,6 +50,7 @@ struct PracticeView: View {
     @State private var remoteItems: [PracticeItem]? = nil
 
     // MARK: - Practice list (local fallback seed)
+    // Keep these for now as a safety fallback. We can replace with a single "Loading…" item later.
 
     private let items: [PracticeItem] = [
         PracticeItem(
@@ -345,6 +346,11 @@ No analysis. Just a clean label.
 
             if !mapped.isEmpty {
                 remoteItems = mapped
+
+                #if DEBUG
+                print("Practice: loaded \(mapped.count) steps from DB")
+                #endif
+
                 // Re-clamp index if remote list is shorter than local seed (rare, but safe)
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
@@ -353,6 +359,9 @@ No analysis. Just a clean label.
                 }
             }
         } catch {
+            #if DEBUG
+            print("Practice: fetch failed, using fallback: \(error)")
+            #endif
             // best-effort: keep local seed
         }
     }

@@ -18,6 +18,7 @@ struct FocusView: View {
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
 
     // MARK: - “Subtitle under title”
+
     @AppStorage("FocusSubtitleSeenCount") private var focusSubtitleSeenCount = 0
     @State private var countedThisAppear = false
     private let focusSubtitleShowLimit = 3
@@ -47,6 +48,7 @@ struct FocusView: View {
     @State private var remoteTeachings: [Teaching]? = nil
 
     // MARK: - Teaching list (local fallback seed)
+    // Keep these for now as a safety fallback. We can replace with a single "Loading…" item later.
 
     private let teachings: [Teaching] = [
         Teaching(
@@ -337,6 +339,11 @@ Nothing is lost.
 
             if !mapped.isEmpty {
                 remoteTeachings = mapped
+
+                #if DEBUG
+                print("Focus: loaded \(mapped.count) steps from DB")
+                #endif
+
                 // Re-clamp index if remote list is shorter than local seed (rare, but safe)
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
@@ -345,6 +352,9 @@ Nothing is lost.
                 }
             }
         } catch {
+            #if DEBUG
+            print("Focus: fetch failed, using fallback: \(error)")
+            #endif
             // best-effort: keep local seed
         }
     }
@@ -386,5 +396,4 @@ private extension String {
     var nilIfBlank: String? {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
-
 }
