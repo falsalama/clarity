@@ -61,26 +61,35 @@ struct Tab_CaptureView: View {
                 capturesSection
             }
             .listStyle(.plain)
-            .navigationTitle("Reflect")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("Reflect")
+                            .font(.headline)
+                        Text("Record or type a thought.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
                         ProgressScreen()
                     } label: {
-                        // Reflect tab badge: soft white (not gold).
                         TopCounterBadge(
                             count: min(108, completedTurns.count),
                             fill: Color.white.opacity(0.92),
                             textColor: .black
                         )
-                        .overlay(
-                            Capsule().stroke(.black.opacity(0.08), lineWidth: 1)
-                        )
+                        .overlay(Capsule().stroke(.black.opacity(0.08), lineWidth: 1))
                     }
                     .accessibilityLabel(Text("Progress: \(min(108, completedTurns.count)) of 108"))
                 }
             }
+
             .navigationDestination(for: UUID.self) { id in
                 TurnDetailView(turnID: id)
             }
@@ -131,10 +140,15 @@ struct Tab_CaptureView: View {
     private var captureSurfaceSection: some View {
         Section {
             VStack(spacing: 12) {
+
+                // Prompt chips (now below the explainer)
                 promptChips
+
                 micButton
+
                 statusPill
                     .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
+
                 typeTextButton
 
                 if let uiErrorKey = userFacingErrorKey {
@@ -142,11 +156,11 @@ struct Tab_CaptureView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.top, 4)
+                        .padding(.top, -4)
                 }
             }
-            .padding(.vertical, 6)
-            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .padding(.vertical, -30)
+            .listRowInsets(EdgeInsets(top: -22, leading: 16, bottom: 10, trailing: 0)) // pulls whole surface up
             .listRowSeparator(.hidden)
         } header: {
             EmptyView()
@@ -176,8 +190,10 @@ struct Tab_CaptureView: View {
                         Button {
                             starTurn(t)
                         } label: {
-                            Label(t.isStarred ? "Unstar" : "Star",
-                                  systemImage: t.isStarred ? "star.slash" : "star")
+                            Label(
+                                t.isStarred ? "Unstar" : "Star",
+                                systemImage: t.isStarred ? "star.slash" : "star"
+                            )
                         }
                         .tint(.yellow)
                     }
@@ -368,3 +384,4 @@ struct Tab_CaptureView: View {
     Tab_CaptureView()
         .environmentObject(TurnCaptureCoordinator())
 }
+

@@ -3,7 +3,7 @@
 import SwiftUI
 import SwiftData
 
-/// PracticeView (v2.2)
+/// PracticeView (v2.3)
 /// - One small practice at a time.
 /// - Deterministic: advances one step per day *only after* the user marks Done.
 /// - Lock: after Done, the practice does not change until the next day.
@@ -18,31 +18,13 @@ struct PracticeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
 
-    // MARK: - “Subtitle under title”
-
-    @AppStorage("PracticeSubtitleSeenCount") private var practiceSubtitleSeenCount = 0
-    @State private var countedThisAppear = false
-    private let practiceSubtitleShowLimit = 3
-
-    private var shouldShowPracticeSubtitle: Bool {
-        practiceSubtitleSeenCount < practiceSubtitleShowLimit
-    }
-
-    private var practiceSubtitleText: String? {
-        guard shouldShowPracticeSubtitle else { return nil }
-        let server = homeSurface.manifest?.practiceSubtitle?.nilIfBlank
-        return server ?? "A tiny exercise you can do anywhere."
-    }
-
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
     // Singleton program state row (id == "singleton")
-    @Query(
-        filter: #Predicate<PracticeProgramStateEntity> { $0.id == "singleton" }
-    )
+    @Query(filter: #Predicate<PracticeProgramStateEntity> { $0.id == "singleton" })
     private var programStates: [PracticeProgramStateEntity]
 
     // MARK: - Remote content (DB-fed)
@@ -87,9 +69,6 @@ No analysis. Just a clean label.
         return items
     }
 
-    // Expand/collapse body
-    @State private var isExpanded = true
-
     // MARK: - Init
 
     init() {
@@ -124,14 +103,13 @@ No analysis. Just a clean label.
                 VStack(spacing: 2) {
                     Text("Practice")
                         .font(.headline)
-                    if let s = practiceSubtitleText {
-                        Text(s)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+
+                    Text("One small practice each day.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -142,17 +120,9 @@ No analysis. Just a clean label.
         .onAppear {
             ensureProgramStateExists()
             applyDailyAdvanceIfNeeded()
-
-            if shouldShowPracticeSubtitle && !countedThisAppear {
-                practiceSubtitleSeenCount += 1
-                countedThisAppear = true
-            }
         }
         .task {
             await loadRemotePracticeStepsIfNeeded()
-        }
-        .onDisappear {
-            countedThisAppear = false
         }
         .onChange(of: scenePhase) { _, newValue in
             if newValue == .active {
@@ -224,22 +194,9 @@ No analysis. Just a clean label.
             Text(item.title)
                 .font(.title3.weight(.semibold))
 
-            if isExpanded {
-                Text(item.body)
-                    .font(.body)
-                    .foregroundStyle(.primary)
-            }
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isExpanded.toggle()
-                }
-            } label: {
-                Text(isExpanded ? "Hide" : "Show")
-                    .font(.callout)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
+            Text(item.body)
+                .font(.body)
+                .foregroundStyle(.primary)
 
             Divider()
 
@@ -338,8 +295,7 @@ No analysis. Just a clean label.
 
     private func ensureProgramStateExists() {
         guard programState == nil else { return }
-        let state = PracticeProgramStateEntity()
-        modelContext.insert(state)
+        modelContext.insert(PracticeProgramStateEntity())
         do { try modelContext.save() } catch { /* best-effort */ }
     }
 
@@ -426,3 +382,4 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
+

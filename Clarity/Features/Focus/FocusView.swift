@@ -18,22 +18,6 @@ struct FocusView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
 
-    // MARK: - “Subtitle under title”
-
-    @AppStorage("FocusSubtitleSeenCount") private var focusSubtitleSeenCount = 0
-    @State private var countedThisAppear = false
-    private let focusSubtitleShowLimit = 3
-
-    private var shouldShowFocusSubtitle: Bool {
-        focusSubtitleSeenCount < focusSubtitleShowLimit
-    }
-
-    private var focusSubtitleText: String? {
-        guard shouldShowFocusSubtitle else { return nil }
-        let server = homeSurface.manifest?.focusSubtitle?.nilIfBlank
-        return server ?? "Carry one short teaching today."
-    }
-
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
@@ -122,14 +106,13 @@ Nothing is lost.
                 VStack(spacing: 2) {
                     Text("Focus")
                         .font(.headline)
-                    if let s = focusSubtitleText {
-                        Text(s)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+
+                    Text("One teaching each day.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
@@ -140,16 +123,10 @@ Nothing is lost.
         .onAppear {
             ensureProgramStateExists()
             applyDailyAdvanceIfNeeded()
-
-            if shouldShowFocusSubtitle && !countedThisAppear {
-                focusSubtitleSeenCount += 1
-                countedThisAppear = true
-            }
         }
         .task {
             await loadRemoteFocusStepsIfNeeded()
         }
-        .onDisappear { countedThisAppear = false }
         .onChange(of: scenePhase) { _, newValue in
             if newValue == .active {
                 ensureProgramStateExists()
@@ -266,7 +243,7 @@ Nothing is lost.
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            Text("If this brings something up, you can reflect on it.")
+            Text("If anything is still pulling at you, switch to Reflect.")
                 .font(.body)
                 .foregroundStyle(.secondary)
         }

@@ -1,3 +1,5 @@
+// PortraitView.swift
+
 import SwiftUI
 
 struct PortraitView: View {
@@ -14,8 +16,14 @@ struct PortraitView: View {
             ZStack {
                 backgroundLayer
                 robeLayer
+
+                // Hair must be split: back behind face, front on top of face.
+                hairBackLayer
+
                 faceLayer
-                hairLayer
+
+                hairFrontLayer
+
                 glassesLayer
                 hatLayer
             }
@@ -34,9 +42,23 @@ struct PortraitView: View {
     private var backgroundLayer: some View {
         ZStack {
             if let c = PortraitPalette.background(recipe.backgroundStyle) {
+                Circle().fill(c.opacity(0.22))
+            }
+
+            if recipe.backgroundStyle == .halo {
                 Circle()
-                    .fill(c.opacity(0.35))
-                    .blur(radius: recipe.backgroundStyle == .halo ? 10 : 0)
+                    .strokeBorder(Color.yellow.opacity(0.30), lineWidth: 10)
+                    .blur(radius: 4)
+                    .padding(6)
+
+                Circle()
+                    .strokeBorder(Color.yellow.opacity(0.18), lineWidth: 2)
+                    .padding(10)
+            }
+
+            if recipe.backgroundStyle == .lotus {
+                SparklesLayer()
+                    .opacity(0.55)
             }
         }
     }
@@ -61,14 +83,10 @@ struct PortraitView: View {
     }
 
     private var faceShape: some Shape {
-        // Same outer rect size for all options; only adjust facial width/aspect ratio.
         switch recipe.faceShape {
-        case .slim:      // label kept: "thinner"
-            return AnyShape(ScaledEllipse(xScale: 0.86, yScale: 1.00))
-        case .standard:  // label kept: "medium"
-            return AnyShape(ScaledEllipse(xScale: 0.93, yScale: 1.00))
-        case .round:     // label kept: "round"
-            return AnyShape(ScaledEllipse(xScale: 1.00, yScale: 1.00))
+        case .slim:      return AnyShape(ScaledEllipse(xScale: 0.86, yScale: 1.00))
+        case .standard:  return AnyShape(ScaledEllipse(xScale: 0.93, yScale: 1.00))
+        case .round:     return AnyShape(ScaledEllipse(xScale: 1.00, yScale: 1.00))
         }
     }
 
@@ -82,10 +100,6 @@ struct PortraitView: View {
         let tint = Color.primary.opacity(0.18)
         let y: CGFloat = -16
 
-        // New expression set:
-        // - serene
-        // - littleSmile
-        // - bigSmile
         switch recipe.expression {
         case .serene:
             return AnyView(
@@ -118,6 +132,7 @@ struct PortraitView: View {
 
     private var mouthLayer: some View {
         let stroke = Color.primary.opacity(0.25)
+        let mouthY: CGFloat = 19
 
         switch recipe.expression {
         case .serene:
@@ -125,7 +140,7 @@ struct PortraitView: View {
                 SmileArc(curvature: 0.10)
                     .stroke(stroke, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: 22, height: 12)
-                    .offset(y: 16)
+                    .offset(y: mouthY)
             )
 
         case .littleSmile:
@@ -133,7 +148,7 @@ struct PortraitView: View {
                 SmileArc(curvature: 0.30)
                     .stroke(stroke, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: 24, height: 14)
-                    .offset(y: 16)
+                    .offset(y: mouthY)
             )
 
         case .bigSmile:
@@ -141,7 +156,7 @@ struct PortraitView: View {
                 SmileArc(curvature: 0.55)
                     .stroke(stroke, style: StrokeStyle(lineWidth: 3, lineCap: .round))
                     .frame(width: 26, height: 16)
-                    .offset(y: 16)
+                    .offset(y: mouthY)
             )
         }
     }
@@ -152,7 +167,6 @@ struct PortraitView: View {
         let robeMain = PortraitPalette.robe(recipe.robeColour)
 
         return ZStack {
-            // Base robe shapes
             switch recipe.robeStyle {
             case .lay:
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -160,28 +174,44 @@ struct PortraitView: View {
                     .frame(width: 120, height: 62)
                     .offset(y: 38)
 
+                Capsule()
+                    .fill(.black.opacity(0.08))
+                    .frame(width: 46, height: 6)
+                    .offset(y: 20)
+
             case .robeA:
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(robeMain)
                     .frame(width: 120, height: 66)
                     .offset(y: 40)
-                Rectangle()
-                    .fill(.black.opacity(0.12))
-                    .frame(width: 36, height: 66)
-                    .offset(x: -18, y: 40)
+
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.black.opacity(0.14))
+                    .frame(width: 44, height: 70)
+                    .offset(x: -22, y: 40)
+
+                Capsule()
+                    .fill(.black.opacity(0.10))
+                    .frame(width: 54, height: 6)
+                    .offset(y: 20)
 
             case .robeB:
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(robeMain)
                     .frame(width: 120, height: 66)
                     .offset(y: 40)
-                Rectangle()
-                    .fill(.black.opacity(0.10))
-                    .frame(width: 44, height: 10)
-                    .offset(y: 22)
+
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(.black.opacity(0.12))
+                    .frame(width: 88, height: 12)
+                    .offset(y: 26)
+
+                Capsule()
+                    .fill(.black.opacity(0.08))
+                    .frame(width: 56, height: 4)
+                    .offset(y: 18)
             }
 
-            // Two-tone sash: show a white diagonal band when the robe colour is Maroon/White.
             if recipe.robeColour == .maroon {
                 twoToneBand
                     .mask(robeMask(for: recipe.robeStyle))
@@ -189,17 +219,14 @@ struct PortraitView: View {
         }
     }
 
-    // The diagonal white band used for Maroon/White two-tone robes.
     private var twoToneBand: some View {
         ZStack {
-            // Fill
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(Color.white)
                 .frame(width: 140, height: 12)
                 .rotationEffect(.degrees(-24))
                 .offset(x: 6, y: 28)
 
-            // Subtle edge to separate from robe colour
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .stroke(Color.black.opacity(0.06), lineWidth: 1)
                 .frame(width: 140, height: 12)
@@ -208,8 +235,6 @@ struct PortraitView: View {
         }
     }
 
-    // Mask that matches the overall robe silhouette per style,
-    // so the band stays inside the robe shape.
     private func robeMask(for style: RobeStyleID) -> some View {
         switch style {
         case .lay:
@@ -229,8 +254,19 @@ struct PortraitView: View {
 
     // MARK: Hair
 
-    private var hairLayer: some View {
-        let hair = PortraitPalette.hair(recipe.hairColour)
+    private var hairWidthScale: CGFloat {
+        switch recipe.faceShape {
+        case .slim: return 0.92
+        case .standard: return 1.00
+        case .round: return 1.04
+        }
+    }
+
+    private var hairColor: Color { PortraitPalette.hair(recipe.hairColour) }
+
+    /// Hair behind face (mass, length).
+    private var hairBackLayer: some View {
+        let c = hairColor
 
         return ZStack {
             switch recipe.hairStyle {
@@ -238,184 +274,195 @@ struct PortraitView: View {
                 EmptyView()
 
             case .short:
-                shortHair(color: hair)
+                EmptyView()
 
             case .shoulder:
-                hairCap(color: hair)
-                shoulderHair(color: hair)
+                BackHairMassShape(length: .shoulder)
+                    .fill(c)
+                    .frame(width: 116 * hairWidthScale, height: 92)
+                    .offset(y: 0)
 
             case .bun:
-                hairCap(color: hair)
-                bun(color: hair)
+                BackHairMassShape(length: .shoulder)
+                    .fill(c)
+                    .frame(width: 116 * hairWidthScale, height: 92)
+                    .offset(y: 0)
 
             case .topknot:
-                hairCap(color: hair)
-                yogiTopknot(color: hair)
+                EmptyView()
 
             case .longStraight:
-                hairCap(color: hair)
-                longHair(color: hair, wave: 0)
+                BackHairMassShape(length: .longStraight)
+                    .fill(c)
+                    .frame(width: 122 * hairWidthScale, height: 100)
+                    .offset(y: 4)
 
             case .longWavy:
-                hairCap(color: hair)
-                longHair(color: hair, wave: 1)
+                BackHairMassShape(length: .longWavy)
+                    .fill(c)
+                    .frame(width: 124 * hairWidthScale, height: 102)
+                    .offset(y: 4)
+
+                VStack(spacing: 10) {
+                    Capsule().fill(Color.white.opacity(0.06)).frame(width: 10, height: 46)
+                    Capsule().fill(Color.white.opacity(0.05)).frame(width: 8, height: 40)
+                }
+                .offset(x: -26 * hairWidthScale, y: 22)
 
             case .longCurls:
-                hairCap(color: hair)
-                longHair(color: hair, wave: 2)
+                BackHairMassShape(length: .longCurls)
+                    .fill(c)
+                    .frame(width: 126 * hairWidthScale, height: 104)
+                    .offset(y: 6)
+
+                VStack(spacing: 8) {
+                    Circle().fill(Color.white.opacity(0.06)).frame(width: 6, height: 6)
+                    Circle().fill(Color.white.opacity(0.05)).frame(width: 6, height: 6)
+                    Circle().fill(Color.white.opacity(0.04)).frame(width: 6, height: 6)
+                }
+                .offset(x: -28 * hairWidthScale, y: 26)
 
             case .tiedBack:
-                hairCap(color: hair)
-                tiedBack(color: hair)
+                BackHairMassShape(length: .tiedBack)
+                    .fill(c)
+                    .frame(width: 118 * hairWidthScale, height: 96)
+                    .offset(y: 2)
             }
         }
     }
 
-    private func hairCap(color: Color) -> some View {
-        Capsule()
+    /// Hair in front of face (cap + fringe/curtains only).
+    private var hairFrontLayer: some View {
+        let c = hairColor
+
+        return ZStack {
+            switch recipe.hairStyle {
+            case .shaved:
+                EmptyView()
+
+            case .short:
+                shortFront(color: c)
+
+            case .shoulder:
+                cap(color: c)
+                curtainsFront(style: .shoulder, color: c)
+
+            case .bun:
+                cap(color: c)
+                curtainsFront(style: .shoulder, color: c)
+                sideBun(color: c)
+
+            case .topknot:
+                topknotFront(color: c)
+
+            case .longStraight:
+                cap(color: c)
+                curtainsFront(style: .longStraight, color: c)
+
+            case .longWavy:
+                cap(color: c)
+                curtainsFront(style: .longWavy, color: c)
+
+            case .longCurls:
+                cap(color: c)
+                curtainsFront(style: .longCurls, color: c)
+
+            case .tiedBack:
+                cap(color: c)
+                curtainsFront(style: .tiedBack, color: c)
+            }
+        }
+    }
+
+    private func cap(color: Color) -> some View {
+        HairCapShape()
             .fill(color)
-            .frame(width: 92, height: 18)
-            .offset(y: -52)
+            .frame(width: 108 * hairWidthScale, height: 72)
+            .offset(y: -30)
             .shadow(color: .black.opacity(0.05), radius: 1, y: 1)
     }
 
-    private func shortHair(color: Color) -> some View {
+    private func shortFront(color: Color) -> some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
+            HairCapShape()
                 .fill(color)
-                .frame(width: 112, height: 44)
-                .offset(y: -2)
-                .mask(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .frame(width: 112, height: 44)
-                        .offset(y: -2)
-                        .overlay {
-                            Circle()
-                                .fill(Color.black)
-                                .frame(width: 110, height: 110)
-                                .offset(y: -14)
-                                .blendMode(.destinationOut)
-                        }
-                )
+                .frame(width: 104 * hairWidthScale, height: 76)
+                .offset(y: -32)
 
-            HairlineArc()
-                .stroke(Color.black.opacity(0.12), style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                .frame(width: 58, height: 18)
-                .offset(y: -6)
+            // Straight fringe band (flat across, no centre point)
+            StraightFringeBandShape()
+                .fill(Color.black.opacity(0.08))
+                .frame(width: 86 * hairWidthScale, height: 14)
+                .offset(y: -22)
         }
-        .compositingGroup()
     }
 
-    private func shoulderHair(color: Color) -> some View {
-        HStack(spacing: 44) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(color)
-                .frame(width: 26, height: 46)
+    private func topknotFront(color: Color) -> some View {
+        ZStack {
+            cap(color: color)
 
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            TopknotShape()
                 .fill(color)
-                .frame(width: 26, height: 46)
+                .frame(width: 18, height: 28)
+                .offset(y: -62)
+
+            Capsule()
+                .fill(Color.black.opacity(0.10))
+                .frame(width: 16, height: 4)
+                .offset(y: -52)
         }
-        .offset(y: -10)
     }
 
-    private func bun(color: Color) -> some View {
+    private func sideBun(color: Color) -> some View {
         ZStack {
             Circle()
                 .fill(color)
-                .frame(width: 16, height: 16)
-                .offset(y: -68)
+                .frame(width: 22, height: 22)
+                .offset(x: 16, y: -58)
 
             Capsule()
-                .fill(color.opacity(0.95))
-                .frame(width: 10, height: 6)
-                .offset(y: -60)
+                .fill(Color.black.opacity(0.10))
+                .frame(width: 16, height: 4)
+                .offset(x: 16, y: -50)
         }
     }
 
-    private func yogiTopknot(color: Color) -> some View {
-        ZStack {
-            Capsule()
-                .fill(color.opacity(0.95))
-                .frame(width: 14, height: 8)
-                .offset(y: -64)
+    private enum CurtainStyle { case shoulder, longStraight, longWavy, longCurls, tiedBack }
 
-            Circle()
-                .fill(color)
-                .frame(width: 14, height: 14)
-                .offset(y: -74)
-
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(color)
-                .frame(width: 6, height: 12)
-                .offset(y: -84)
-        }
-    }
-
-    private func longHair(color: Color, wave: Int) -> some View {
-        let width: CGFloat = 112
-        let height: CGFloat = 72
+    private func curtainsFront(style: CurtainStyle, color: Color) -> some View {
+        let (w, h, x, y, curve, curl) : (CGFloat, CGFloat, CGFloat, CGFloat, CGFloat, CGFloat) = {
+            switch style {
+            case .shoulder:     return (44, 56, 30, -2, 0.10, 0.00)
+            case .longStraight: return (46, 64, 30,  0, 0.12, 0.00)
+            case .longWavy:     return (46, 66, 30,  0, 0.18, 0.00)
+            case .longCurls:    return (48, 68, 30,  2, 0.20, 0.18)
+            case .tiedBack:     return (40, 52, 34, -4, 0.10, 0.00)
+            }
+        }()
 
         return ZStack {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            FrontCurtainShape(isLeft: true, curve: curve, curl: curl)
                 .fill(color)
-                .frame(width: width, height: height)
-                .offset(y: 6)
-                .mask(
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .frame(width: width, height: height)
-                        .offset(y: 6)
-                        .overlay(alignment: .top) {
-                            Circle()
-                                .fill(Color.black)
-                                .frame(width: 110, height: 110)
-                                .offset(y: -26)
-                                .blendMode(.destinationOut)
-                        }
+                .frame(width: w * hairWidthScale, height: h)
+                .offset(x: -x * hairWidthScale, y: y)
+
+            FrontCurtainShape(isLeft: false, curve: curve, curl: curl)
+                .fill(color)
+                .frame(width: w * hairWidthScale, height: h)
+                .offset(x: x * hairWidthScale, y: y)
+        }
+        // important: keep centre of face clear
+        .mask(
+            Rectangle()
+                .overlay(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .frame(width: 96 * hairWidthScale, height: 108)
+                        .offset(y: -4)
+                        .blendMode(.destinationOut)
                 )
-
-            if wave == 1 {
-                HStack(spacing: 10) {
-                    Capsule().fill(.white.opacity(0.10)).frame(width: 8, height: 56)
-                    Capsule().fill(.white.opacity(0.08)).frame(width: 6, height: 50)
-                }
-                .offset(x: -26, y: 14)
-            } else if wave == 2 {
-                HStack(spacing: 12) {
-                    VStack(spacing: 10) {
-                        Circle().fill(.white.opacity(0.10)).frame(width: 6, height: 6)
-                        Circle().fill(.white.opacity(0.08)).frame(width: 6, height: 6)
-                        Circle().fill(.white.opacity(0.06)).frame(width: 6, height: 6)
-                    }
-                    VStack(spacing: 10) {
-                        Circle().fill(.white.opacity(0.10)).frame(width: 6, height: 6)
-                        Circle().fill(.white.opacity(0.08)).frame(width: 6, height: 6)
-                        Circle().fill(.white.opacity(0.06)).frame(width: 6, height: 6)
-                    }
-                }
-                .offset(x: -30, y: 16)
-            }
-        }
+                .compositingGroup()
+        )
         .compositingGroup()
-    }
-
-    private func tiedBack(color: Color) -> some View {
-        ZStack {
-            HStack(spacing: 56) {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(color)
-                    .frame(width: 18, height: 34)
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(color)
-                    .frame(width: 18, height: 34)
-            }
-            .offset(y: -12)
-
-            Capsule()
-                .fill(color)
-                .frame(width: 16, height: 8)
-                .offset(y: -60)
-        }
     }
 
     // MARK: Glasses
@@ -454,121 +501,105 @@ struct PortraitView: View {
         }
 
         switch style {
-            case .round, .roundThin:
-                return AnyView(roundFrame())
-            case .square, .squareThin:
-                return AnyView(squareFrame())
-            case .hex:
-                return AnyView(hexFrame())
+        case .round, .roundThin:   return AnyView(roundFrame())
+        case .square, .squareThin: return AnyView(squareFrame())
+        case .hex:                 return AnyView(hexFrame())
         }
     }
 
-    // MARK: Hats
+    // MARK: Hats (anchor to head)
 
     private var hatLayer: some View {
         guard let hat = recipe.hatStyle else { return AnyView(EmptyView()) }
 
         switch hat {
-        case .conicalStraw:
-            return AnyView(conicalHat)
-        case .patternedCap:
-            return AnyView(patternedCap)
-        case .monasticCap:
-            return AnyView(monasticCap)
+        case .conicalStraw:  return AnyView(conicalHat)
+        case .patternedCap:  return AnyView(patternedCap)
+        case .monasticCap:   return AnyView(monasticCap)
         }
     }
+
+    private var hatAnchorY: CGFloat { -78 }
 
     private var conicalHat: some View {
         ZStack {
             Ellipse()
                 .fill(.black.opacity(0.14))
-                .frame(width: 118, height: 28)
-                .offset(y: -60)
+                .frame(width: 112 * hairWidthScale, height: 22)
+                .offset(y: hatAnchorY + 10)
 
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(.black.opacity(0.16))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(.black.opacity(0.18))
                 .frame(width: 54, height: 20)
-                .offset(y: -72)
+                .offset(y: hatAnchorY)
 
             Capsule()
                 .fill(.white.opacity(0.16))
                 .frame(width: 34, height: 3)
-                .offset(x: -6, y: -74)
+                .offset(x: -6, y: hatAnchorY - 2)
         }
+        .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
     }
 
     private var patternedCap: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(.black.opacity(0.18))
-                .frame(width: 80, height: 22)
-                .offset(y: -64)
+                .frame(width: 82, height: 22)
+                .offset(y: hatAnchorY)
 
             HStack(spacing: 6) {
                 Capsule().fill(.white.opacity(0.14)).frame(width: 6, height: 14)
                 Capsule().fill(.white.opacity(0.10)).frame(width: 6, height: 14)
                 Capsule().fill(.white.opacity(0.14)).frame(width: 6, height: 14)
             }
-            .offset(y: -64)
+            .offset(y: hatAnchorY)
         }
+        .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
     }
 
     private var monasticCap: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(PortraitPalette.robe(.saffron).opacity(0.95))
-                .frame(width: 62, height: 18)
-                .offset(y: -64)
+                .frame(width: 66, height: 18)
+                .offset(y: hatAnchorY + 2)
 
             Capsule()
                 .fill(.black.opacity(0.10))
-                .frame(width: 46, height: 3)
-                .offset(y: -60)
+                .frame(width: 48, height: 3)
+                .offset(y: hatAnchorY + 6)
         }
+        .shadow(color: .black.opacity(0.06), radius: 1, y: 1)
     }
 }
 
 // MARK: - Helpers
 
 private struct AnyShape: Shape {
-    // Make the stored closure Sendable so the type-erased shape can be Sendable.
     private let _path: @Sendable (CGRect) -> Path
-
-    // Require the captured shape to be Sendable so the @Sendable closure is valid.
-    init<S: Shape & Sendable>(_ s: S) {
-        _path = { rect in s.path(in: rect) }
-    }
-
+    init<S: Shape & Sendable>(_ s: S) { _path = { rect in s.path(in: rect) } }
     func path(in rect: CGRect) -> Path { _path(rect) }
 }
 
 private struct ScaledEllipse: Shape, Sendable {
     let xScale: CGFloat
     let yScale: CGFloat
-
     func path(in rect: CGRect) -> Path {
         let w = rect.width * xScale
         let h = rect.height * yScale
-        let r = CGRect(
-            x: rect.midX - w / 2,
-            y: rect.midY - h / 2,
-            width: w,
-            height: h
-        )
+        let r = CGRect(x: rect.midX - w / 2, y: rect.midY - h / 2, width: w, height: h)
         return Ellipse().path(in: r)
     }
 }
 
 private struct SmileArc: Shape, Sendable {
-    /// 0.0 = flat, 1.0 = very smiley
     let curvature: CGFloat
-
     func path(in rect: CGRect) -> Path {
         let left = CGPoint(x: rect.minX, y: rect.midY)
         let right = CGPoint(x: rect.maxX, y: rect.midY)
         let lift = rect.height * curvature
         let control = CGPoint(x: rect.midX, y: rect.midY + lift)
-
         var p = Path()
         p.move(to: left)
         p.addQuadCurve(to: right, control: control)
@@ -596,14 +627,250 @@ private struct Hexagon: Shape {
     }
 }
 
-private struct HairlineArc: Shape {
+// MARK: - Background sparkles
+
+private struct SparklesLayer: View {
+    var body: some View {
+        ZStack {
+            sparkle(x: -34, y: -30, s: 10, o: 0.18)
+            sparkle(x: 28, y: -26, s: 7, o: 0.16)
+            sparkle(x: -18, y: 18, s: 6, o: 0.12)
+            sparkle(x: 34, y: 20, s: 9, o: 0.14)
+            sparkle(x: 0, y: -44, s: 5, o: 0.10)
+        }
+    }
+
+    private func sparkle(x: CGFloat, y: CGFloat, s: CGFloat, o: CGFloat) -> some View {
+        Circle()
+            .fill(Color.white.opacity(o))
+            .frame(width: s, height: s)
+            .blur(radius: 0.5)
+            .offset(x: x, y: y)
+    }
+}
+
+// MARK: - Hair shapes
+
+private struct HairCapShape: Shape, Sendable {
     func path(in rect: CGRect) -> Path {
-        let left = CGPoint(x: rect.minX, y: rect.midY)
-        let right = CGPoint(x: rect.maxX, y: rect.midY)
-        let control = CGPoint(x: rect.midX, y: rect.minY - rect.height * 0.35)
+        let w = rect.width
+        let h = rect.height
+        let top = rect.minY
+        let left = rect.minX
+        let right = rect.maxX
+        let midX = rect.midX
+
+        let hairlineY = rect.minY + h * 0.54
+
         var p = Path()
-        p.move(to: left)
-        p.addQuadCurve(to: right, control: control)
+        p.move(to: CGPoint(x: left + w * 0.10, y: hairlineY))
+        p.addQuadCurve(
+            to: CGPoint(x: midX, y: hairlineY + h * 0.06),
+            control: CGPoint(x: midX - w * 0.20, y: hairlineY - h * 0.12)
+        )
+        p.addQuadCurve(
+            to: CGPoint(x: right - w * 0.10, y: hairlineY),
+            control: CGPoint(x: midX + w * 0.20, y: hairlineY - h * 0.12)
+        )
+
+        p.addQuadCurve(
+            to: CGPoint(x: right - w * 0.16, y: top + h * 0.12),
+            control: CGPoint(x: right, y: top + h * 0.34)
+        )
+
+        p.addQuadCurve(
+            to: CGPoint(x: left + w * 0.16, y: top + h * 0.12),
+            control: CGPoint(x: midX, y: top - h * 0.08)
+        )
+
+        p.addQuadCurve(
+            to: CGPoint(x: left + w * 0.10, y: hairlineY),
+            control: CGPoint(x: left, y: top + h * 0.34)
+        )
+
+        p.closeSubpath()
         return p
     }
 }
+
+private struct StraightFringeBandShape: Shape, Sendable {
+    func path(in rect: CGRect) -> Path {
+        _ = rect.width
+        let h = rect.height
+        let yTop = rect.minY + h * 0.30
+        let yBottom = rect.maxY
+
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: yTop))
+        p.addLine(to: CGPoint(x: rect.maxX, y: yTop))
+        p.addLine(to: CGPoint(x: rect.maxX, y: yBottom))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.minX, y: yBottom),
+            control: CGPoint(x: rect.midX, y: yBottom + h * 0.18)
+        )
+        p.closeSubpath()
+        return p
+    }
+}
+
+private struct TopknotShape: Shape, Sendable {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX + w * 0.18, y: rect.midY))
+        p.addQuadCurve(
+            to: CGPoint(x: rect.midX, y: rect.minY + h * 0.06),
+            control: CGPoint(x: rect.minX + w * 0.28, y: rect.minY + h * 0.12)
+        )
+        p.addQuadCurve(
+            to: CGPoint(x: rect.maxX - w * 0.18, y: rect.midY),
+            control: CGPoint(x: rect.maxX - w * 0.28, y: rect.minY + h * 0.12)
+        )
+        p.addQuadCurve(
+            to: CGPoint(x: rect.midX, y: rect.maxY - h * 0.04),
+            control: CGPoint(x: rect.maxX - w * 0.22, y: rect.maxY)
+        )
+        p.addQuadCurve(
+            to: CGPoint(x: rect.minX + w * 0.18, y: rect.midY),
+            control: CGPoint(x: rect.minX + w * 0.22, y: rect.maxY)
+        )
+        p.closeSubpath()
+        return p
+    }
+}
+
+private enum HairLengthKind { case shoulder, longStraight, longWavy, longCurls, tiedBack }
+
+private struct BackHairMassShape: Shape, Sendable {
+    let length: HairLengthKind
+
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        let top = rect.minY
+        let left = rect.minX
+        let right = rect.maxX
+        let bottom = rect.maxY
+
+        let (shoulderY, bottomLift, sway, scallop): (CGFloat, CGFloat, CGFloat, CGFloat) = {
+            switch length {
+            case .shoulder:    return (top + h * 0.74, h * 0.06, 0.02, 0.00)
+            case .tiedBack:    return (top + h * 0.70, h * 0.08, 0.00, 0.00)
+            case .longStraight:return (top + h * 0.84, h * 0.02, 0.00, 0.00)
+            case .longWavy:    return (top + h * 0.86, h * 0.02, 0.10, 0.00)
+            case .longCurls:   return (top + h * 0.88, h * 0.00, 0.12, 0.20)
+            }
+        }()
+
+        var p = Path()
+        p.move(to: CGPoint(x: left + w * 0.20, y: top + h * 0.22))
+
+        p.addCurve(
+            to: CGPoint(x: left + w * (0.10 + sway), y: shoulderY),
+            control1: CGPoint(x: left + w * 0.08, y: top + h * 0.40),
+            control2: CGPoint(x: left + w * 0.05, y: top + h * 0.62)
+        )
+
+        if scallop > 0 {
+            let y = bottom - bottomLift
+            p.addQuadCurve(
+                to: CGPoint(x: left + w * 0.34, y: y),
+                control: CGPoint(x: left + w * 0.16, y: bottom + h * scallop)
+            )
+            p.addQuadCurve(
+                to: CGPoint(x: right - w * 0.34, y: y),
+                control: CGPoint(x: rect.midX, y: bottom + h * scallop * 0.9)
+            )
+            p.addQuadCurve(
+                to: CGPoint(x: right - w * 0.10 - sway * w, y: shoulderY),
+                control: CGPoint(x: right - w * 0.16, y: bottom + h * scallop)
+            )
+        } else {
+            p.addQuadCurve(
+                to: CGPoint(x: right - w * 0.10 - sway * w, y: shoulderY),
+                control: CGPoint(x: rect.midX, y: bottom + h * 0.06)
+            )
+        }
+
+        p.addCurve(
+            to: CGPoint(x: right - w * 0.20, y: top + h * 0.22),
+            control1: CGPoint(x: right - w * 0.05, y: top + h * 0.62),
+            control2: CGPoint(x: right - w * 0.08, y: top + h * 0.40)
+        )
+
+        p.addQuadCurve(
+            to: CGPoint(x: left + w * 0.20, y: top + h * 0.22),
+            control: CGPoint(x: rect.midX, y: top + h * 0.08)
+        )
+
+        p.closeSubpath()
+        return p
+    }
+}
+
+private struct FrontCurtainShape: Shape, Sendable {
+    let isLeft: Bool
+    let curve: CGFloat
+    let curl: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+
+        let top = rect.minY
+        let bottom = rect.maxY
+
+        let outerX = isLeft ? rect.minX : rect.maxX
+        let innerX = isLeft ? rect.maxX : rect.minX
+
+        // Keep away from the centre so it never forms a middle spike.
+        let innerInset = w * 0.40
+
+        // Concave top: centre higher, sides lower.
+        let topInner = CGPoint(
+            x: innerX + (isLeft ? -innerInset : innerInset),
+            y: top + h * 0.06
+        )
+        let topOuter = CGPoint(
+            x: outerX,
+            y: top + h * 0.18
+        )
+
+        var p = Path()
+        p.move(to: topInner)
+
+        p.addQuadCurve(
+            to: topOuter,
+            control: CGPoint(
+                x: (topInner.x + topOuter.x) * 0.5,
+                y: top + h * 0.02
+            )
+        )
+
+        p.addCurve(
+            to: CGPoint(x: outerX, y: bottom - h * 0.10),
+            control1: CGPoint(x: outerX, y: top + h * (0.30 + curve)),
+            control2: CGPoint(x: outerX, y: top + h * (0.62 + curve))
+        )
+
+        let curlLift = h * curl
+        p.addQuadCurve(
+            to: CGPoint(x: innerX, y: bottom),
+            control: CGPoint(x: rect.midX, y: bottom + curlLift)
+        )
+
+        p.addQuadCurve(
+            to: topInner,
+            control: CGPoint(
+                x: innerX + (isLeft ? -innerInset * 0.85 : innerInset * 0.85),
+                y: top + h * 0.56
+            )
+        )
+
+        p.closeSubpath()
+        return p
+    }
+}
+
