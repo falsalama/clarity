@@ -155,6 +155,9 @@ struct TurnDetailView: View {
 
             // WAL preview removed per design: show only the badge in header.
 
+            Divider()
+            actionsSection
+
             if hasAnyOutputs {
                 Divider()
                 outputsSection
@@ -164,9 +167,6 @@ struct TurnDetailView: View {
                 Divider()
                 talkSection
             }
-
-            Divider()
-            actionsSection
         }
     }
 
@@ -606,10 +606,42 @@ struct TurnDetailView: View {
         }
     }
 
+    private func toolTint(_ tool: CloudTool) -> Color {
+        switch tool {
+
+        // White – Air / Clarity
+        case .reflect:
+            return Color(red: 0.55, green: 0.42, blue: 0.18)
+
+        // Blue – Space / Vastness
+        case .perspective:
+            return Color(red: 0.08, green: 0.18, blue: 0.42)
+
+        // Green – Water / Movement
+        case .options:
+            return Color(red: 0.10, green: 0.48, blue: 0.32)
+
+        // Red – Fire / Cutting
+        case .questions:
+            return Color(red: 0.58, green: 0.10, blue: 0.14)
+
+        // Yellow – Earth / Grounding
+        case .talkItThrough:
+            return Color(red: 0.78, green: 0.62, blue: 0.12)
+        }
+    }
+
+
+
     private func toolButton(title: String, tool: CloudTool, enabled: Bool) -> some View {
-        Button(title) { requestTool(tool) }
-            .buttonStyle(.bordered)
-            .disabled(!enabled)
+        Button { requestTool(tool) } label: {
+            Text(title)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+        .tint(toolTint(tool))
+        .disabled(!enabled)
     }
 
     private func requestTool(_ tool: CloudTool) {
@@ -909,8 +941,6 @@ private struct StatusPill: View {
         default: return "Processing"
         }
     }
-
-
 }
 
 // MARK: - Cloud Tap gating
