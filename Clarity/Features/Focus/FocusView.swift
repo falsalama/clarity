@@ -107,7 +107,7 @@ Nothing is lost.
                     Text("Focus")
                         .font(.headline)
 
-                    Text("One teaching each day.")
+                    Text("One small teaching each day.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

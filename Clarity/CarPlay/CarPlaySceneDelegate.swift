@@ -19,9 +19,12 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private weak var interfaceController: CPInterfaceController?
     private var tabBarTemplate: CPTabBarTemplate?
 
+    // MARK: - CPTemplateApplicationSceneDelegate
+
     func templateApplicationScene(
         _ templateApplicationScene: CPTemplateApplicationScene,
-        didConnect interfaceController: CPInterfaceController
+        didConnect interfaceController: CPInterfaceController,
+        to window: CPWindow
     ) {
         self.interfaceController = interfaceController
 
@@ -36,7 +39,8 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
     func templateApplicationScene(
         _ templateApplicationScene: CPTemplateApplicationScene,
-        didDisconnectInterfaceController interfaceController: CPInterfaceController
+        didDisconnect interfaceController: CPInterfaceController,
+        from window: CPWindow
     ) {
         self.interfaceController = nil
         self.tabBarTemplate = nil
