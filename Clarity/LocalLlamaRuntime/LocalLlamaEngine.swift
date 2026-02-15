@@ -45,6 +45,9 @@ actor LocalLlamaEngine {
     // Default to legacy for identical behavior; you can opt into the fast mode at runtime.
     private var samplingMode: SamplingMode = .legacyFullSoftmax
 
+    // Cache the context params so we can recreate a fresh context per request (stateless generation).
+    private var cachedContextParams: llama_context_params?
+
     deinit {
         // Actor deinit is nonisolated; use a static helper to free resources safely.
         LocalLlamaEngine.freeResources(
@@ -90,6 +93,9 @@ actor LocalLlamaEngine {
         // cparams.n_threads = UInt32(nThreads)
         // cparams.n_threads_batch = UInt32(nThreads)
 
+        // Cache params for per-request context recreation.
+        cachedContextParams = cparams
+
         guard let ctx = llama_init_from_model(m, cparams) else {
             llama_model_free(m)
             throw EngineError.contextCreateFailed
@@ -113,6 +119,7 @@ actor LocalLlamaEngine {
         context = nil
         model = nil
         vocab = nil
+        cachedContextParams = nil
         didInitBackend = false
     }
 
@@ -133,11 +140,36 @@ actor LocalLlamaEngine {
         }
     }
 
+    // Recreate a fresh llama context for each independent request.
+    // This avoids KV/cache accumulation across Reflect -> Perspective -> Options -> Questions.
+    private func resetContextForNewRequest() throws {
+        guard let m = model, let params = cachedContextParams else { return }
+
+        if let ctx = context {
+            llama_free(ctx)
+            context = nil
+        }
+
+        guard let newCtx = llama_init_from_model(m, params) else {
+            throw EngineError.contextCreateFailed
+        }
+
+        context = newCtx
+        // vocab remains valid for the model; no need to re-fetch.
+    }
+
     func generate(prompt: String, maxTokens: Int, temperature: Float) throws -> String {
-        guard let _ = model, let ctx = context, let v = vocab else {
+        guard model != nil, vocab != nil else {
             return ""
         }
         if prompt.isEmpty { return "" }
+
+        // Ensure a clean context per request (no cross-request KV/cache).
+        try resetContextForNewRequest()
+
+        guard let ctx = context, let v = vocab else {
+            return ""
+        }
 
         // Tokenize
         let utf8Count = prompt.utf8.count
@@ -265,7 +297,6 @@ actor LocalLlamaEngine {
 
                 // 1) Find top-K logits and ids; skip control/special tokens (except EOG).
                 let eos = llama_vocab_eos(v)
-                // Some builds expose EOT/EOM; keep them if present by text check below.
                 var topScores = [Float]()
                 var topIds = [Int]()
                 topScores.reserveCapacity(k)
@@ -465,3 +496,4 @@ actor LocalLlamaEngine {
         return s == "<|end_of_text|>" || s == "<|eot_id|>" || s == "<|eom_id|>"
     }
 }
+
