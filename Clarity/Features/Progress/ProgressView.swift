@@ -7,15 +7,13 @@ struct ProgressScreen: View {
     @StateObject private var profileStore = UserProfileStore()
     @State private var showPortraitEditor = false
 
-    @Query private var completedTurns: [TurnEntity]
+    @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
     init() {
-        _completedTurns = Query(
-            filter: #Predicate<TurnEntity> { turn in
-                !turn.transcriptRedactedActive.isEmpty
-            }
+        _reflectCompletions = Query(
+            sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)]
         )
 
         _focusCompletions = Query(
@@ -27,7 +25,7 @@ struct ProgressScreen: View {
         )
     }
 
-    private var reflectCount: Int { min(108, completedTurns.count) }
+    private var reflectCount: Int { min(108, reflectCompletions.count) }
     private var focusCount: Int { focusCompletions.count }
     private var practiceCount: Int { practiceCompletions.count }
 
@@ -48,8 +46,11 @@ struct ProgressScreen: View {
                 .padding(.top, 12)
 
                 VStack(spacing: 10) {
-                    ProgressCounterCapsule(reflectCount: reflectCount, focusCount: focusCount, practiceCount: practiceCount)
-
+                    ProgressCounterCapsule(
+                        reflectCount: reflectCount,
+                        focusCount: focusCount,
+                        practiceCount: practiceCount
+                    )
 
                     Text("\(bloomOpenCount) of 108")
                         .font(.title2.weight(.semibold))
@@ -68,7 +69,6 @@ struct ProgressScreen: View {
         .navigationTitle("Progress")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPortraitEditor, onDismiss: {
-            // Refresh portrait after save
             profileStore.attach(modelContext: modelContext)
         }) {
             NavigationStack {
@@ -80,3 +80,4 @@ struct ProgressScreen: View {
         }
     }
 }
+

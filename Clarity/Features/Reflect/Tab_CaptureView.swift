@@ -10,6 +10,8 @@ struct Tab_CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
     @Environment(\.modelContext) private var modelContext
 
+    private let cloudTap = CloudTapService()
+
     @State private var showPermissionAlert: Bool = false
     @State private var permissionAlertTitleKey: String = "perm.title.generic"
     @State private var permissionAlertMessageKey: String = ""
@@ -20,8 +22,19 @@ struct Tab_CaptureView: View {
     // Sheet toggle for typing text
     @State private var showPasteSheet: Bool = false
 
-    // Completed turns count (badge)
+    // Steps (Reflect onboarding)
+    @State private var steps: [CloudTapStep] = []
+    @State private var stepsError: String? = nil
+    @State private var stepsLoading: Bool = false
+
+    // Captures list (unchanged)
     @Query private var completedTurns: [TurnEntity]
+
+    // Progress count (Reflect done-days)
+    @Query private var reflectCompletions: [ReflectCompletionEntity]
+
+    // Singleton state (programme pointer)
+    @Query private var reflectState: [ReflectProgramStateEntity]
 
     init() {
         _completedTurns = Query(
@@ -29,6 +42,16 @@ struct Tab_CaptureView: View {
                 !turn.transcriptRedactedActive.isEmpty
             },
             sort: [SortDescriptor(\TurnEntity.recordedAt, order: .reverse)]
+        )
+
+        _reflectCompletions = Query(
+            sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)]
+        )
+
+        _reflectState = Query(
+            filter: #Predicate<ReflectProgramStateEntity> { s in
+                s.id == "singleton"
+            }
         )
     }
 
@@ -54,6 +77,32 @@ struct Tab_CaptureView: View {
         static let sectionCorner: CGFloat = 16
     }
 
+    // MARK: - Derived state
+
+    private var todayKey: String {
+        let cal = Calendar.current
+        let d = cal.startOfDay(for: Date())
+        let y = cal.component(.year, from: d)
+        let m = cal.component(.month, from: d)
+        let day = cal.component(.day, from: d)
+        return String(format: "%04d-%02d-%02d", y, m, day)
+    }
+
+    private var isDoneToday: Bool {
+        reflectCompletions.contains(where: { $0.dayKey == todayKey })
+    }
+
+    private var programmeState: ReflectProgramStateEntity? {
+        reflectState.first
+    }
+
+    private var currentStep: CloudTapStep? {
+        guard !steps.isEmpty else { return nil }
+        let idx = programmeState?.currentIndex ?? 0
+        let clamped = max(0, min(idx, steps.count - 1))
+        return steps[clamped]
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             List {
@@ -66,7 +115,7 @@ struct Tab_CaptureView: View {
                     VStack(spacing: 2) {
                         Text("Reflect")
                             .font(.headline)
-                        Text("Record or type a thought.")
+                        Text("One honest answer each day.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -80,13 +129,13 @@ struct Tab_CaptureView: View {
                         ProgressScreen()
                     } label: {
                         TopCounterBadge(
-                            count: min(108, completedTurns.count),
+                            count: min(108, reflectCompletions.count),
                             fill: Color.white.opacity(0.92),
                             textColor: .black
                         )
                         .overlay(Capsule().stroke(.black.opacity(0.08), lineWidth: 1))
                     }
-                    .accessibilityLabel(Text("Progress: \(min(108, completedTurns.count)) of 108"))
+                    .accessibilityLabel(Text("Progress: \(min(108, reflectCompletions.count)) of 108"))
                 }
             }
 
@@ -132,7 +181,70 @@ struct Tab_CaptureView: View {
                 }
                 .environmentObject(coordinator)
             }
+            .onAppear {
+                ensureProgrammeState()
+                Task { await loadStepsIfNeeded() }
+                advanceIfPending()
+            }
+            .onChange(of: todayKey) { _, _ in
+                // New calendar day: advance if yesterday was marked done.
+                advanceIfPending()
+            }
         }
+    }
+
+    // MARK: - Steps: load + state
+
+    private func ensureProgrammeState() {
+        guard programmeState == nil else { return }
+        let s = ReflectProgramStateEntity()
+        modelContext.insert(s)
+        do { try modelContext.save() } catch { /* best-effort */ }
+    }
+
+    private func loadStepsIfNeeded() async {
+        guard steps.isEmpty, stepsLoading == false else { return }
+        stepsLoading = true
+        stepsError = nil
+        do {
+            let resp = try await cloudTap.reflectSteps(programme: "starter_5day")
+            await MainActor.run {
+                self.steps = resp.steps
+                self.stepsLoading = false
+                self.stepsError = resp.steps.isEmpty ? "No steps returned." : nil
+            }
+        } catch {
+            await MainActor.run {
+                self.stepsLoading = false
+                self.stepsError = "Couldn’t load today’s question."
+            }
+        }
+    }
+
+    private func advanceIfPending() {
+        guard let s = programmeState else { return }
+        guard let pending = s.pendingAdvanceDayKey else { return }
+        guard pending != todayKey else { return } // only advance on a new day after Done
+        guard !steps.isEmpty else { return }
+
+        s.currentIndex = min(s.currentIndex + 1, steps.count - 1)
+        s.pendingAdvanceDayKey = nil
+        s.updatedAt = Date()
+        do { try modelContext.save() } catch { /* best-effort */ }
+    }
+
+    private func markDoneToday() {
+        guard isDoneToday == false else { return }
+
+        let completion = ReflectCompletionEntity(dayKey: todayKey, completedAt: Date())
+        modelContext.insert(completion)
+
+        if let s = programmeState {
+            s.pendingAdvanceDayKey = todayKey
+            s.updatedAt = Date()
+        }
+
+        do { try modelContext.save() } catch { /* best-effort */ }
     }
 
     // MARK: - Sections
@@ -141,7 +253,9 @@ struct Tab_CaptureView: View {
         Section {
             VStack(spacing: 12) {
 
-                // Prompt chips (now below the explainer)
+                todayQuestionCard
+
+                // Prompt chips
                 promptChips
 
                 micButton
@@ -160,12 +274,70 @@ struct Tab_CaptureView: View {
                 }
             }
             .padding(.vertical, -30)
-            .listRowInsets(EdgeInsets(top: -22, leading: 16, bottom: 10, trailing: 0)) // pulls whole surface up
+            .listRowInsets(EdgeInsets(top: -26, leading: 16, bottom: 10, trailing: 16))
             .listRowSeparator(.hidden)
         } header: {
             EmptyView()
         }
     }
+
+    private var todayQuestionCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+
+            Text("Today’s question")
+                .font(.title3.weight(.semibold))
+
+            if stepsLoading {
+                Text("Loading…")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let err = stepsError {
+                Text(err)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else if let step = currentStep {
+                Text(step.body)
+                    .font(.body)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("Press mic or type to answer. Speaking is recommended.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("No question yet.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Divider()
+                .padding(.top, 6)
+
+            HStack {
+                Text(isDoneToday ? "Done for today, come back tomorrow." : "Mark as done for today.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Button { markDoneToday() } label: {
+                    Text("Done")
+                        .font(.callout.weight(.semibold))
+                }
+                .buttonStyle(.bordered) // <- matches Focus/Practice
+                .disabled(isDoneToday || coordinator.phase != .idle)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding() // 16
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
+                .stroke(.black.opacity(0.06), lineWidth: 1)
+        )
+        // remove extra top padding to match other feature cards
+    }
+
 
     private var capturesSection: some View {
         Section {
@@ -218,9 +390,8 @@ struct Tab_CaptureView: View {
     private var promptChips: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: Layout.chipsSpacing) {
-                chip("I can’t tell if…")
-                chip("I’m stuck choosing…")
-                chip("I feel tension with…")
+                chip("I already practice, but…")
+                chip("I’m new but do know shamata…")
             }
             .padding(.top, Layout.chipsTopPadding)
         }
@@ -300,7 +471,7 @@ struct Tab_CaptureView: View {
             Text("Type text")
                 .font(.headline)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8) // less padding (requested)
+                .padding(.vertical, 8)
         }
         .buttonStyle(.bordered)
         .disabled(coordinator.phase != .idle)

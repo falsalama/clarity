@@ -362,6 +362,53 @@ final class PatternStatsEntity {
     }
 }
 
+// MARK: - ReflectCompletionEntity (Done taps)
+
+@Model
+final class ReflectCompletionEntity {
+
+    @Attribute(.unique)
+    var id: UUID
+
+    /// Calendar-day key (local timezone), e.g. "2026-02-12"
+    @Attribute(.unique)
+    var dayKey: String
+
+    var completedAt: Date
+
+    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+        self.id = id
+        self.dayKey = dayKey
+        self.completedAt = completedAt
+    }
+}
+
+// MARK: - ReflectProgramStateEntity (linear programme pointer; singleton)
+
+@Model
+final class ReflectProgramStateEntity {
+
+    /// Always `"singleton"`
+    @Attribute(.unique)
+    var id: String
+
+    var currentIndex: Int
+    var pendingAdvanceDayKey: String?
+    var updatedAt: Date
+
+    init(
+        id: String = "singleton",
+        currentIndex: Int = 0,
+        pendingAdvanceDayKey: String? = nil,
+        updatedAt: Date = Date()
+    ) {
+        self.id = id
+        self.currentIndex = currentIndex
+        self.pendingAdvanceDayKey = pendingAdvanceDayKey
+        self.updatedAt = updatedAt
+    }
+}
+
 // MARK: - FocusCompletionEntity (Done taps)
 
 @Model

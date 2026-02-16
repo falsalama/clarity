@@ -53,6 +53,10 @@ final class CloudTapService {
 
     // MARK: - Steps (DB-fed content)
 
+    func reflectSteps(programme: String = "starter_5day") async throws -> CloudTapStepsResponse {
+        try await getJSON(from: "reflect-steps", query: [URLQueryItem(name: "programme", value: programme)])
+    }
+
     func focusSteps(programme: String = "core") async throws -> CloudTapStepsResponse {
         try await getJSON(from: "focus-steps", query: [URLQueryItem(name: "programme", value: programme)])
     }
