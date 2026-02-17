@@ -1,11 +1,22 @@
 import Foundation
 
+// MARK: - Capsule mode (controls what we inject)
+
+enum CloudTapCapsuleMode: String, Codable, Sendable {
+    case reflect
+    case talk
+}
+
 // MARK: - Learned cues (bounded, optional)
 
 struct CloudTapLearnedCue: Codable, Sendable, Equatable {
     let statement: String
     let evidenceCount: Int
     let lastSeenAtISO: String
+
+    // NEW (optional; back-compat)
+    let kindRaw: String?
+    let key: String?
 }
 
 // MARK: - Capsule snapshot (bounded, safe)
@@ -16,12 +27,12 @@ struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
     let preferences: [String: String]
     let learnedCues: [CloudTapLearnedCue]?    // optional, gated by learningEnabled
 
-    static func fromCapsule(_ capsule: CapsuleModel) -> CloudTapCapsuleSnapshot {
+    static func fromCapsule(_ capsule: CapsuleModel, mode: CloudTapCapsuleMode = .reflect) -> CloudTapCapsuleSnapshot {
         CloudTapCapsuleSnapshot(
             version: capsule.version,
             updatedAt: ISO8601DateFormatter().string(from: capsule.updatedAt),
             preferences: boundPreferences(capsule.preferences),
-            learnedCues: capsule.cloudTapLearnedCuesPayload(max: 12) // returns nil unless learningEnabled && non-empty
+            learnedCues: capsule.cloudTapLearnedCuesPayload(max: 12, mode: mode) // returns nil unless learningEnabled && non-empty
         )
     }
 

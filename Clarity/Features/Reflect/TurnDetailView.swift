@@ -27,6 +27,10 @@ struct TurnDetailView: View {
 
     @Query private var matches: [TurnEntity]
 
+    // Scroll control
+    @State private var scrollProxy: ScrollViewProxy? = nil
+    private let outputsBottomID = "outputsBottom"
+
     init(turnID: UUID) {
         self.turnID = turnID
         _matches = Query(filter: #Predicate<TurnEntity> { $0.id == turnID })
@@ -86,62 +90,72 @@ struct TurnDetailView: View {
     // MARK: - View
 
     var body: some View {
-        ScrollView {
-            content
-                .padding()
-        }
-        .navigationTitle("Capture")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if let t = turn, let updated = FileStore.normalisedStoredAudioPath(from: t.audioPath) {
-                t.audioPath = updated
-                try? modelContext.save()
+        ScrollViewReader { proxy in
+            ScrollView {
+                content
+                    .padding()
+                    .id("scrollRoot")
             }
-            player.load(storedAudioPath: turn?.audioPath)
-        }
-        .onChange(of: turn?.audioPath) { _, _ in
-            player.load(storedAudioPath: turn?.audioPath)
-        }
+            .onAppear {
+                self.scrollProxy = proxy
+                if let t = turn, let updated = FileStore.normalisedStoredAudioPath(from: t.audioPath) {
+                    t.audioPath = updated
+                    try? modelContext.save()
+                }
+                player.load(storedAudioPath: turn?.audioPath)
+            }
+            .onChange(of: turn?.audioPath) { _, _ in
+                player.load(storedAudioPath: turn?.audioPath)
+            }
 
-        .onDisappear { player.stop() }
-        .sheet(item: $sheetRoute) { route in
-            switch route {
-            case .cloudTapOff:
-                CloudTapOffSheet()
-            case .missingCapture:
-                MissingCaptureSheet()
-            }
-        }
-        .alert("Send to Cloud Tap?", isPresented: $showCloudConfirm) {
-            Button("Cancel", role: .cancel) {}
+            .navigationTitle("Capture")
+            .navigationBarTitleDisplayMode(.inline)
 
-            Button(isSendingCloud ? "Sending…" : "Send") {
-                Task { await sendCloudTapRequest() }
-            }
-            .disabled(isSendingCloud || transcriptForCloudPayload(from: turn).isEmpty)
-        } message: {
-            Text("Send redacted text to generate \(pendingTool.rawValue). Audio and raw transcript stay on this device.")
-        }
-        .alert("Couldn't Send", isPresented: Binding(
-            get: { cloudSendError != nil },
-            set: { if !$0 { cloudSendError = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(cloudSendError ?? "")
-        }
-        .overlay {
-            if isSendingCloud || isSendingChat {
-                sendingOverlay
-            }
-        }
-        .allowsHitTesting(!(isSendingCloud || isSendingChat))
-        .onChange(of: isTalkActive) { _, becameActive in
-            if becameActive {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    isChatFocused = true
+            .onDisappear { player.stop() }
+            .sheet(item: $sheetRoute) { route in
+                switch route {
+                case .cloudTapOff:
+                    CloudTapOffSheet()
+                case .missingCapture:
+                    MissingCaptureSheet()
                 }
             }
+            .alert("Send to Cloud Tap?", isPresented: $showCloudConfirm) {
+                Button("Cancel", role: .cancel) {}
+
+                Button(isSendingCloud ? "Sending…" : "Send") {
+                    Task { await sendCloudTapRequest() }
+                }
+                .disabled(isSendingCloud || transcriptForCloudPayload(from: turn).isEmpty)
+            } message: {
+                Text("Send redacted text to generate \(pendingTool.rawValue). Audio and raw transcript stay on this device.")
+            }
+            .alert("Couldn't Send", isPresented: Binding(
+                get: { cloudSendError != nil },
+                set: { if !$0 { cloudSendError = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(cloudSendError ?? "")
+            }
+            .overlay {
+                if isSendingCloud || isSendingChat {
+                    sendingOverlay
+                }
+            }
+            .allowsHitTesting(!(isSendingCloud || isSendingChat))
+            .onChange(of: isTalkActive) { _, becameActive in
+                if becameActive {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        isChatFocused = true
+                    }
+                }
+            }
+            // Auto-scroll when any output changes to keep it in view
+            .onChange(of: turn?.reflectText) { _, _ in scrollOutputsToBottom() }
+            .onChange(of: turn?.perspectiveText) { _, _ in scrollOutputsToBottom() }
+            .onChange(of: turn?.optionsText) { _, _ in scrollOutputsToBottom() }
+            .onChange(of: turn?.questionsText) { _, _ in scrollOutputsToBottom() }
         }
     }
 
@@ -161,11 +175,26 @@ struct TurnDetailView: View {
             if hasAnyOutputs {
                 Divider()
                 outputsSection
+                // Invisible anchor to scroll to
+                Color.clear
+                    .frame(height: 1)
+                    .id(outputsBottomID)
             }
 
             if hasTalkContent {
                 Divider()
                 talkSection
+            }
+        }
+    }
+
+    private func scrollOutputsToBottom() {
+        guard hasAnyOutputs else { return }
+        guard let proxy = scrollProxy else { return }
+        // Defer to next runloop to ensure layout updated
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo(outputsBottomID, anchor: .bottom)
             }
         }
     }
@@ -527,7 +556,7 @@ struct TurnDetailView: View {
             Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? "0"
 
-        let snapshot = capsuleSnapshotOrNil()
+        let snapshot = capsuleSnapshotOrNil(for: pendingTool)
 
         // Optimistically append user message locally
         var thread = loadTalkThread(from: t)
@@ -689,7 +718,7 @@ struct TurnDetailView: View {
             Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
             ?? "0"
 
-        let snapshot = capsuleSnapshotOrNil()
+        let snapshot = capsuleSnapshotOrNil(for: .talkItThrough)
 
         let mode: ContemplationMode
         switch pendingTool {
@@ -737,6 +766,9 @@ struct TurnDetailView: View {
 
             t.reflectionText = (t.reflectText ?? t.optionsText ?? t.questionsText ?? t.perspectiveText) ?? ""
             try modelContext.save()
+
+            // Scroll to show the latest outputs
+            scrollOutputsToBottom()
         } catch {
             cloudSendError = String(describing: error)
         }
@@ -765,7 +797,7 @@ struct TurnDetailView: View {
                 Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
                 ?? "0"
 
-            let snapshot = capsuleSnapshotOrNil()
+            let snapshot = capsuleSnapshotOrNil(for: pendingTool)
 
             switch pendingTool {
             case .reflect, .options, .questions, .perspective:
@@ -832,12 +864,15 @@ struct TurnDetailView: View {
             }
 
             try modelContext.save()
+
+            // Scroll to show the latest outputs
+            scrollOutputsToBottom()
         } catch {
             cloudSendError = String(describing: error)
         }
     }
 
-    private func capsuleSnapshotOrNil() -> CloudTapCapsuleSnapshot? {
+    private func capsuleSnapshotOrNil(for tool: CloudTool? = nil) -> CloudTapCapsuleSnapshot? {
         let c = capsuleStore.capsule
         let p = c.preferences
 
@@ -849,13 +884,17 @@ struct TurnDetailView: View {
 
         let hasExtras = !p.extras.isEmpty
 
-        // NEW: learned cues count only when learningEnabled is true
-        let learned = c.cloudTapLearnedCuesPayload(max: 12)
+        // Decide capsule mode based on tool (talk vs everything else)
+        let mode: CloudTapCapsuleMode = (tool == .talkItThrough) ? .talk : .reflect
+
+        // Learned cues count only when learningEnabled is true
+        let learned = c.cloudTapLearnedCuesPayload(max: 12, mode: mode)
         let hasLearned = (learned?.isEmpty == false)
 
         guard hasTyped || hasExtras || hasLearned else { return nil }
-        return CloudTapCapsuleSnapshot.fromCapsule(c)
+        return CloudTapCapsuleSnapshot.fromCapsule(c, mode: mode)
     }
+
 
     // MARK: - Talk thread helpers
 
@@ -953,4 +992,3 @@ private enum CloudTool: String, CaseIterable, Identifiable {
     case talkItThrough = "Talk it through"
     var id: String { rawValue }
 }
-
