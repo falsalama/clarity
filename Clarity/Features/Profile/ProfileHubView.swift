@@ -3,7 +3,7 @@ import SwiftData
 
 struct ProfileHubView: View {
     // Progress counters
-    @Query private var completedTurns: [TurnEntity]
+    @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
@@ -11,10 +11,8 @@ struct ProfileHubView: View {
     @Query private var userProfiles: [UserProfileEntity]
 
     init() {
-        _completedTurns = Query(
-            filter: #Predicate<TurnEntity> { turn in
-                !turn.transcriptRedactedActive.isEmpty
-            }
+        _reflectCompletions = Query(
+            sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)]
         )
 
         _focusCompletions = Query(
@@ -87,7 +85,7 @@ struct ProfileHubView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                let reflectCount = min(108, completedTurns.count)
+                let reflectCount = min(108, reflectCompletions.count)
                 let focusCount = focusCompletions.count
                 let practiceCount = practiceCompletions.count
 
@@ -107,3 +105,4 @@ struct ProfileHubView: View {
         }
     }
 }
+

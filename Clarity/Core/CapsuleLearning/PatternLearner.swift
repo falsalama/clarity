@@ -165,9 +165,14 @@ struct PatternLearner {
             out.append(contentsOf: deriveSituationalConstraints(from: text))
         }
 
-        // MARK: New: explicit-phrase v1 for question/breadth density (low-authority)
+        // MARK: explicit-phrase v1 for question/breadth density (low-authority)
         if let text = redactedText?.lowercased(), !text.isEmpty {
             out.append(contentsOf: deriveQuestionAndBreadthPreferences(from: text))
+        }
+
+        // MARK: NEW — Buddhist practice signals (explicit phrases only; no inference)
+        if let text = redactedText?.lowercased(), !text.isEmpty {
+            out.append(contentsOf: deriveBuddhistSignals(from: text))
         }
 
         // Keep bounded and deduplicated per (kind,key)
@@ -245,11 +250,10 @@ struct PatternLearner {
         return out
     }
 
-    // NEW: explicit-phrase v1 for the four cues
+    // explicit-phrase v1 for the four cues
     private func deriveQuestionAndBreadthPreferences(from text: String) -> [PatternObservation] {
         var out: [PatternObservation] = []
 
-        // question_light
         let qLight = [
             "stop asking questions", "just tell me", "don't ask me questions", "do not ask me questions",
             "no questions", "no more questions", "quit asking questions", "stop with the questions"
@@ -258,7 +262,6 @@ struct PatternLearner {
             out.append(.init(kind: .workflow_preference, key: "question_light", strength: 0.5))
         }
 
-        // question_guided
         let qGuided = [
             "ask me questions", "help me think this through", "question me", "can you question me",
             "guide me with questions", "ask questions to help me think"
@@ -267,7 +270,6 @@ struct PatternLearner {
             out.append(.init(kind: .workflow_preference, key: "question_guided", strength: 0.5))
         }
 
-        // narrow_first
         let narrow = [
             "one thing at a time", "just pick one", "too many options", "pick one for me",
             "choose one for me", "don't give me options", "do not give me options", "just choose for me", "pick one"
@@ -276,7 +278,6 @@ struct PatternLearner {
             out.append(.init(kind: .workflow_preference, key: "narrow_first", strength: 0.5))
         }
 
-        // explore_space
         let explore = [
             "what are my options", "map it out", "what else could work", "alternatives",
             "explore options", "show me options", "option space", "lay out the options"
@@ -287,6 +288,138 @@ struct PatternLearner {
 
         return out
     }
+
+    // MARK: NEW — Buddhist practice signals (explicit phrases only)
+    private func deriveBuddhistSignals(from text: String) -> [PatternObservation] {
+        var out: [PatternObservation] = []
+
+        func hit(_ phrases: [String]) -> Bool { phrases.contains(where: { text.contains($0) }) }
+        func add(_ key: String, _ strength: Double) {
+            out.append(.init(kind: .topic_recurrence, key: key, strength: strength))
+        }
+
+        // --- Practice forms (explicit terms)
+        let practices: [(String, [String])] = [
+            ("shamatha", ["shamatha", "śamatha", "calm abiding", "calm-abiding", "tranquillity"]),
+            ("vipashyana", ["vipashyana", "vipaśyanā", "vipassana", "insight meditation", "insight practice"]),
+            ("lojong", ["lojong", "blo sbyong", "mind training"]),
+            ("tonglen", ["tonglen", "gtong len"]),
+            ("metta", ["metta", "mettā", "loving-kindness", "loving kindness"]),
+            ("ngondro", ["ngondro", "ngöndro", "sngon 'gro", "preliminaries"]),
+            ("deity_yoga", ["deity yoga", "generation stage", "kyerim", "bskyed rim"]),
+            ("dzogchen", ["dzogchen", "rdzogs chen", "atiyoga", "trekchö", "trekcho", "thögal", "thogal"]),
+            ("mahamudra", ["mahamudra", "mahāmudrā"]),
+            ("koan", ["koan", "kōan"]),
+            ("zazen", ["zazen", "shikantaza"])
+        ]
+        for (k, phrases) in practices where hit(phrases) {
+            add("dharma:practice:\(k)", 0.35)
+        }
+
+        // --- Tradition/lineage lane (explicit mentions)
+        let lineages: [(String, [String])] = [
+            ("nyingma", ["nyingma"]),
+            ("kagyu", ["kagyu", "kagyü"]),
+            ("gelug", ["gelug", "geluk"]),
+            ("sakya", ["sakya"]),
+            ("zen", ["zen"]),
+            ("theravada", ["theravada", "theravāda"]),
+            ("secular", ["secular buddhism", "secular dharma"])
+        ]
+        for (k, phrases) in lineages where hit(phrases) {
+            add("dharma:lineage:\(k)", 0.35)
+        }
+
+        // --- Stated level/experience (explicit phrases only)
+        let levels: [(String, [String])] = [
+            ("beginner", ["i'm a beginner", "im a beginner", "new to buddhism", "new to meditation", "just starting"]),
+            ("returning", ["returning to practice", "back to practice", "starting again"]),
+            ("experienced", ["i've practiced for", "i have practiced for", "years of practice", "long time practitioner"]),
+            ("ordained", ["ordained", "monk", "nun", "lama", "ngakpa"]),
+            ("ngondro_complete", ["completed ngondro", "completed ngöndro", "finished ngondro", "finished ngöndro"])
+        ]
+        for (k, phrases) in levels where hit(phrases) {
+            add("dharma:level:\(k)", 0.35)
+        }
+
+        // --- Teacher / community (explicit; do NOT store names)
+        // We only record that a teacher/community is referenced.
+        if hit(["my teacher", "my lama", "my guru", "my roshi", "my ajahn", "my sangha", "our sangha"]) {
+            add("dharma:teacher_mentioned", 0.30)
+        }
+        if hit(["rinpoche", "roshi", "ajahn", "sayadaw", "geshe", "khenpo", "lama", "guru"]) {
+            add("dharma:title_terms_present", 0.25)
+        }
+
+        // --- Training / course / retreat / empowerment (explicit)
+        let training: [(String, [String])] = [
+            ("retreat_mentioned", ["retreat", "retreating", "in retreat", "silent retreat"]),
+            ("course_mentioned", ["course", "programme", "program", "training course", "meditation course"]),
+            ("empowerment_mentioned", ["empowerment", "wang", "dbang", "lung", "reading transmission", "tri", "instruction"]),
+            ("ordination_mentioned", ["ordained", "ordination", "monastic", "took vows", "vows"])
+        ]
+        for (k, phrases) in training where hit(phrases) {
+            add("dharma:training:\(k)", 0.30)
+        }
+
+        // --- Language / comprehension (explicit only)
+        // Keep coarse; avoid inferring proficiency.
+        let languageClaims: [(String, [String])] = [
+            ("english_only", ["only english", "just english", "i only speak english", "i only speak english"]),
+            ("non_native_english", ["english isn't my first language", "english is not my first language", "non-native english"]),
+            ("tibetan_some", ["a bit of tibetan", "some tibetan", "basic tibetan", "i can read tibetan"]),
+            ("sanskrit_some", ["a bit of sanskrit", "some sanskrit", "basic sanskrit"])
+        ]
+        for (k, phrases) in languageClaims where hit(phrases) {
+            add("profile:language:\(k)", 0.25)
+        }
+
+        // --- Country / region (explicit only; keep coarse)
+        // Only catch a small allowlist; expand later if needed.
+        let countryClaims: [(String, [String])] = [
+            ("uk", ["i'm in the uk", "i am in the uk", "i live in the uk", "i'm in england", "i am in england"]),
+            ("us", ["i'm in the us", "i am in the us", "i live in the us", "i'm in america", "i am in america"]),
+            ("eu", ["i'm in europe", "i am in europe", "i live in europe"]),
+            ("india", ["i'm in india", "i am in india", "i live in india"]),
+            ("japan", ["i'm in japan", "i am in japan", "i live in japan"])
+        ]
+        for (k, phrases) in countryClaims where hit(phrases) {
+            add("profile:country:\(k)", 0.25)
+        }
+
+        // --- Motivation / aim (explicit)
+        if hit(["liberation", "awakening", "enlightenment", "buddhahood"]) {
+            add("dharma:aim:liberation", 0.25)
+        }
+        if hit(["compassion", "bodhicitta", "benefit others", "help others"]) {
+            add("dharma:aim:bodhicitta", 0.25)
+        }
+
+        // --- Strength / struggle (explicit “I’m good at…” / “I struggle with…” patterns)
+        // These are signals, not truths. Keep them coarse.
+        let struggleMarkers = ["i struggle with", "i find it hard to", "i can't", "i cannot", "i have trouble", "i find it difficult to"]
+        if struggleMarkers.contains(where: { text.contains($0) }) {
+            add("self:claim:struggle_mentioned", 0.20)
+            if hit(["focus", "concentration", "distracted", "distraction"]) { add("self:struggle:focus", 0.25) }
+            if hit(["anxiety", "worry", "panic"]) { add("self:struggle:anxiety", 0.25) }
+            if hit(["anger", "irritation", "resentment"]) { add("self:struggle:anger", 0.25) }
+            if hit(["compassion", "kindness"]) { add("self:struggle:compassion", 0.20) }
+            if hit(["sleep", "tired", "exhausted"]) { add("self:struggle:sleep_energy", 0.25) }
+        }
+
+        let strengthMarkers = ["i'm good at", "i am good at", "i'm very good at", "i am very good at", "my strength is", "i'm strong at", "i am strong at"]
+        if strengthMarkers.contains(where: { text.contains($0) }) {
+            add("self:claim:strength_mentioned", 0.20)
+            if hit(["focus", "concentration", "steady attention"]) { add("self:strength:focus", 0.25) }
+            if hit(["discipline", "consistent", "routine"]) { add("self:strength:discipline", 0.25) }
+            if hit(["study", "reading", "learning"]) { add("self:strength:study", 0.20) }
+            if hit(["compassion", "kindness", "patience"]) { add("self:strength:heart", 0.20) }
+        }
+
+        // Avoid flooding
+        return Array(out.prefix(8))
+    }
+
 
     @MainActor
     func apply(observations: [PatternObservation], into context: ModelContext, now: Date = Date()) throws {
@@ -303,19 +436,16 @@ struct PatternLearner {
 
     @MainActor
     private func upsert(kind: PatternStatsEntity.Kind, key: String, increment: Double, now: Date, context: ModelContext) throws {
-        // Bind raw values to concrete constants to avoid key-path RHS in predicate builder
         let kindRaw = kind.rawValue
         let keyValue = key
 
-        // Fetch existing row (unique by kind+key)
         let descriptor = FetchDescriptor<PatternStatsEntity>(
             predicate: #Predicate { $0.kindRaw == kindRaw && $0.key == keyValue },
-            sortBy: [] // single row expected
+            sortBy: []
         )
         let matches = try context.fetch(descriptor)
 
         if let row = matches.first {
-            // Exponential decay: score *= decayFactor; then add increment
             let hl = max(1.0, row.halfLifeDays)
             let deltaDays = max(0, now.timeIntervalSince(row.lastSeenAt) / (60 * 60 * 24))
             let decayFactor = pow(0.5, deltaDays / hl)
@@ -325,7 +455,6 @@ struct PatternLearner {
             row.count &+= 1
             row.lastSeenAt = now
         } else {
-            // New row
             let row = PatternStatsEntity(
                 kindRaw: kindRaw,
                 key: keyValue,
@@ -339,3 +468,4 @@ struct PatternLearner {
         }
     }
 }
+
