@@ -48,19 +48,24 @@ final class HomeSurfaceStore: ObservableObject {
             try persistManifest(data)
             setLastFetchNow()
 
-            // If manifest changed but image is same, we do not re-download the image.
+            // Re-download image if:
+            // - the URL changed, OR
+            // - it's a new day (dateKey changed), OR
+            // - we don't actually have a cached image file.
             if let urlString = newManifest.imageURL,
                let imageURL = URL(string: urlString) {
 
                 let hasCachedImage = cachedImageFileURL != nil && fm.fileExists(atPath: imagePath().path)
                 let imageChanged = (oldImageURL != urlString)
+                let dateChanged = (oldDateKey != newManifest.dateKey)
 
-                if imageChanged || !hasCachedImage {
+                if imageChanged || dateChanged || !hasCachedImage {
                     await fetchAndCacheImage(from: imageURL)
                 }
             } else {
                 // If server removed imageURL, keep cached image as-is (best UX).
             }
+
 
             // Note: message changes will reflect immediately because manifest is updated.
             _ = oldDateKey // retained for clarity; dateKey is used by refreshIfNeededForToday()
