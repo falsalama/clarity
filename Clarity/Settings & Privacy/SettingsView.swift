@@ -16,6 +16,7 @@ struct SettingsView: View {
     // File import for .gguf
     @State private var showImporter: Bool = false
     @State private var importError: String? = nil
+    @State private var dailyNudgeEnabled: Bool = UserDefaults.standard.bool(forKey: "daily_nudge_enabled")
 
     var body: some View {
         Form {
@@ -149,6 +150,44 @@ struct SettingsView: View {
                 } label: {
                     Text(SettingsCopy.redactionRemoveAll)
                 }
+            }
+            Section {
+                Toggle("Daily check-in reminder", isOn: $dailyNudgeEnabled)
+                    .onChange(of: dailyNudgeEnabled) {
+                        let isOn = dailyNudgeEnabled
+                        UserDefaults.standard.set(isOn, forKey: "daily_nudge_enabled")
+
+                        Task {
+                            if isOn {
+                                let ok = await NotificationManager.shared.requestPermissionIfNeeded()
+                                if ok {
+                                    await NotificationManager.shared.scheduleDaily(
+                                        hour: 18,
+                                        minute: 15,
+                                        title: "Clarity",
+                                        body: "One small step today - Reflect, View, or Practice."
+                                    )
+                                } else {
+                                    NotificationManager.shared.openSystemSettings()
+                                    dailyNudgeEnabled = false
+                                    UserDefaults.standard.set(false, forKey: "daily_nudge_enabled")
+                                }
+                            } else {
+                                await NotificationManager.shared.cancelDaily()
+                            }
+                        }
+                    }
+
+
+
+                Button("Notification Settings") {
+                    NotificationManager.shared.openSystemSettings()
+                }
+                .font(.footnote)
+            } header: {
+                Text("Reminders")
+            } footer: {
+                Text("You can also turn this off in iOS Settings → Notifications → Clarity.")
             }
 
             // Transparency

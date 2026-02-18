@@ -1,17 +1,16 @@
-// PracticeView.swift
+// LearnView.swift
 
 import SwiftUI
 import SwiftData
 
-/// PracticeView (v2.3)
-/// - One small practice at a time.
+/// LearnView (renamed from FocusView)
+/// - One short teaching at a time.
 /// - Deterministic: advances one step per day *only after* the user marks Done.
-/// - Lock: after Done, the practice does not change until the next day.
+/// - Lock: after Done, the teaching does not change until the next day.
 /// - Content: remote-first (Supabase/Edge via CloudTapService) with local fallback.
 /// - Mantra: optional per-step mantra shown above tab bar, fades in only after Done.
-/// - Uses PracticeProgramStateEntity (singleton) to future-proof progression (modules/routes later).
-struct PracticeView: View {
-    @State private var bgPhase = false
+/// - Uses FocusProgramStateEntity (singleton) to future-proof progression (modules/routes later).
+struct LearnView: View {
 
     // MARK: - Environment
 
@@ -22,52 +21,55 @@ struct PracticeView: View {
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
-    @Query private var practiceCompletions: [PracticeCompletionEntity]
+    @Query private var learnCompletions: [FocusCompletionEntity]
 
     // Singleton program state row (id == "singleton")
-    @Query(filter: #Predicate<PracticeProgramStateEntity> { $0.id == "singleton" })
-    private var programStates: [PracticeProgramStateEntity]
+    @Query(filter: #Predicate<FocusProgramStateEntity> { $0.id == "singleton" })
+    private var programStates: [FocusProgramStateEntity]
 
     // MARK: - Remote content (DB-fed)
 
     private let cloudTap = CloudTapService()
-    @State private var remoteItems: [PracticeItem]? = nil
+    @State private var remoteTeachings: [Teaching]? = nil
 
-    // MARK: - Practice list (local fallback seed)
+    // MARK: - Teaching list (local fallback seed)
 
-    private let items: [PracticeItem] = [
-        PracticeItem(
-            title: "Three breaths",
+    private let teachings: [Teaching] = [
+        Teaching(
+            title: "Training attention",
             body: """
-Take three natural breaths.
-Nothing to fix. Nothing to achieve.
-Just notice the next inhale, then the next exhale.
+Notice where the mind goes when it is not being directed.
+There is no need to stop it or improve it.
+Just see how it moves on its own.
 """,
+            prompt: "What do you notice about how your attention moves?",
             mantra: nil
         ),
-        PracticeItem(
-            title: "Soften the jaw",
+        Teaching(
+            title: "Working with change",
             body: """
-Let the jaw unclench.
-Let the tongue rest.
-Notice what changes when the face stops bracing.
+Everything that appears also changes.
+This includes thoughts, moods, and situations.
+Nothing needs to be held in place.
 """,
+            prompt: "Where do you notice change happening right now?",
             mantra: nil
         ),
-        PracticeItem(
-            title: "Name the feeling",
+        Teaching(
+            title: "Softening effort",
             body: """
-Silently name what is most present.
-“Pressure”, “tired”, “open”, “restless”, “fine”.
-No analysis. Just a clean label.
+Often we add effort on top of experience.
+See what happens if effort relaxes slightly.
+Nothing is lost.
 """,
+            prompt: "What eases when effort softens?",
             mantra: nil
         )
     ]
 
-    private var activeItems: [PracticeItem] {
-        if let remoteItems, !remoteItems.isEmpty { return remoteItems }
-        return items
+    private var activeTeachings: [Teaching] {
+        if let remoteTeachings, !remoteTeachings.isEmpty { return remoteTeachings }
+        return teachings
     }
 
     // MARK: - Init
@@ -79,8 +81,8 @@ No analysis. Just a clean label.
             }
         )
 
-        _practiceCompletions = Query(
-            sort: [SortDescriptor(\PracticeCompletionEntity.completedAt, order: .reverse)]
+        _learnCompletions = Query(
+            sort: [SortDescriptor(\FocusCompletionEntity.completedAt, order: .reverse)]
         )
     }
 
@@ -88,42 +90,17 @@ No analysis. Just a clean label.
 
     var body: some View {
         ZStack {
-            Image("CloudsBG")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity)
-                .opacity(0.09)
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0.00),
-                            .init(color: .black, location: 0.28),
-                            .init(color: .black, location: 1.00)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .scaleEffect(x: -1, y: 1)           // mirror horizontally
-                .offset(y: bgPhase ? 48 : 70)
-                .allowsHitTesting(false)
+            CloudsBackground() // subtle background artwork
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    practiceCard
+                VStack(alignment: .leading, spacing: 20) {
+                    teachingCard
                     optionalHint
                     Spacer(minLength: 24)
                 }
                 .padding()
             }
         }
-        .onAppear {
-            bgPhase.toggle()
-            ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
-        }
-        .animation(.easeInOut(duration: 26).repeatForever(autoreverses: true), value: bgPhase)
         .safeAreaInset(edge: .bottom) {
             mantraStrip
         }
@@ -131,10 +108,10 @@ No analysis. Just a clean label.
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Practice")
+                    Text("Learn")
                         .font(.headline)
 
-                    Text("One small practice each day.")
+                    Text("One small teaching each day.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
@@ -147,21 +124,25 @@ No analysis. Just a clean label.
                 achievementsLink
             }
         }
+        .onAppear {
+            ensureProgramStateExists()
+            applyDailyAdvanceIfNeeded()
+        }
         .task {
-            await loadRemotePracticeStepsIfNeeded()
+            await loadRemoteLearnStepsIfNeeded()
         }
         .onChange(of: scenePhase) { _, newValue in
             if newValue == .active {
                 ensureProgramStateExists()
                 applyDailyAdvanceIfNeeded()
-                Task { await loadRemotePracticeStepsIfNeeded() }
+                Task { await loadRemoteLearnStepsIfNeeded() }
             }
         }
     }
 
-    // MARK: - Current item (stateful)
+    // MARK: - Teaching selection (stateful)
 
-    private var programState: PracticeProgramStateEntity? {
+    private var programState: FocusProgramStateEntity? {
         programStates.first
     }
 
@@ -170,16 +151,16 @@ No analysis. Just a clean label.
     }
 
     private var isDoneToday: Bool {
-        practiceCompletions.contains(where: { $0.dayKey == todayKey })
+        learnCompletions.contains(where: { $0.dayKey == todayKey })
     }
 
     private var currentIndex: Int {
         programState?.currentIndex ?? 0
     }
 
-    private var currentItem: PracticeItem {
-        let list = activeItems
-        guard !list.isEmpty else { return PracticeItem(title: "Practice", body: "—", mantra: nil) }
+    private var currentTeaching: Teaching {
+        let list = activeTeachings
+        guard !list.isEmpty else { return Teaching(title: "Learn", body: "—", prompt: "", mantra: nil) }
         let idx = max(0, min(currentIndex, list.count - 1))
         return list[idx]
     }
@@ -187,7 +168,7 @@ No analysis. Just a clean label.
     // MARK: - Mantra strip
 
     private var currentMantra: String? {
-        let raw = currentItem.mantra?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = currentTeaching.mantra?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let raw, !raw.isEmpty else { return nil }
         return raw
     }
@@ -213,16 +194,24 @@ No analysis. Just a clean label.
 
     // MARK: - Sections
 
-    private var practiceCard: some View {
-        let item = currentItem
+    private var teachingCard: some View {
+        let teaching = currentTeaching
 
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(item.title)
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(teaching.title)
                 .font(.title3.weight(.semibold))
 
-            Text(item.body)
+            Text(teaching.body)
                 .font(.body)
-                .foregroundStyle(.primary)
+
+            let prompt = teaching.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !prompt.isEmpty {
+                Divider()
+
+                Text(prompt)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
 
             Divider()
 
@@ -268,27 +257,26 @@ No analysis. Just a clean label.
 
     private var achievementsLink: some View {
         _ = min(108, completedTurns.count)
-        let practiceCount = practiceCompletions.count
+        let learnCount = learnCompletions.count
 
         return NavigationLink {
             ProgressScreen()
         } label: {
             TopCounterBadge(
-                count: practiceCount,
-                fill: practiceFill,
-                textColor: .white
+                count: learnCount,
+                fill: learnFill,
+                textColor: .black
             )
-            .overlay(Capsule().stroke(.black.opacity(0.14), lineWidth: 1))
+            .overlay(Capsule().stroke(.black.opacity(0.10), lineWidth: 1))
         }
-        .accessibilityLabel(Text("Practice completions: \(practiceCount)"))
+        .accessibilityLabel(Text("Learn completions: \(learnCount)"))
     }
 
-    private var practiceFill: Color {
-        // Deep maroon / oxblood
-        Color(red: 0.36, green: 0.10, blue: 0.14).opacity(0.92)
+    private var learnFill: Color {
+        Color(red: 0.92, green: 0.80, blue: 0.34).opacity(0.92)
     }
 
-    // MARK: - Done state
+    // MARK: - Done state text
 
     private var doneStateText: String {
         isDoneToday ? "Done for today. Come back tomorrow." : "Mark as done for today."
@@ -298,14 +286,13 @@ No analysis. Just a clean label.
         guard !isDoneToday else { return }
 
         let key = todayKey
-        modelContext.insert(PracticeCompletionEntity(dayKey: key))
+        modelContext.insert(FocusCompletionEntity(dayKey: key))
 
-        // Mark “pending advance” for tomorrow.
         if let state = programState {
             state.pendingAdvanceDayKey = key
             state.updatedAt = Date()
         } else {
-            let state = PracticeProgramStateEntity(
+            let state = FocusProgramStateEntity(
                 id: "singleton",
                 currentIndex: 0,
                 pendingAdvanceDayKey: key,
@@ -321,7 +308,7 @@ No analysis. Just a clean label.
 
     private func ensureProgramStateExists() {
         guard programState == nil else { return }
-        modelContext.insert(PracticeProgramStateEntity())
+        modelContext.insert(FocusProgramStateEntity())
         do { try modelContext.save() } catch { /* best-effort */ }
     }
 
@@ -332,7 +319,7 @@ No analysis. Just a clean label.
               pendingFromDay < todayKey
         else { return }
 
-        let list = activeItems
+        let list = activeTeachings
         if !list.isEmpty {
             let next = min(state.currentIndex + 1, list.count - 1)
             state.currentIndex = next
@@ -347,27 +334,29 @@ No analysis. Just a clean label.
     // MARK: - Remote load
 
     @MainActor
-    private func loadRemotePracticeStepsIfNeeded() async {
-        if let remoteItems, !remoteItems.isEmpty { return }
+    private func loadRemoteLearnStepsIfNeeded() async {
+        if let remoteTeachings, !remoteTeachings.isEmpty { return }
 
         do {
-            let resp = try await cloudTap.practiceSteps(programme: "core")
+            let resp = try await cloudTap.focusSteps(programme: "core") // keep API name if backend uses "focus"
 
-            let mapped: [PracticeItem] = resp.steps
+            let mapped: [Teaching] = resp.steps
                 .sorted(by: { $0.stepIndex < $1.stepIndex })
                 .map { step in
-                    PracticeItem(
+                    let (body, prompt) = Self.splitBodyAndPrompt(step.body)
+                    return Teaching(
                         title: step.title,
-                        body: step.body,
+                        body: body,
+                        prompt: prompt,
                         mantra: step.mantra
                     )
                 }
 
             if !mapped.isEmpty {
-                remoteItems = mapped
+                remoteTeachings = mapped
 
                 #if DEBUG
-                print("Practice: loaded \(mapped.count) steps from DB")
+                print("Learn: loaded \(mapped.count) steps from DB")
                 #endif
 
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
@@ -378,9 +367,19 @@ No analysis. Just a clean label.
             }
         } catch {
             #if DEBUG
-            print("Practice: fetch failed, using fallback: \(error)")
+            print("Learn: fetch failed, using fallback: \(error)")
             #endif
         }
+    }
+
+    private static func splitBodyAndPrompt(_ body: String) -> (String, String) {
+        let marker = "\n\nPrompt:"
+        if let r = body.range(of: marker) {
+            let main = String(body[..<r.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
+            let prompt = String(body[r.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return (main, prompt.isEmpty ? "" : prompt)
+        }
+        return (body.trimmingCharacters(in: .whitespacesAndNewlines), "")
     }
 
     // MARK: - Day key helper
@@ -395,11 +394,45 @@ No analysis. Just a clean label.
     }
 }
 
+// MARK: - Background artwork
+
+private struct CloudsBackground: View {
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                Color(.systemBackground)
+
+                // Top clouds
+                Image("CloudsBackground")
+                    .resizable()
+                    .scaledToFit()
+                    .opacity(0.08) // thin ink
+                    .blendMode(.multiply)
+                    .frame(width: geo.size.width * 0.6)
+                    .position(x: geo.size.width * 0.72, y: geo.size.height * 0.18)
+
+                // Bottom clouds
+                Image("CloudsBackground")
+                    .resizable()
+                    .scaledToFit()
+                    .opacity(0.08)
+                    .blendMode(.multiply)
+                    .scaleEffect(x: -1, y: 1)
+                    .rotationEffect(.degrees(6))
+                    .frame(width: geo.size.width * 0.65)
+                    .position(x: geo.size.width * 0.28, y: geo.size.height * 0.82)
+            }
+            .ignoresSafeArea()
+        }
+    }
+}
+
 // MARK: - Model
 
-private struct PracticeItem {
+private struct Teaching {
     let title: String
     let body: String
+    let prompt: String
     let mantra: String?
 }
 

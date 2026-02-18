@@ -11,12 +11,14 @@ import SwiftData
 /// - Mantra: optional per-step mantra shown above tab bar, fades in only after Done.
 /// - Uses FocusProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct FocusView: View {
+    @State private var bgPhase = false
 
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Data
 
@@ -89,13 +91,35 @@ Nothing is lost.
     // MARK: - View
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                teachingCard
-                optionalHint
-                Spacer(minLength: 24)
+        ZStack {
+            Image("CloudsBG")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .scaleEffect(bgPhase ? 1.02 : 1.00)
+                .offset(x: bgPhase ? 0 : 10, y: bgPhase ? 44 : 34)
+                .opacity(0.20)
+                .overlay(
+                    LinearGradient(
+                        colors: [.white.opacity(0.0), .white.opacity(0.65)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .animation(.easeInOut(duration: 26).repeatForever(autoreverses: true), value: bgPhase)
+                .onAppear { bgPhase = true }
+                .allowsHitTesting(false)
+
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    teachingCard
+                    optionalHint
+                    Spacer(minLength: 24)
+                }
+                .padding()
             }
-            .padding()
         }
         .safeAreaInset(edge: .bottom) {
             mantraStrip
@@ -104,7 +128,7 @@ Nothing is lost.
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Focus")
+                    Text("View")
                         .font(.headline)
 
                     Text("One small teaching each day.")
@@ -121,6 +145,7 @@ Nothing is lost.
             }
         }
         .onAppear {
+            bgPhase = !reduceMotion ? true : false
             ensureProgramStateExists()
             applyDailyAdvanceIfNeeded()
         }
@@ -135,6 +160,7 @@ Nothing is lost.
             }
         }
     }
+
 
     // MARK: - Teaching selection (stateful)
 
@@ -404,3 +430,4 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
+

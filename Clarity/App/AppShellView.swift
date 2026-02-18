@@ -42,7 +42,7 @@ struct AppShellView: View {
                 .tag(AppTab.reflect)
 
             NavigationStack { FocusView() }
-                .tabItem { Label("Focus", systemImage: "book.closed") }
+                .tabItem { Label("View", systemImage: "book.closed") }
                 .tag(AppTab.focus)
 
             NavigationStack { PracticeView() }
