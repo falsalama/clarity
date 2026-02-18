@@ -37,7 +37,7 @@ struct AppShellView: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)
 
-            Tab_CaptureView()
+            CaptureView()
                 .tabItem { Label("Reflect", systemImage: "mic") }
                 .tag(AppTab.reflect)
 

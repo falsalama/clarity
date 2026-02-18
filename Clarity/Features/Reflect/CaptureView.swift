@@ -1,4 +1,4 @@
-// Tab_CaptureView.swift
+// CaptureView.swift
 
 import SwiftUI
 import SwiftData
@@ -6,7 +6,7 @@ import SwiftData
 import UIKit
 #endif
 
-struct Tab_CaptureView: View {
+struct CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
     @Environment(\.modelContext) private var modelContext
 
@@ -552,7 +552,6 @@ struct Tab_CaptureView: View {
 }
 
 #Preview {
-    Tab_CaptureView()
+    CaptureView()
         .environmentObject(TurnCaptureCoordinator())
 }
-
