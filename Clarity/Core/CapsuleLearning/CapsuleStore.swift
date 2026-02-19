@@ -10,7 +10,7 @@ final class CapsuleStore: ObservableObject {
 
     // Bounds for open-ended extras
     private let extrasMaxItems = 24
-    private let extrasKeyMax = 32
+    private let extrasKeyMax = 64
     private let extrasValueMax = 128
 
     init() {
@@ -225,7 +225,6 @@ final class CapsuleStore: ObservableObject {
     }
 
     private func isAllowedExtraKey(_ k: String) -> Bool {
-        // after normaliseKey, only allow [a-z0-9_]
-        k.range(of: #"^[a-z0-9_]+$"#, options: .regularExpression) != nil
+        k.range(of: #"^[a-z0-9]+(?:[:_][a-z0-9]+)*$"#, options: .regularExpression) != nil
     }
 }
