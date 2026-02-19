@@ -24,21 +24,6 @@ struct CapsuleView: View {
             }
 
             // Learning navigation
-            Section {
-                NavigationLink {
-                    LearningView()
-                } label: {
-                    HStack {
-                        Text("Learning")
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .foregroundStyle(.tertiary)
-                    }
-                    .contentShape(Rectangle())
-                }
-                .accessibilityLabel("Learning")
-            }
-
             Section("Pseudonym") {
                 TextField("Optional Pseudonym", text: $pseudonymDraft)
                     .textInputAutocapitalization(.words)

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct CapsuleLearningView: View {
     @EnvironmentObject private var store: CapsuleStore
+    @AppStorage("learning_show_debug_tags") private var showDebugTags = false
 
     var body: some View {
         List {
@@ -17,6 +18,8 @@ struct CapsuleLearningView: View {
                     get: { store.capsule.learningEnabled },
                     set: { store.setLearningEnabled($0) }
                 ))
+
+                Toggle("Show debug tags", isOn: $showDebugTags)
 
                 HStack {
                     Text("Learned cues")
@@ -34,6 +37,13 @@ struct CapsuleLearningView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text(t.statement)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                            if showDebugTags {
+                                Text("\(t.sourceKindRaw ?? "—") • \(t.sourceKey ?? "—")")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .textSelection(.enabled)
+                            }
 
                             HStack(spacing: 10) {
                                 Text("Evidence \(t.evidenceCount)")
@@ -75,3 +85,4 @@ struct CapsuleLearningView: View {
             .environmentObject(CapsuleStore())
     }
 }
+
