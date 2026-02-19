@@ -160,23 +160,33 @@ struct SettingsView: View {
                         Task {
                             if isOn {
                                 let ok = await NotificationManager.shared.requestPermissionIfNeeded()
-                                if ok {
-                                    await NotificationManager.shared.scheduleDaily(
-                                        hour: 18,
-                                        minute: 15,
-                                        title: "Clarity",
-                                        body: "One small step today - Reflect, View, or Practice."
-                                    )
-                                } else {
+                                guard ok else {
                                     NotificationManager.shared.openSystemSettings()
                                     dailyNudgeEnabled = false
                                     UserDefaults.standard.set(false, forKey: "daily_nudge_enabled")
+                                    return
                                 }
+
+                                // Confirm delivery immediately (normal UX, not debug).
+                                await NotificationManager.shared.scheduleTestIn(
+                                    seconds: 10,
+                                    title: "Clarity",
+                                    body: "Reminder is on."
+                                )
+
+                                // Daily repeating reminder.
+                                await NotificationManager.shared.scheduleDaily(
+                                    hour: 10,
+                                    minute: 0,
+                                    title: "Clarity",
+                                    body: "One small step today - Reflect, View, or Practice."
+                                )
                             } else {
                                 await NotificationManager.shared.cancelDaily()
                             }
                         }
                     }
+
 
 
 

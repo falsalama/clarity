@@ -26,6 +26,8 @@ struct CaptureView: View {
     @State private var steps: [CloudTapStep] = []
     @State private var stepsError: String? = nil
     @State private var stepsLoading: Bool = false
+    //fade in of question card
+    @State private var questionReady: Bool = false
 
     // Captures list (unchanged)
     @Query private var completedTurns: [TurnEntity]
@@ -206,17 +208,20 @@ struct CaptureView: View {
         guard steps.isEmpty, stepsLoading == false else { return }
         stepsLoading = true
         stepsError = nil
+        questionReady = false
         do {
             let resp = try await cloudTap.reflectSteps(programme: "starter_5day")
             await MainActor.run {
                 self.steps = resp.steps
                 self.stepsLoading = false
                 self.stepsError = resp.steps.isEmpty ? "No steps returned." : nil
+                self.questionReady = !resp.steps.isEmpty
             }
         } catch {
             await MainActor.run {
                 self.stepsLoading = false
                 self.stepsError = "Couldn’t load today’s question."
+                self.questionReady = true
             }
         }
     }
@@ -287,27 +292,35 @@ struct CaptureView: View {
             Text("Today’s question")
                 .font(.title3.weight(.semibold))
 
-            if stepsLoading {
-                Text("Loading…")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if let err = stepsError {
-                Text(err)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if let step = currentStep {
-                Text(step.body)
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if stepsLoading {
+                    Text("Loading…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if let err = stepsError {
+                    Text(err)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if let step = currentStep {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(step.body)
+                            .font(.body)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                Text("Press mic or type to answer. Speaking is recommended.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("No question yet.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                        Text("Press mic or type to answer. Speaking is recommended.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .opacity(questionReady ? 1 : 0)
+                    .animation(.easeOut(duration: 0.55), value: questionReady)
+                } else {
+                    Text("No question yet.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .transaction { $0.animation = nil }
+
 
             Divider()
                 .padding(.top, 6)

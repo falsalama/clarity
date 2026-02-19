@@ -251,6 +251,7 @@ Nothing is lost.
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 6)
     }
 
     // MARK: - Toolbar

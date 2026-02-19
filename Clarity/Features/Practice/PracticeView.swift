@@ -1,5 +1,3 @@
-// PracticeView.swift
-
 import SwiftUI
 import SwiftData
 
@@ -12,6 +10,7 @@ import SwiftData
 /// - Uses PracticeProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct PracticeView: View {
     @State private var bgPhase = false
+    @State private var isReady = false
 
     // MARK: - Environment
 
@@ -105,23 +104,33 @@ No analysis. Just a clean label.
                     )
                 )
                 .frame(maxHeight: .infinity, alignment: .bottom)
-                .scaleEffect(x: -1, y: 1)           // mirror horizontally
-                .offset(y: bgPhase ? 48 : 70)
+                .scaleEffect(x: -1, y: 1) // mirror horizontally
+                .offset(y: bgPhase ? 98 : 120)
                 .allowsHitTesting(false)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+
                     practiceCard
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: isReady)
+
                     optionalHint
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: isReady)
+
                     Spacer(minLength: 24)
                 }
                 .padding()
             }
+            // Prevent the “layout snap” animation of the scroll container itself.
+            .transaction { $0.animation = nil }
         }
         .onAppear {
             bgPhase.toggle()
             ensureProgramStateExists()
             applyDailyAdvanceIfNeeded()
+            isReady = false
         }
         .animation(.easeInOut(duration: 26).repeatForever(autoreverses: true), value: bgPhase)
         .safeAreaInset(edge: .bottom) {
@@ -149,12 +158,24 @@ No analysis. Just a clean label.
         }
         .task {
             await loadRemotePracticeStepsIfNeeded()
+            withAnimation(.easeOut(duration: 0.55)) {
+                isReady = true
+            }
         }
         .onChange(of: scenePhase) { _, newValue in
-            if newValue == .active {
-                ensureProgramStateExists()
-                applyDailyAdvanceIfNeeded()
-                Task { await loadRemotePracticeStepsIfNeeded() }
+            guard newValue == .active else { return }
+
+            isReady = false
+            ensureProgramStateExists()
+            applyDailyAdvanceIfNeeded()
+
+            Task {
+                await loadRemotePracticeStepsIfNeeded()
+                await MainActor.run {
+                    withAnimation(.easeOut(duration: 0.55)) {
+                        isReady = true
+                    }
+                }
             }
         }
     }
@@ -262,6 +283,7 @@ No analysis. Just a clean label.
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 6)
     }
 
     // MARK: - Toolbar
@@ -366,10 +388,6 @@ No analysis. Just a clean label.
             if !mapped.isEmpty {
                 remoteItems = mapped
 
-                #if DEBUG
-                print("Practice: loaded \(mapped.count) steps from DB")
-                #endif
-
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
                     state.updatedAt = Date()
@@ -377,9 +395,7 @@ No analysis. Just a clean label.
                 }
             }
         } catch {
-            #if DEBUG
-            print("Practice: fetch failed, using fallback: \(error)")
-            #endif
+            // Silent fallback to local seed items.
         }
     }
 
@@ -408,4 +424,3 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
-
