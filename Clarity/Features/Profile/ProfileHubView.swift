@@ -10,6 +10,9 @@ struct ProfileHubView: View {
     // User profile singleton
     @Query private var userProfiles: [UserProfileEntity]
 
+    // Calendar
+    @StateObject private var calendarStore = CalendarStore()
+
     init() {
         _reflectCompletions = Query(
             sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)]
@@ -49,6 +52,23 @@ struct ProfileHubView: View {
                 }
 
                 NavigationLink {
+                    CalendarView()
+                } label: {
+                    HStack(spacing: 10) {
+                        Label("Calendar", systemImage: "calendar")
+
+                        Spacer()
+
+                        if let today = calendarStore.today.first {
+                            Text(today.title)
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                
+                NavigationLink {
                     PortraitEditorView()
                 } label: {
                     HStack(spacing: 12) {
@@ -83,6 +103,9 @@ struct ProfileHubView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await calendarStore.refresh()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 let reflectCount = min(108, reflectCompletions.count)
@@ -105,4 +128,3 @@ struct ProfileHubView: View {
         }
     }
 }
-

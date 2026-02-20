@@ -31,7 +31,8 @@ struct CaptureView: View {
 
     // Captures list (unchanged)
     @Query private var completedTurns: [TurnEntity]
-
+    @State private var bgPhase: Bool = false
+    @State private var isReady: Bool = false
     // Progress count (Reflect done-days)
     @Query private var reflectCompletions: [ReflectCompletionEntity]
 
@@ -107,11 +108,18 @@ struct CaptureView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                captureSurfaceSection
-                capturesSection
+            ZStack {
+                cloudsBackground
+
+                List {
+                    captureSurfaceSection
+                    capturesSection
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .opacity(isReady ? 1 : 0)
+                .animation(.easeOut(duration: 0.55), value: isReady)
             }
-            .listStyle(.plain)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
@@ -184,9 +192,19 @@ struct CaptureView: View {
                 .environmentObject(coordinator)
             }
             .onAppear {
+                bgPhase.toggle()
+                isReady = false
                 ensureProgrammeState()
-                Task { await loadStepsIfNeeded() }
-                advanceIfPending()
+
+                Task {
+                    await loadStepsIfNeeded()
+                    await MainActor.run {
+                        advanceIfPending()
+                        withAnimation(.easeOut(duration: 0.55)) {
+                            isReady = true
+                        }
+                    }
+                }
             }
             .onChange(of: todayKey) { _, _ in
                 // New calendar day: advance if yesterday was marked done.
@@ -194,8 +212,31 @@ struct CaptureView: View {
             }
         }
     }
-
-    // MARK: - Steps: load + state
+    
+    private var cloudsBackground: some View {
+        Image("CloudsBG")
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .opacity(0.09)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.00),
+                        .init(color: .black, location: 0.28),
+                        .init(color: .black, location: 1.00)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .scaleEffect(bgPhase ? 1.30 : 1.18, anchor: .bottom)
+            .scaleEffect(x: -1, y: 1) // mirror horizontally
+            .offset(y: bgPhase ? 98 : 120)
+            .allowsHitTesting(false)
+        
+    }    // MARK: - Steps: load + state
 
     private func ensureProgrammeState() {
         guard programmeState == nil else { return }
@@ -256,6 +297,7 @@ struct CaptureView: View {
 
     private var captureSurfaceSection: some View {
         Section {
+
             VStack(spacing: 12) {
 
                 todayQuestionCard
@@ -281,9 +323,12 @@ struct CaptureView: View {
             .padding(.vertical, -30)
             .listRowInsets(EdgeInsets(top: -26, leading: 16, bottom: 10, trailing: 16))
             .listRowSeparator(.hidden)
+
         } header: {
             EmptyView()
         }
+        .listRowBackground(Color.clear)     // <-- add
+        .listRowSeparator(.hidden)          // <-- add (keeps it consistent)
     }
 
     private var todayQuestionCard: some View {

@@ -18,7 +18,7 @@ struct FocusView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
+    @Environment(\.colorScheme) private var colorScheme
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
@@ -102,7 +102,9 @@ Nothing is lost.
                     .opacity(0.20)
                     .overlay(
                         LinearGradient(
-                            colors: [.white.opacity(0.0), .white.opacity(0.65)],
+                            colors: colorScheme == .dark
+                                ? [Color.black.opacity(0.0), Color.black.opacity(0.55)]
+                                : [Color.white.opacity(0.0), Color.white.opacity(0.65)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
