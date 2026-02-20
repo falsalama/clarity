@@ -17,7 +17,7 @@ struct CapsuleView: View {
 
     @State private var dharmaVehicleSelection: String = ""
     @State private var dharmaSchoolSelection: String = ""
-    @State private var dharmaTraditionSelection: String = ""
+    @State private var dharmaTraditionSelection: String = "" // e.g. Drikung, Kadampa, etc. (sub-lineage / movement)
 
     @State private var dharmaRoleSelection: String = ""
     @State private var dharmaExperienceSelection: String = ""
@@ -26,7 +26,6 @@ struct CapsuleView: View {
 
     @State private var dharmaPracticesSelected: Set<String> = []
     @State private var dharmaDeitiesSelected: Set<String> = []
-    @State private var dharmaTermsSelected: Set<String> = []
     @State private var dharmaMilestonesSelected: Set<String> = []
 
     private enum Field: Hashable { case label, value, pseudonym }
@@ -52,254 +51,310 @@ struct CapsuleView: View {
 
         static let dharmaPractices = "dharma:practices"
         static let dharmaDeities = "dharma:deities"
-        static let dharmaTerms = "dharma:terms"
         static let dharmaMilestones = "dharma:milestones"
     }
 
     // MARK: - Option sets
 
     private let languageOptions: [String] = [
-        "", "English", "French", "German", "Spanish", "Italian",
-        "Japanese", "Chinese (Mandarin)", "Chinese (Cantonese)", "Hindi", "Tibetan", "Other"
-    ]
+            "",
+            "English",
+            "French",
+            "German",
+            "Spanish",
+            "Italian",
+            "Portuguese",
+            "Dutch",
+            "Russian",
+            "Arabic",
+            "Hindi",
+            "Nepali",
+            "Sinhala",
+            "Thai",
+            "Burmese",
+            "Vietnamese",
+            "Khmer",
+            "Lao",
+            "Mongolian",
+            "Chinese (Mandarin)",
+            "Cantonese",
+            "Japanese",
+            "Korean",
+            "Tibetan"
+        ]
 
     private let regionOptions: [String] = [
-        "", "Europe", "UK", "North America", "South America", "Middle East",
-        "Africa", "South Asia", "East Asia", "South East Asia", "Oceania", "Other"
+          "",
+          "Europe (other)",
+          "North America",
+          "Latin America",
+          "North Africa",
+          "Sub-Saharan Africa",
+          "Middle East",
+          "South Asia",
+          "Southeast Asia",
+          "East Asia",
+          "Central Asia",
+          "Oceania",
+          "Online / Remote",
+          "Other"
     ]
 
     private let countryOptions: [String] = [
-        "", "UK", "Ireland", "USA", "Canada", "Australia", "New Zealand",
-        "France", "Germany", "Spain", "Italy", "Netherlands", "Sweden", "Norway", "Denmark",
-        "Switzerland", "Austria", "Belgium", "Portugal", "Greece", "Poland", "Czechia",
-        "Hungary", "Romania", "Bulgaria", "Turkey", "Ukraine", "Russia", "Israel", "UAE",
-        "Saudi Arabia", "Egypt", "South Africa", "Nigeria", "Kenya", "Ghana",
-        "India", "Pakistan", "Bangladesh", "Sri Lanka", "Nepal", "Bhutan",
-        "China", "Hong Kong", "Taiwan", "South Korea", "Singapore", "Malaysia",
-        "Indonesia", "Thailand", "Vietnam", "Philippines", "Japan", "Mongolia", "Tibet",
-        "Myanmar (Burma)",
-        "Other"
-    ]
+            "",
+            "United Kingdom",
+            "Ireland",
+            "France",
+            "Germany",
+            "Spain",
+            "Italy",
+            "Netherlands",
+            "Belgium",
+            "Switzerland",
+            "Austria",
+            "Sweden",
+            "Norway",
+            "Denmark",
+            "Poland",
+            "Czechia",
+            "Greece",
+            "Portugal",
+            "United States",
+            "Canada",
+            "Mexico",
+            "Brazil",
+            "Argentina",
+            "Australia",
+            "New Zealand",
+            "India",
+            "Nepal",
+            "Bhutan",
+            "Sri Lanka",
+            "Pakistan",
+            "Bangladesh",
+            "Myanmar (Burma)",
+            "Thailand",
+            "Laos",
+            "Cambodia",
+            "Vietnam",
+            "Malaysia",
+            "Singapore",
+            "Indonesia",
+            "Philippines",
+            "China",
+            "Hong Kong",
+            "Taiwan",
+            "Mongolia",
+            "Japan",
+            "South Korea",
+            "North Korea",
+            "Tibet (region)",
+            "Russia",
+            "Other"
+        ]
 
     private let dharmaVehicleOptions: [String] = [
-        "",
-        "Theravāda",
-        "Mahayana",
-        "Vajrayana",
-        "Zen/Chan",
-        "Bön",
-        "Secular / Pragmatic"
+        "", "Theravāda", "Mahāyāna", "Vajrayāna", "Other / Mixed"
     ]
 
     private let dharmaSchoolOptions: [String] = [
         "",
-        "Nyingma",
-        "Kagyu",
-        "Gelug",
-        "Sakya",
-        "Jonang",
-        "Rimé (Non-sectarian)",
-        "Kadampa / New Kadampa",
-        "Zen/Chan",
         "Theravāda",
-        "Other"
+        "Zen (Chan/Seon/Thiền)",
+        "Pure Land",
+        "Tiantai / Tendai",
+        "Nichiren",
+        "Kagyu",
+        "Sakya",
+        "Gelug",
+        "Jonang",
+        "Bön",
+        "Shingon",
+        "Nyingma",
+        "Other / Mixed"
     ]
 
     private let dharmaTraditionOptions: [String] = [
         "",
+        "FPMT",
+        "Rimé (non-sectarian)",
+        "Rigpa",
         "Drikung Kagyu",
         "Karma Kagyu",
         "Drukpa Kagyu",
         "Shangpa Kagyu",
-        "FPMT",
-        "Triratna",
-        "Mahasi",
-        "Goenka",
-        "Other"
+        "Thai Forest",
+        "Insight Meditation",
+        "Plum Village",
+        "Vipassanā (Goenka)",
+        "Other / Mixed"
     ]
+    private let dharmaPracticeRegionOptions: [String] = [
+        "",
+            "UK & Ireland",
+            "Europe (other)",
+            "North America",
+            "Latin America",
+            "Middle East",
+            "Africa",
+            "India",
+            "Nepal",
+            "Bhutan",
+            "Sri Lanka",
+            "Myanmar (Burma)",
+            "Thailand",
+            "Laos / Cambodia / Vietnam",
+            "Malaysia / Singapore / Indonesia",
+            "China / Hong Kong / Taiwan",
+            "Japan",
+            "Korea",
+            "Mongolia",
+            "Tibet / Himalayan region",
+            "Online / Remote",
+            "Other"
+        ]
 
     private let dharmaRoleOptions: [String] = [
         "",
-        "Lay practitioner",
-        "Lay vows",
-        "Ordained",
-        "Ngagpa/Ngagmo",
-        "Monastic",
-        "Teacher",
-        "Lama",
-        "Rinpoche",
-        "Tulku",
-        "Tertön",
-        "Khenpo",
-        "Geshe",
-        "Roshi",
-        "Ajahn",
-        "Sayadaw",
-        "Dr."
-    ]
+           "Lay practitioner",
+           "Lay teacher / facilitator",
+           "Novice monastic",
+           "Nun (bhikkhunī)",
+           "Monk (bhikkhu)",
+           "Monastic (unspecified)",
+           "Ngakpa / Ngakma (Ngagpa/Ngagma)",
+           "Tantric Practitioner",
+           "Yogi / Yogini",
+           "Teacher",
+           "Lama / Rinpoche",
+           "Tulku",
+           "Abbott / Abbess",
+           "Retreatant",
+           "Chant leader / umdze",
+           "Translator / interpreter",
+           "Scholar / researcher",
+           "Other"
+       ]
 
     private let dharmaExperienceOptions: [String] = [
-        "", "Beginner", "Some experience", "Long-term", "Very experienced"
+        "", "< 1 year", "1–3 years", "3–7 years", "7–15 years", "15+ years"
     ]
 
     private let dharmaStudyLevelOptions: [String] = [
-        "",
-        "Short course",
-        "1 month course",
-        "6 month course",
-        "1 year course",
-        "2 year course",
-        "3 year retreat",
-        "Degree (BA/MA)",
-        "PhD",
-        "Other"
-    ]
-
-    private let dharmaPracticeRegionOptions: [String] = [
-        "",
-        "Tibet",
-        "India",
-        "Nepal",
-        "Bhutan",
-        "Mongolia",
-        "China",
-        "Japan",
-        "Thailand",
-        "Myanmar (Burma)",
-        "Vietnam",
-        "Sri Lanka",
-        "Russia",
-        "Korea",
-        "Western / Europe",
-        "North America",
-        "Other"
+        "", "Beginner", "Intermediate", "Advanced", "Scholar", "Practitioner-focused"
     ]
 
     private let dharmaPracticeOptions: [String] = [
-        "Refuge",
-        "Bodhicitta",
-        "Lay vows",
-        "Monastic vows",
-        "Ngöndro",
-        "Ngöndro completed",
+        // Core meditation streams
+            "Dzogchen",
+            "Mahāmudrā",
+            "Shamatha",
+            "Vipashyana",
 
-        "Shamatha",
-        "Vipashyana/Vipassana",
-        "Shiné",
-        "Lhatong",
-        "Zazen",
-        "Koan practice",
-        "Metta",
-        "Tonglen",
-        "Lojong",
-        "Lamrim",
+            // Foundational / training systems
+            "Ngöndro",
+            "Lamrim",
+            "Lojong",
+            "Tonglen",
+            "Satipaṭṭhāna",
+            "Mindfulness of breathing (Ānāpānasati)",
+            "Metta (loving-kindness)",
 
-        "Mantra recitation",
-        "Sādhana",
-        "Tantric practice",
-        "Guru yoga",
-        "Vajrasattva",
-        "Tsok/Ganachakra",
-        "Chöd",
-        "Phowa",
-        "Tummo",
-        "Dream yoga",
-        "Generation stage",
-        "Completion stage",
-        "Mahamudra",
-        "Dzogchen",
-        "Trekchö",
-        "Thögal",
+            // Vajrayana methods (kept broad / non-controversial)
+            "Mantra recitation",
+            "Yidam / Deity yoga",
+            "Guru yoga",
+            "Vajrasattva purification",
+            "Chöd",
+            "Phowa",
+            "Tummo (inner heat)",
+            "Six Yogas of Naropa (general)",
 
-        "Thangka painting"
-    ]
+            // Major devotional practices (big + common)
+            "Chenrezig / Avalokiteshvara",
+            "Guānyīn (Avalokiteshvara)",
+            "Tārā",
+            "Amitābha / Amitāyus (Pure Land / long life)",
+
+            // Zen / East Asian
+            "Zazen / Shikantaza",
+            "Koan practice",
+            "Pure Land nianfo / nembutsu",
+
+            // Study (optional but useful)
+            "Madhyamaka study",
+            "Abhidharma study",
+            "Prajñāpāramitā study",
+
+            // Aspiration / prayer (broad)
+            "Monlam (aspiration prayers)"
+        ]
 
     private let dharmaDeityOptions: [String] = [
-        "Tara",
-        "Green Tara",
-        "White Tara",
-        "Avalokiteshvara/Chenrezig",
-        "Manjushri",
-        "Vajrapani",
-        "Medicine Buddha",
-        "Amitabha",
-        "Shakyamuni",
-        "Padmasambhava/Guru Rinpoche",
-        "Yeshe Tsogyal",
-        "Vajrayogini",
-        "Vajrakilaya",
-        "Chakrasamvara",
-        "Hevajra",
-        "Yamantaka/Vajrabhairava",
-        "Kalachakra"
-    ]
+        "",
+            "Shakyamuni Buddha",
+            "Amitabha (Amida / Amituofo)",
+            "Medicine Buddha (Bhaisajyaguru / Yakushi / Yaoshi)",
+            "Avalokiteshvara (Chenrezig / Guanyin / Kannon)",
+            "Manjushri (Wenshu / Monju)",
+            "Vajrapani",
+            "Kshitigarbha (Jizo)",
+            "Maitreya (Miroku)",
+            "Samantabhadra (Puxian / Fugen)",
 
-    private let dharmaTermOptions: [String] = [
-        "Sutra",
-        "Tantra",
-        "Mantra/Dharani",
-        "Empowerment (wang/dbang)",
-        "Reading transmission (lung)",
-        "Tri (instruction)",
-        "Samaya",
-        "Purification/Confession",
-        "Ngakso"
-    ]
+            "Tara (Green / White)",
+            "Vajrasattva (Dorje Sempa)",
+            "Guru Rinpoche (Padmasambhava)",
+
+            "Kalachakra",
+            "Vajrayogini",
+            "Chakrasamvara",
+            "Hevajra",
+            "Guhyasamaja",
+            "Yamantaka (Vajrabhairava)",
+            "Vajrakilaya",
+            "Hayagriva",
+
+            "Acala (Fudo Myo-o)",
+            "Mahakala",
+
+            "Other"
+        ]
 
     private let dharmaMilestoneOptions: [String] = [
-        "Taken refuge",
-        "Lay vows",
-        "Monastic vows",
-        "Ordained",
-        "Ngagpa ordained",
-        "Ngöndro completed",
-        "One-year retreat",
-        "Three-year retreat",
-        "Empowerments (general)",
-        "Reading transmissions (lung)"
-    ]
+        "",
+
+           // Foundational commitment
+           "Taken Refuge",
+           "Undertaken Bodhisattva Vows",
+           "Undertaken Tantric Vows",
+
+           // Practice completions
+           "Completed Ngöndro",
+           "Completed Major Retreat (1+ month)",
+           "Completed 3-Year Retreat",
+
+           // Study milestones
+           "Completed Lamrim Course",
+           "Completed Structured Dharma Study Program",
+
+           // Ordination
+           "Lay Precepts Taken",
+           "Ordained Monastic",
+           "Ordained Ngakpa / Ngakma",
+
+           // Tantric context (neutral phrasing)
+           "Received Empowerment (Wang)",
+
+           "Other"
+       ]
 
     var body: some View {
         List {
-            Section { EmptyView() }
-
-            Section("Pseudonym") {
-                TextField("Optional Pseudonym", text: $pseudonymDraft)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled(true)
-                    .textContentType(.nickname)
-                    .submitLabel(.done)
-                    .focused($focusedField, equals: .pseudonym)
-                    .onChange(of: pseudonymDraft) { _, newValue in
-                        store.setPseudonym(newValue)
-                    }
-            }
-
             structuredProfileSection
             structuredDharmaSection
             preferencesSection
-
-            Section {
-                HStack {
-                    Text("Updated")
-                    Spacer()
-                    Text(store.capsule.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Section {
-                Button(role: .destructive) {
-                    focusedField = nil
-                    hideKeyboard()
-                    store.wipe()
-                } label: {
-                    Text("Wipe Capsule")
-                }
-                .accessibilityLabel("Wipe Capsule")
-                .accessibilityHint("Deletes all preferences and notes from your Capsule.")
-            }
+            advancedSection
         }
         .navigationTitle("Capsule")
 #if os(iOS)
@@ -339,11 +394,10 @@ struct CapsuleView: View {
             dharmaStudyLevelSelection = prefValue(PrefKey.dharmaStudyLevel)
             dharmaPracticeRegionSelection = prefValue(PrefKey.dharmaPracticeRegion)
 
-            // Dharma multi
-            dharmaPracticesSelected = parseCSVSet(prefValue(PrefKey.dharmaPractices))
-            dharmaDeitiesSelected = parseCSVSet(prefValue(PrefKey.dharmaDeities))
-            dharmaTermsSelected = parseCSVSet(prefValue(PrefKey.dharmaTerms))
-            dharmaMilestonesSelected = parseCSVSet(prefValue(PrefKey.dharmaMilestones))
+            // Dharma multi (typed; no CSV)
+            dharmaPracticesSelected = Set(store.multiSelect(.dharmaPractices))
+            dharmaDeitiesSelected = Set(store.multiSelect(.dharmaDeities))
+            dharmaMilestonesSelected = Set(store.multiSelect(.dharmaMilestones))
         }
     }
 
@@ -441,7 +495,7 @@ struct CapsuleView: View {
                     options: dharmaPracticeOptions,
                     selection: $dharmaPracticesSelected
                 ) {
-                    setPrefOrClear(key: PrefKey.dharmaPractices, value: toCSV(dharmaPracticesSelected))
+                    store.setMultiSelect(.dharmaPractices, values: Array(dharmaPracticesSelected).sorted())
                 }
             } label: {
                 LabeledContent("Practices") {
@@ -457,7 +511,7 @@ struct CapsuleView: View {
                     options: dharmaDeityOptions,
                     selection: $dharmaDeitiesSelected
                 ) {
-                    setPrefOrClear(key: PrefKey.dharmaDeities, value: toCSV(dharmaDeitiesSelected))
+                    store.setMultiSelect(.dharmaDeities, values: Array(dharmaDeitiesSelected).sorted())
                 }
             } label: {
                 LabeledContent("Deities") {
@@ -469,27 +523,11 @@ struct CapsuleView: View {
 
             NavigationLink {
                 MultiSelectList(
-                    title: "Terms",
-                    options: dharmaTermOptions,
-                    selection: $dharmaTermsSelected
-                ) {
-                    setPrefOrClear(key: PrefKey.dharmaTerms, value: toCSV(dharmaTermsSelected))
-                }
-            } label: {
-                LabeledContent("Terms") {
-                    Text(summaryText(for: dharmaTermsSelected))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            NavigationLink {
-                MultiSelectList(
                     title: "Milestones",
                     options: dharmaMilestoneOptions,
                     selection: $dharmaMilestonesSelected
                 ) {
-                    setPrefOrClear(key: PrefKey.dharmaMilestones, value: toCSV(dharmaMilestonesSelected))
+                    store.setMultiSelect(.dharmaMilestones, values: Array(dharmaMilestonesSelected).sorted())
                 }
             } label: {
                 LabeledContent("Milestones") {
@@ -514,7 +552,7 @@ struct CapsuleView: View {
             }
 
             if pairs.isEmpty {
-                Text("None yet.")
+                Text("No preferences yet.")
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(pairs, id: \.key) { kv in
@@ -563,61 +601,81 @@ struct CapsuleView: View {
                 }
 
                 HStack {
-                    if let validation = prefValidationMessage {
-                        Text(validation)
+                    if let validationMessage {
+                        Text(validationMessage)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
-                    Button {
+                    Button("Add") {
                         addPreference()
-                    } label: {
-                        Text("Add")
-                            .fontWeight(.semibold)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!canAddPref)
-                    .accessibilityHint("Adds a new preference label and value")
+                    .disabled(!canAddPreference)
                 }
             }
-            .padding(.top, 4)
+            .padding(.vertical, 6)
+        }
+    }
+
+    // MARK: - Advanced
+
+    private var advancedSection: some View {
+        Section("Advanced") {
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Pseudonym (optional)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                TextField("e.g. a nickname", text: $pseudonymDraft)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled(false)
+                    .submitLabel(.done)
+                    .focused($focusedField, equals: .pseudonym)
+                    .onSubmit {
+                        store.setPseudonym(pseudonymDraft)
+                        focusedField = nil
+                        hideKeyboard()
+                    }
+
+                HStack {
+                    Spacer()
+                    Button("Save pseudonym") {
+                        store.setPseudonym(pseudonymDraft)
+                        focusedField = nil
+                        hideKeyboard()
+                    }
+                }
+            }
+
+            Button(role: .destructive) {
+                store.wipe()
+            } label: {
+                Text("Wipe capsule (delete all)")
+            }
+            .accessibilityHint("Deletes all preferences and notes from your Capsule.")
         }
     }
 
     // MARK: - Validation
 
-    private var canAddPref: Bool {
+    private var validationMessage: String? {
         let k = normaliseKey(newPrefKey)
-        let v = newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !k.isEmpty, !v.isEmpty else { return false }
-        return store.preferenceKeyValues.contains(where: { $0.key == k }) == false
-    }
-
-    private var prefValidationMessage: String? {
-        let rawKey = newPrefKey
-        let k = normaliseKey(rawKey)
-
-        if !rawKey.isEmpty, k.isEmpty { return "Label is invalid." }
-        if store.preferenceKeyValues.contains(where: { $0.key == k }) { return "Label already exists." }
+        if k.isEmpty { return nil }
+        if !k.contains(where: { $0.isLetter || $0.isNumber }) { return "Key must contain letters/numbers." }
+        if k.count > 64 { return "Key too long (max 64)." }
+        if newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines).count > 128 { return "Value too long (max 128)." }
         return nil
     }
 
-    // MARK: - Actions
-
-    private func addPreference() {
+    private var canAddPreference: Bool {
         let k = normaliseKey(newPrefKey)
         let v = newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !k.isEmpty, !v.isEmpty else { return }
-        guard store.preferenceKeyValues.contains(where: { $0.key == k }) == false else { return }
-
-        store.setPreference(key: k, value: v)
-        newPrefKey = ""
-        newPrefValue = ""
-        focusedField = nil
-        hideKeyboard()
+        return !k.isEmpty && !v.isEmpty && validationMessage == nil
     }
+
+    // MARK: - Actions
 
     private func setPrefOrClear(key: String, value: String) {
         let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -628,22 +686,22 @@ struct CapsuleView: View {
         }
     }
 
-    /// IMPORTANT: read directly from extras so structured keys always load,
-    /// even if the UI hides them from the Preferences list.
+    private func addPreference() {
+        guard canAddPreference else { return }
+        let k = normaliseKey(newPrefKey)
+        let v = newPrefValue.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        store.setPreference(key: k, value: v)
+
+        newPrefKey = ""
+        newPrefValue = ""
+        focusedField = .label
+    }
+
+    // MARK: - Helpers
+
     private func prefValue(_ key: String) -> String {
         store.capsule.preferences.extras[key] ?? ""
-    }
-
-    private func parseCSVSet(_ value: String) -> Set<String> {
-        let parts = value
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        return Set(parts)
-    }
-
-    private func toCSV(_ set: Set<String>) -> String {
-        set.sorted().joined(separator: ", ")
     }
 
     private func summaryText(for set: Set<String>) -> String {
@@ -676,22 +734,22 @@ struct CapsuleView: View {
     }
 }
 
-// MARK: - Components
+// MARK: - Small helpers
 
 private struct PreferencePickerRow: View {
     let title: String
     @Binding var selection: String
     let options: [String]
-    let onCommit: (String) -> Void
+    let onChange: (String) -> Void
 
     var body: some View {
         Picker(title, selection: $selection) {
-            ForEach(options, id: \.self) { v in
-                Text(v.isEmpty ? "None" : v).tag(v)
+            ForEach(options, id: \.self) { option in
+                Text(option.isEmpty ? "—" : option).tag(option)
             }
         }
         .onChange(of: selection) { _, newValue in
-            onCommit(newValue)
+            onChange(newValue)
         }
     }
 }
@@ -700,23 +758,25 @@ private struct MultiSelectList: View {
     let title: String
     let options: [String]
     @Binding var selection: Set<String>
-    let onCommit: () -> Void
+    let onDone: () -> Void
 
     var body: some View {
         List {
-            ForEach(options, id: \.self) { option in
+            ForEach(options, id: \.self) { opt in
                 Button {
-                    if selection.contains(option) {
-                        selection.remove(option)
+                    if selection.contains(opt) {
+                        selection.remove(opt)
                     } else {
-                        selection.insert(option)
+                        selection.insert(opt)
                     }
-                    onCommit()
+
+                    // SAVE IMMEDIATELY (so Back works, Done not required)
+                    onDone()
                 } label: {
                     HStack {
-                        Text(option)
+                        Text(opt)
                         Spacer()
-                        if selection.contains(option) {
+                        if selection.contains(opt) {
                             Image(systemName: "checkmark")
                                 .foregroundStyle(.tint)
                         }
@@ -725,13 +785,15 @@ private struct MultiSelectList: View {
             }
         }
         .navigationTitle(title)
+        .toolbar {
+            // Keep button for UX familiarity, but it's no longer required.
+            Button("Done") {
+                onDone()
+            }
+        }
+        // Safety: if user presses Back without hitting Done after last change.
+        .onDisappear {
+            onDone()
+        }
     }
 }
-
-#Preview {
-    NavigationStack {
-        CapsuleView()
-            .environmentObject(CapsuleStore())
-    }
-}
-

@@ -673,3 +673,20 @@ No reward loop based on emotional intensity.
 
 Notes (possible future directions - keep open)
 Clarity can remain reflection-first while gradually strengthening the daily practice layer: build a stronger completion moment (light confirmation + one-line “what did you notice?” + short dedication) so “Done” has meaning without gamification; explore progress as continuity-reflection (calendar/bloom/quiet visual deepening) rather than achievement; consider a Dzogchen-leaning tone and UI (more space, fewer words, calmer transitions) while keeping training structure gradual and lamrim-safe; introduce “sangha without feed” via rotating practitioner/teacher photos and quotes plus anonymous aggregate practice counts (no profiles, no ranking, no comments); keep the module path metaphor as a later option (subtle environmental deepening rather than avatar travel) once the core daily content stabilises; and phase toward a larger Buddhist knowledge backbone (canonical database + APT/WAL-driven sequencing, multilingual/regional adaptation) after the first practice content set is proven.
+
+
+TRACE (idea for wal/extract/learn/inject model)
+Turn (TurnEntity - event log)
+Reduce (WAL - abstraction)
+Accumulate (PatternStats - evidence)
+Curate (learnedTendencies - projection)
+Export (CloudTap snapshot - injection)
+
+
+or
+PRISM
+Prompt (Turn input)
+Refract (WAL reduction)
+Increment (PatternStats accumulation)
+Select (Curate/projection into learnedTendencies)
+Message (Export/inject + response)
