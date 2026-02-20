@@ -157,10 +157,11 @@ Nothing is lost.
             bgPhase = !reduceMotion
             isReady = false
             ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
+            // IMPORTANT: don't advance yet - wait until remote steps are loaded.
         }
         .task {
             await loadRemoteFocusStepsIfNeeded()
+            applyDailyAdvanceIfNeeded()
             withAnimation(.easeOut(duration: 0.55)) {
                 isReady = true
             }
@@ -170,11 +171,11 @@ Nothing is lost.
 
             isReady = false
             ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
 
             Task {
                 await loadRemoteFocusStepsIfNeeded()
                 await MainActor.run {
+                    applyDailyAdvanceIfNeeded()
                     withAnimation(.easeOut(duration: 0.55)) {
                         isReady = true
                     }

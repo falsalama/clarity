@@ -129,8 +129,8 @@ No analysis. Just a clean label.
         .onAppear {
             bgPhase.toggle()
             ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
             isReady = false
+            // IMPORTANT: don't advance yet - wait until remote steps are loaded.
         }
         .animation(.easeInOut(duration: 26).repeatForever(autoreverses: true), value: bgPhase)
         .safeAreaInset(edge: .bottom) {
@@ -158,6 +158,7 @@ No analysis. Just a clean label.
         }
         .task {
             await loadRemotePracticeStepsIfNeeded()
+            applyDailyAdvanceIfNeeded()
             withAnimation(.easeOut(duration: 0.55)) {
                 isReady = true
             }
@@ -167,11 +168,11 @@ No analysis. Just a clean label.
 
             isReady = false
             ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
 
             Task {
                 await loadRemotePracticeStepsIfNeeded()
                 await MainActor.run {
+                    applyDailyAdvanceIfNeeded()
                     withAnimation(.easeOut(duration: 0.55)) {
                         isReady = true
                     }
