@@ -73,7 +73,7 @@ struct ProfileHubView: View {
                 } label: {
                     HStack(spacing: 12) {
                         PortraitView(recipe: portraitRecipe)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 38, height: 38)
 
                         Text("Portrait")
 

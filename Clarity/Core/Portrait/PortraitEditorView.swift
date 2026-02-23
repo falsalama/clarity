@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct PortraitEditorView: View {
+
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -10,9 +11,10 @@ struct PortraitEditorView: View {
 
     var body: some View {
         List {
-            // Preview
+
             Section {
                 VStack(spacing: 0) {
+
                     PortraitView(recipe: working)
                         .frame(width: 140, height: 140)
                         .padding(.top, 18)
@@ -33,100 +35,32 @@ struct PortraitEditorView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
-            }
-
-            // Head (this must be inside List/Form, not top-level)
-            Section("Head") {
-                Picker("Face shape", selection: $working.faceShape) {
-                    ForEach(FaceShapeID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
-                    }
-                }
-
-                Picker("Expression", selection: $working.expression) {
-                    ForEach(ExpressionID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
-                    }
-                }
+                .listRowInsets(EdgeInsets())
             }
 
             Section("Hair") {
-                Picker("Style", selection: $working.hairStyle) {
-                    ForEach(HairStyleID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
-                    }
-                }
-
-                Picker("Colour", selection: $working.hairColour) {
-                    ForEach(HairColourID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
+                Picker("Style", selection: $working.hair) {
+                    Text("None").tag(HairID?.none)
+                    ForEach(HairID.allCases, id: \.self) { id in
+                        Text(displayName(for: id)).tag(HairID?.some(id))
                     }
                 }
             }
 
             Section("Robe") {
-                Picker("Style", selection: $working.robeStyle) {
-                    ForEach(RobeStyleID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
-                    }
-                }
-
-                Picker("Colour", selection: $working.robeColour) {
-                    ForEach(RobeColourID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
+                Picker("Style", selection: $working.robe) {
+                    Text("None").tag(RobeID?.none)
+                    ForEach(RobeID.allCases, id: \.self) { id in
+                        Text(displayName(for: id)).tag(RobeID?.some(id))
                     }
                 }
             }
 
-            Section("Face") {
-                Picker("Skin", selection: $working.skinTone) {
-                    ForEach(SkinToneID.allCases, id: \.self) { id in
-                        Text("Tone \(toneLabel(for: id))").tag(id)
-                    }
-                }
-
-                Picker("Eyes", selection: $working.eyeColour) {
-                    ForEach(EyeColourID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
-                    }
-                }
-            }
-
-            Section("Extras") {
-                Toggle("Glasses", isOn: Binding(
-                    get: { working.glassesStyle != nil },
-                    set: { on in
-                        working.glassesStyle = on ? (working.glassesStyle ?? .round) : nil
-                    }
-                ))
-
-                if working.glassesStyle != nil {
-                    Picker("Glasses style", selection: Binding(
-                        get: { working.glassesStyle ?? .round },
-                        set: { working.glassesStyle = $0 }
-                    )) {
-                        ForEach(GlassesStyleID.allCases, id: \.self) { id in
-                            Text(PortraitCatalogue.title(for: id)).tag(id)
-                        }
-                    }
-                }
-
-                Picker("Background", selection: $working.backgroundStyle) {
-                    ForEach(BackgroundStyleID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(id)
-                    }
-                }
-            }
-
-            Section("Hat") {
-                Picker("Hat", selection: Binding(
-                    get: { working.hatStyle },
-                    set: { working.hatStyle = $0 }
-                )) {
-                    Text("None").tag(HatStyleID?.none)
-                    ForEach(HatStyleID.allCases, id: \.self) { id in
-                        Text(PortraitCatalogue.title(for: id)).tag(HatStyleID?.some(id))
+            Section("Halo") {
+                Picker("Colour", selection: $working.halo) {
+                    Text("None").tag(HaloID?.none)
+                    ForEach(HaloID.allCases, id: \.self) { id in
+                        Text(displayName(for: id)).tag(HaloID?.some(id))
                     }
                 }
             }
@@ -147,16 +81,27 @@ struct PortraitEditorView: View {
         }
     }
 
-    private func toneLabel(for id: SkinToneID) -> String {
-        switch id {
-        case .tone1: return "1"
-        case .tone2: return "2"
-        case .tone3: return "3"
-        case .tone4: return "4"
-        case .tone5: return "5"
-        case .tone6: return "6"
-        case .tone7: return "7"
-        case .tone8: return "8"
+    private func displayName(for hair: HairID) -> String {
+        switch hair {
+        case .shorthair: return "Short"
+        case .longhair:  return "Long"
+        case .topknot:   return "Topknot"
+        case .yogi:      return "Yogi"
+        }
+    }
+
+    private func displayName(for robe: RobeID) -> String {
+        switch robe {
+        case .lay:     return "Lay"
+        case .western: return "Western"
+        }
+    }
+
+    private func displayName(for halo: HaloID) -> String {
+        switch halo {
+        case .golden:  return "Golden"
+        case .silver:  return "Silver"
+        case .rainbow: return "Rainbow"
         }
     }
 }
