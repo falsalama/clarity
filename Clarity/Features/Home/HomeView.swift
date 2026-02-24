@@ -3,7 +3,8 @@ import UIKit
 
 struct HomeView: View {
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-
+    @State private var showFullImage = false
+    
     var body: some View {
         ZStack {
             backgroundImage
