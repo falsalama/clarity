@@ -95,6 +95,7 @@ struct PortraitEditorView: View {
         case .longhair:  return "Long"
         case .topknot:   return "Topknot"
         case .yogi:      return "Yogi"
+        case .tiedBack:  return "Tied back"
         }
     }
 
