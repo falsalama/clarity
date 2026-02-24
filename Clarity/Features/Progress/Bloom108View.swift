@@ -12,55 +12,60 @@ struct Bloom108View: View {
             let size = min(proxy.size.width, proxy.size.height)
             let innerRadius = size * 0.30
             let outerRadius = size * 0.44
-            let petalLength = outerRadius - innerRadius
-            let petalWidth = size * 0.035
+            let basePetalLength = outerRadius - innerRadius
+            let basePetalWidth = size * 0.035
 
             ZStack {
                 ForEach(0..<petalCount, id: \.self) { i in
                     let angle = (Double(i) / Double(petalCount)) * 2.0 * Double.pi
                     let isOpen = i < min(max(openCount, 0), petalCount)
 
+                    // Stable micro-variation (deterministic; no randomness)
+                    let wobbleA = CGFloat(sin(Double(i) * 0.55))
+                    let wobbleB = CGFloat(cos(Double(i) * 0.37))
+                    let w = basePetalWidth * (1.0 + 0.10 * wobbleA)
+                    let l = basePetalLength * (1.0 + 0.04 * wobbleB)
+
                     PetalShape()
-                        .fill(.primary.opacity(isOpen ? 0.16 : 0.04))
+                        .fill(petalFill(isOpen: isOpen))
                         .overlay(
                             PetalShape()
-                                .stroke(.primary.opacity(isOpen ? 0.20 : 0.08), lineWidth: 1)
+                                .stroke(.primary.opacity(isOpen ? 0.18 : 0.08), lineWidth: 1)
                         )
-                        .frame(width: petalWidth, height: petalLength)
-                        .offset(y: -innerRadius - petalLength / 2)
+                        .shadow(
+                            color: .black.opacity(isOpen ? 0.06 : 0.00),
+                            radius: isOpen ? 1.2 : 0,
+                            x: 0,
+                            y: isOpen ? 0.8 : 0
+                        )
+                        .frame(width: w, height: l)
+                        .offset(y: -innerRadius - l / 2)
                         .rotationEffect(.radians(angle))
-                        .scaleEffect(isOpen ? 1.0 : 0.92)
+                        .scaleEffect(isOpen ? 1.0 : 0.94)
                 }
 
-                VStack(spacing: 8) {
-                    Button(action: onPortraitTap) {
-                        ZStack {
-                            Circle()
-                                .fill(.primary.opacity(0.06))
-                                .overlay(Circle().stroke(.primary.opacity(0.10), lineWidth: 1))
-
-                            PortraitView(recipe: portraitRecipe)
-                                .padding(size * 0.02)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .frame(width: size * 0.26, height: size * 0.26)
-
-                    RoundedRectangle(cornerRadius: size * 0.06, style: .continuous)
-                        .fill(.primary.opacity(0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: size * 0.06, style: .continuous)
-                                .stroke(.primary.opacity(0.10), lineWidth: 1)
-                        )
-                        .frame(width: size * 0.36, height: size * 0.10)
+                Button(action: onPortraitTap) {
+                    PortraitView(recipe: portraitRecipe)
                 }
-                .offset(y: size * 0.05)
+                .buttonStyle(.plain)
+                .frame(width: size * 0.40, height: size * 0.40) // tweak as desired
             }
             .frame(width: size, height: size)
-            .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
         }
         .aspectRatio(1, contentMode: .fit)
         .padding(.vertical, 12)
+    }
+
+    private func petalFill(isOpen: Bool) -> LinearGradient {
+        // Subtle form: slightly darker at base, lighter towards tip
+        let top = Color.primary.opacity(isOpen ? 0.14 : 0.035)
+        let base = Color.primary.opacity(isOpen ? 0.22 : 0.06)
+
+        return LinearGradient(
+            colors: [top, base],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
 

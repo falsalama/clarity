@@ -1,231 +1,692 @@
-# CLARITY — CANONICAL PRODUCT & PHILOSOPHY DOCUMENT
-Version: 1.2  
-Status: Canonical (additive evolution, no deletions)  
-Last updated: 2026-02-10
+# CLARITY — CANONICAL PRODUCT & SYSTEM BLUEPRINT
+
+Version: 2.2
+Status: Canonical
+Last Updated: 2026-02-18
 
 ---
 
-## 0. What Clarity Is
+# 0. Orientation
 
-Clarity is a **private, audio-first thinking instrument**.
+Clarity is a private, audio-first contemplative training system for the modern world.
 
-Reflection is the method.  
+In five minutes, it should steady the mind.
+In five days, it should reduce reactivity.
+Over time, it should reshape conditioning.
+
+Reflection is the method.
 Clarity is the outcome.
 
-Clarity exists to help people **untangle experience**, regain agency, and see more clearly — without being told what to think, feel, or do.
+Clarity combines:
+
+* Open-ended audio reflection
+* Structured daily contemplative training
+* A living Buddhist knowledge architecture
+* Privacy-first local intelligence
+* Non-reifying design principles
+
+It is not a chatbot.
+It is not therapy.
+
+It is a restrained contemplative instrument designed to preserve clarity in a noisy age.
+
+This document governs philosophy, architecture, UX direction, intelligence layering, and system constraints.
+It exists to prevent drift.
+
+---
+
+# 1. Core Identity
+
+Clarity exists to help users:
+
+* Untangle experience
+* Regain agency
+* Reduce reactivity
+* Strengthen skilful response
+
+It does not instruct belief.
+It does not impose ideology.
+It does not construct identity.
+It does not gamify insight.
+
+Clarity preserves and adapts contemplative training for present conditions.
+
+---
+
+# 2. Sealed Principles (Non-Negotiable)
+
+## 2.1 Local-First, Privacy-First
+
+* Raw audio remains on device by default
+* Transcripts remain on device
+* No silent uploads
+* No hidden analytics
+* Cloud use is explicit and user-initiated only
+
+Local intelligence must be “good enough” alone.
+
+---
+
+## 2.2 Redaction-First Architecture
+
+* Sensitive material is stripped before any cloud processing
+* Redaction happens locally
+* The system is designed to forget
+
+---
+
+## 2.3 Explicit Consent (Cloud Tap)
+
+* Any cloud intelligence requires deliberate user action
+* Consent is visible, contextual, and reversible
+* No background sync masquerading as help
+
+Cloud enhances depth. It does not create dependency.
+
+---
+
+## 2.4 Non-Reification
+
+Clarity does not:
+
+* Diagnose
+* Type personality
+* Create psychological labels
+* Convert transient states into fixed traits
+
+All intelligence layers must avoid identity construction.
+
+---
+
+## 2.5 No Therapy Framing
+
+Clarity:
+
+* Does not provide medical advice
+* Does not replace professional care
+* Does not position itself as treatment
+
+It operates as contemplative training within a recognised philosophical tradition.
+
+---
+
+# 3. Philosophical Orientation
+
+Clarity operates within a Buddhist contemplative framework.
+
+It aligns with:
+
+* Attention training (samatha)
+* Ethical refinement (śīla)
+* Conditioning logic (karma as repetition)
+* Gradual stabilisation of mind
+* Examination of view and self-structure
+* Non-reification (emptiness as design principle)
+
+It does not:
+
+* Require religious identity
+* Require metaphysical belief
+* Enforce doctrinal allegiance
+
+Karma is framed as conditioning logic:
+
+* Repetition strengthens patterns
+* Intention shapes direction
+* Emotional tone affects impact
+* Behaviour reinforces structure
+
+No supernatural claims.
+No fatalism.
+Clear causal training logic.
+
+Clarity preserves vast contemplative teachings in contemporary form without theatricality or inflation.
+
+---
+
+# 4. Core Capabilities
+
+Clarity consists of four primary surfaces:
+
+* Welcome
+* Reflect
+* Learn
+* Practice
+* Progress
+
+Each serves a distinct function.
+
+---
+
+# 4.1 Welcome Surface
+
+The Welcome surface is:
+
+* A rotating contemplative threshold
+* Content-driven
+* Remotely configurable
+* Offline-first cached
+
+It may rotate:
+
+* Practitioner photographs
+* Teacher or lama quotations
+* Pilgrimage imagery
+* Short Dharma-aligned phrases
+
+Purpose:
+
+* Establish tone
+* Foster seriousness
+* Encourage continuity
 
 It is not:
-- a chatbot
-- a therapist
-- a mindfulness game
-- a self-improvement scoreboard
+
+* A feed
+* A social surface
+* A marketing banner
+* Behaviourally targeted
+
+Belonging without performance.
 
 ---
 
-## 1. Core Principles (Sealed)
+# 4.2 Reflect
 
-These principles are non-negotiable for Clarity itself.
+Primary mode.
 
-### 1.1 Local-First, Privacy-First
-- Raw audio and transcripts remain on device by default
-- No silent uploads
-- No hidden analytics
-- Cloud use is explicit and user-initiated only
+Audio-first capture with optional text.
 
-### 1.2 Redaction-First Architecture
-- Sensitive material is stripped before any cloud processing
-- Redaction happens *before* intelligence
-- The system is designed to forget
+Capabilities:
 
-### 1.3 Explicit Consent (Cloud Tap)
-- Any cloud intelligence requires deliberate user action
-- Consent is visible, contextual, and reversible
-- No background sync masquerading as “help”
+* Voice capture
+* Local transcription
+* Redaction
+* WAL extraction
+* Pattern learning
+* Capsule integration
+* Optional Cloud Tap synthesis
 
-### 1.4 Non-Reification
-- Clarity does not label the user
-- It does not diagnose
-- It does not turn transient states into identities
-
-### 1.5 No Therapy Framing
-- Clarity does not claim treatment
-- It does not replace human support
-- It does not position itself as care
+Reflect is open-ended.
+It untangles present experience.
+It never prescribes action.
 
 ---
 
-## 2. What Clarity Actually Does
+# 4.3 Learn
 
-### 2.1 Primary Interaction
-- Voice capture is primary
-- Text is optional
-- Audio is treated as first-class data
+Learning surface.
 
-### 2.2 Reflective Modes
-Clarity offers distinct, bounded modes (local or Cloud Tap):
-- Reflect
-- Perspective
-- Gratitude
-- Talk-It-Through
+Short daily themes providing:
 
-Each mode:
-- names what is present
-- loosens grip
-- returns agency
+* Context
+* Conditioning explanations
+* Ethical framing
+* Motivation guidance
 
-No advice. No prescriptions.
+Learn prepares understanding before Practice.
 
-### 2.3 Outcome Orientation
-Clarity measures success by:
-- felt relief
-- cognitive unknots
-- regained clarity
+It must remain:
 
-Not engagement minutes.
+* Brief
+* Clear
+* Non-preachy
+* Non-inflated
 
 ---
 
-## 3. Navigation & UI Doctrine
+# 4.4 Practice
 
-### 3.1 Tabs Are Functional, Not Narrative
-- Tabs represent *capabilities*, not a journey
-- iOS always has a selected tab; Clarity respects this
+Applied daily contemplative training.
 
-### 3.2 First-Run Welcome Is an Overlay
-- Welcome is **not a tab**
-- It appears only on first run
-- It overlays the default tab (Reflect)
-- It introduces options without blocking routing
+One instruction per day.
 
-This avoids:
-- “no tab selected” states
-- artificial onboarding flows
-- navigation complexity
+* Sequential progression
+* No binge unlocking
+* Repetition over novelty
+* Optional dedication
 
-### 3.3 Capture Is Always Close
-- The microphone affordance is always reachable
-- Capture never feels buried behind structure
+Purpose:
+
+To steady attention, create space before reaction, soften habitual compulsion, and support a calmer, more skilful capacity to respond.
+
+Practice is foundational training, not achievement.
 
 ---
 
-## 4. Storage Doctrine (Audio & Text)
+# 4.5 Progress Surface
 
-### 4.1 Audio Is User-Generated Content
-- Stored in Application Support
-- Persistent across normal updates
-- Never placed in tmp or Caches
+Progress reflects continuity, not attainment.
 
-### 4.2 Paths Are Not Identities
-- Stored references must be **relative**, not absolute
-- Absolute container paths are treated as legacy only
-- Runtime resolution always asks the system for the current container
+It may include:
 
-This prevents data loss illusions after reinstall/offload.
+* Days completed
+* Current module phase
+* Visual metaphor (e.g., bloom)
+* Practice continuity markers
 
----
+It must never:
 
-## 5. Intelligence Architecture
+* Rank users
+* Encourage comparison
+* Reward volume over steadiness
+* Trigger spiritual materialism
 
-### 5.1 Local First
-- On-device models are the baseline
-- Local intelligence must be “good enough” alone
-
-### 5.2 Cloud as Opt-In Amplifier
-- Cloud Tap improves depth, not dependency
-- Cloud responses must remain stylistically compatible with local output
-
-### 5.3 WAL (Wisdom Abstraction Layer)
-- Speech → inner-state primitives
-- Inner-state primitives → reflective lenses
-- No interpretation leakage
-- No hidden profiling
+Progress is reflection on continuity.
 
 ---
 
-## 6. Explicit Non-Goals (Clarity Proper)
+# 5. 108-Day Foundational Module
 
-Clarity itself does **not**:
-- run streaks
-- award points
-- rank users
-- gamify insight
-- create spiritual status
+Module One spans 108 days.
 
-These are design constraints, not omissions.
+It is:
 
----
+* Gradual
+* Stabilising
+* Lamrim-safe
+* Compatible with Dzogchen without prematurely invoking advanced view
 
-## 7. Considered Evolution Lane (Non-Binding)
+It progresses through nine phases:
 
-The following section records **considered future directions**.  
-Nothing here overrides the sealed principles above.
+1. Stabilising Attention
+2. Recognising Reactivity
+3. Softening Habit
+4. Intention & Conditioning
+5. Ethical Stability
+6. Identity & View
+7. Emotional Maturity
+8. Compassion & Perspective
+9. Integration & Spaciousness
 
-### 7.1 Possible Derivative / Rewrap
-A future product (working name: *Untangle*) may:
-- inherit Clarity’s architecture
-- re-wrap it as a daily practice instrument
-- introduce progression metaphors intentionally and ethically
+This is one module among many.
 
-This may exist as:
-- a separate app
-- or a forked evolution with a new canon version
+Future modules may include:
 
-### 7.2 Daily Practice Framing
-A practice-oriented wrapper may introduce:
-- Reflect / Focus / Inner Peace pillars
-- gentle repetition
-- structured entry when users “don’t know what to say”
+* Applied Ethics
+* Conflict & Communication
+* Emptiness & Dependent Origination
+* Silent Integration
+* Teacher-guided study cycles
 
-### 7.3 Progress Without Spiritual Materialism
-If progression exists:
-- no leaderboards
-- no competition
-- no “more is better” loops
-
-A **visual metaphor** (e.g. a 108-petal bloom) may be used as:
-- continuity
-- encouragement
-- orientation
-
-Not status.
-
-### 7.4 Achievements as a Separate Space
-- Achievements are **not a tab**
-- Accessed via a top-right counter button
-- Treated as reflection on continuity, not reward
-
-### 7.5 Welcome as Living Surface
-A welcome surface may:
-- rotate imagery
-- rotate short Dharma-aligned phrases
-- be content-only
-- be remotely configurable (e.g. Supabase Edge)
-
-Constraints:
-- offline-first
-- no telemetry
-- no user data dependency
-- no dark patterns
+Progression is directional, not hierarchical.
 
 ---
 
-## 8. Ethos Continuity
+# 6. Living Dharma Knowledge Architecture
 
-Whether Clarity remains singular or evolves:
-- privacy remains primary
-- agency remains with the user
-- clarity remains the outcome
+Clarity includes a long-term Canonical Dharma Database.
 
-Anything that compromises those is out of scope.
+This database contains:
+
+* Scriptural references
+* Commentary mappings
+* Thematic categorisation
+* View-specific metadata
+* Regional tradition variants
+
+It functions as:
+
+* A contextual intelligence backbone
+* An adaptive content source
+* A sequencing engine for appropriate teaching depth
+
+It is not exposed as a searchable library.
+It operates beneath the surface.
 
 ---
 
-## 9. Closing Statement
+## 6.1 APT Extraction (Abstraction → Primitive → Tendency)
+
+Canonical teachings are processed into:
+
+* Contemplative primitives
+* Conditioning markers
+* View distortions
+* Ethical cues
+
+These feed:
+
+* WAL refinement
+* Pattern learning
+* Adaptive sequencing
+
+---
+
+## 6.2 WAL (Wisdom Abstraction Layer)
+
+WAL extracts:
+
+* Inner-state primitives
+* Emotional tone
+* Conditioning loops
+* View tensions
+
+It distinguishes:
+
+* Lasting markers
+* Decaying states
+* Noise
+
+It must avoid:
+
+* Identity formation
+* Psychological typing
+* Interpretive leakage
+
+---
+
+## 6.3 Pattern Learner
+
+Pattern learning:
+
+* Is local-first
+* Uses decay functions
+* Separates stable vs transient markers
+* Refines prompts and sequencing
+* Remains anonymous and non-profiling
+
+Over time, this allows:
+
+* Vastly improved alignment
+* Appropriate unfolding through teachings
+* Cultural nuance
+* Language sensitivity
+
+Without constructing identity.
+
+---
+
+## 6.4 Capsule System
+
+Capsule stores:
+
+* User preferences
+* Tone calibration
+* Practice orientation
+* Learned cues
+
+Capsule is user-editable.
+User sovereignty is preserved.
+
+---
+
+# 7. Intelligence Architecture
+
+## 7.1 Local Baseline
+
+Includes:
+
+* Apple Speech
+* Apple Foundation Models (on-device)
+* Local Llama (where available)
+
+Local intelligence must function independently.
+
+---
+
+## 7.2 Cloud Tap
+
+Cloud Tap is:
+
+* Explicit
+* User-initiated
+* Contextual
+* Reversible
+
+It supports:
+
+* Deeper synthesis
+* Structured questioning
+* Remote content rotation
+* Canon database retrieval
+
+Cloud never overrides local sovereignty.
+
+---
+
+# 8. Global & Language Expansion
+
+Clarity is designed for:
+
+* Multilingual deployment
+* Region-sensitive adaptation
+* Cross-tradition compatibility
+
+Future expansions may support:
+
+* Theravāda emphasis
+* Mahāyāna emphasis
+* Vajrayāna contextual layering
+* Secular framing
+
+All governed by non-reification.
+
+---
+
+# 9. Audio Orientation
+
+Audio is encouraged but optional.
+
+Voice:
+
+* Reduces self-editing
+* Surfaces conditioning
+* Strengthens immediacy
+
+Silence remains valid.
+
+---
+
+# 10. Explicit Non-Goals
+
+Clarity does not:
+
+* Run streaks
+* Award points
+* Rank users
+* Encourage competition
+* Manufacture spiritual identity
+* Promote consumption over repetition
+
+Restraint is intentional.
+
+---
+
+# 11. Development Phasing
+
+Phase 1: Reflection + 108-Day Module
+Phase 2: Canonical Database Integration
+Phase 3: Multilingual Expansion
+Phase 4: Region-Adaptive Sequencing
+Phase 5: Teacher-Integrated Tracks
+
+Each phase must preserve sealed principles.
+
+---
+
+# 12. Governance Rule
+
+When adding features:
+
+Ask:
+
+* Does this increase clarity?
+* Does this reduce reactivity?
+* Does this preserve privacy?
+* Does this avoid identity construction?
+* Does this avoid spiritual materialism?
+
+If not, it does not belong.
+
+---
+
+# Closing Statement
 
 Clarity is intentionally restrained.
 
-That restraint is not a limitation.  
-It is the moat.
+Under the surface, it is vast.
 
-Any future evolution must earn the right to add structure by **not violating emptiness**.
+Its architecture reflects its philosophy.
 
+Its philosophy demands coherence as it grows.
+
+Restraint is not limitation.
+It is structural integrity.
+
+
+Appendix A — Contemplative Architecture Principles
+These principles guide sequencing, tone, and system behaviour.
+They are not branding elements.
+They are structural guardrails.
+A1. Three Trainings (Triśikṣā)
+Ethics (Śīla) → Concentration (Samādhi) → Wisdom (Prajñā)
+Design implication:
+Stabilise behaviour before insight work.
+No premature metaphysical framing.
+108-day module reflects this progression.
+A2. Five Faculties (Pañca Indriya)
+Śraddhā — Confidence
+Vīrya — Joyful Effort
+Smṛti — Mindfulness
+Samādhi — Concentration
+Prajñā — Discernment
+Design implication:
+Confidence arises from experience, not belief.
+Joyful effort = continuity without pressure.
+Mindfulness = remembering to return.
+Concentration = breath training foundation.
+Wisdom = pattern recognition and view clarification.
+Clarity must support all five in balance.
+A3. Seven Factors of Awakening (Bojjhaṅga)
+Mindfulness
+Investigation
+Energy
+Joy
+Tranquility
+Concentration
+Equanimity
+Design implication:
+Reflect = investigation.
+Practice = concentration + tranquility.
+Progress = supports energy.
+Tone = calm and equanimous.
+No agitation-inducing UX.
+A4. Six Pāramitās (Perfections)
+Generosity
+Ethics
+Patience
+Joyful Effort
+Concentration
+Wisdom
+Design implication:
+Ethical reflection modules.
+Conflict & communication modules.
+Compassion phase in 108-day arc.
+Avoid self-focus narrowing.
+A5. Noble Eightfold Path (Behavioural Matrix)
+Right View
+Right Intention
+Right Speech
+Right Action
+Right Livelihood
+Right Effort
+Right Mindfulness
+Right Concentration
+Design implication:
+Content sequencing can map implicitly to this matrix without overt doctrinal framing.
+A6. Pratītyasamutpāda (Dependent Origination)
+Everything arises from conditions.
+Design implication:
+Pattern learner tracks conditioning loops.
+Karma framed as repetition logic.
+No fatalistic messaging.
+Clear cause-and-effect framing.
+A7. Anitya (Impermanence)
+All states change.
+Design implication:
+Pattern decay in WAL.
+No permanent user labels.
+No fixed “stage” identity.
+A8. Anātman (Non-Fixed Self)
+No solid identity.
+Design implication:
+Avoid archetype rigidity.
+Avoid “you are this type”.
+Capsule editable.
+No personality profiling.
+A9. Upāya (Skillful Means)
+Appropriateness to context.
+Design implication:
+Adaptive content sequencing.
+Cultural nuance.
+Language-sensitive expansion.
+Canonical database used responsibly.
+A10. The Four Reliances
+Rely on the teaching, not the person.
+Rely on the meaning, not the words.
+Rely on definitive meaning, not provisional.
+Rely on wisdom, not ordinary consciousness.
+Design implication:
+Avoid personality cult dynamics.
+Avoid charisma-driven UX.
+Preserve meaning over phrasing.
+Emphasise experiential verification.
+A11. Upekṣā (Equanimity)
+Balanced steadiness.
+Design implication:
+No alarmist notifications.
+No urgency gamification.
+Calm UI.
+Stable typography and layout.
+A12. Bodhicitta (Light Framing)
+Orientation toward reducing harm.
+Design implication:
+Motivation setting.
+Dedication statements.
+Ethical emphasis.
+Compassion phase in module structure.
+A13. Gradual Path Discipline
+Stability before subtlety.
+Design implication:
+Breath training before view inquiry.
+Ethics before emptiness.
+No premature advanced doctrines.
+A14. Non-Reification as Structural Rule
+Emptiness is not content — it is architecture.
+Design implication:
+No hard identity encoding.
+No rigid psychological taxonomies.
+No “advanced user” caste.
+No permanent rank.
+Appendix B — Systemic Guardrails for Intelligence
+(Technical interpretation of the above)
+Pattern decay must exist.
+Capsule must remain user-editable.
+Cloud responses must match local tone.
+Canon database retrieval must respect context depth.
+No content escalation without stability markers.
+No algorithmic amplification of agitation.
+No reward loop based on emotional intensity.
+
+
+
+Notes (possible future directions - keep open)
+Clarity can remain reflection-first while gradually strengthening the daily practice layer: build a stronger completion moment (light confirmation + one-line “what did you notice?” + short dedication) so “Done” has meaning without gamification; explore progress as continuity-reflection (calendar/bloom/quiet visual deepening) rather than achievement; consider a Dzogchen-leaning tone and UI (more space, fewer words, calmer transitions) while keeping training structure gradual and lamrim-safe; introduce “sangha without feed” via rotating practitioner/teacher photos and quotes plus anonymous aggregate practice counts (no profiles, no ranking, no comments); keep the module path metaphor as a later option (subtle environmental deepening rather than avatar travel) once the core daily content stabilises; and phase toward a larger Buddhist knowledge backbone (canonical database + APT/WAL-driven sequencing, multilingual/regional adaptation) after the first practice content set is proven.
+
+
+TRACE (idea for wal/extract/learn/inject model)
+Turn (TurnEntity - event log)
+Reduce (WAL - abstraction)
+Accumulate (PatternStats - evidence)
+Curate (learnedTendencies - projection)
+Export (CloudTap snapshot - injection)
+
+
+or
+PRISM
+Prompt (Turn input)
+Refract (WAL reduction)
+Increment (PatternStats accumulation)
+Select (Curate/projection into learnedTendencies)
+Message (Export/inject + response)

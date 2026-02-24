@@ -13,6 +13,9 @@ struct LearningSync {
                 rows = rows.filter { $0.lastSeenAt > resetAt }
             }
 
+            // Exclude specific keys we don't want to surface
+            rows = rows.filter { !($0.kind == .constraint_trigger && $0.key == "trigger:eye_contact") }
+
             // Thresholds (per-kind + per-key overrides)
             rows = rows.filter { r in
                 switch r.kind {
@@ -32,10 +35,65 @@ struct LearningSync {
                 }
             }
 
-            // Exclude specific keys we don't want to surface
-            rows = rows.filter { !($0.kind == .constraint_trigger && $0.key == "trigger:eye_contact") }
+            // MARK: Persistence bucketing (sticky / seasonal / ephemeral)
 
-            // Sort: score desc, then lastSeenAt desc
+            enum Bucket { case sticky, seasonal, ephemeral }
+
+            func daysSince(_ date: Date) -> Double {
+                max(0, now.timeIntervalSince(date) / (60 * 60 * 24))
+            }
+
+            // Ephemeral window: only surface "today-ish" states when genuinely recent.
+            let ephemeralRecencyDays: Double = 7.0
+
+            func bucket(for r: PatternStatsEntity) -> Bucket {
+                // Ephemeral: day-state and short-lived ease signals
+                if r.kind == .release_pattern { return .ephemeral }
+                if r.kind == .constraint_trigger {
+                    if r.key.contains("low_sleep") || r.key.contains("low_energy") || r.key.contains("deadline_pressure") {
+                        return .ephemeral
+                    }
+                }
+                if r.kind == .constraints_sensitivity {
+                    // treat time/energy as potentially ephemeral; other constraints are longer-lived
+                    if r.key == "time_pressure" || r.key == "low_energy" {
+                        return .ephemeral
+                    }
+                }
+
+                // Sticky: environment/sensory/social triggers + certain hard workflow prefs
+                if r.kind == .constraint_trigger { return .sticky }
+                if r.kind == .constraints_sensitivity, r.key == "sensory_noise" { return .sticky }
+                if r.kind == .workflow_preference, r.key == "question_light" { return .sticky }
+
+                // Seasonal: everything else (preferences and patterns that can evolve)
+                return .seasonal
+            }
+
+            // Extra gating for ephemeral: must be recent + slightly higher bar to avoid noise.
+            rows = rows.filter { r in
+                let b = bucket(for: r)
+                guard b == .ephemeral else { return true }
+
+                // Recency gate
+                guard daysSince(r.lastSeenAt) <= ephemeralRecencyDays else { return false }
+
+                // Strength gate (a bit stricter than default)
+                switch r.kind {
+                case .release_pattern:
+                    return r.score >= 0.4
+                case .constraint_trigger:
+                    // e.g. low_sleep / low_energy / deadline_pressure
+                    return r.score >= 0.5 && r.count >= 2
+                case .constraints_sensitivity:
+                    // time_pressure / low_energy
+                    return r.score >= 0.6 && r.count >= 2
+                default:
+                    return r.score >= 0.5
+                }
+            }
+
+            // Sort: score desc, then lastSeenAt desc (global pre-sort)
             rows.sort {
                 if $0.score == $1.score {
                     return $0.lastSeenAt > $1.lastSeenAt
@@ -43,39 +101,75 @@ struct LearningSync {
                 return $0.score > $1.score
             }
 
-            // Diversity: cap per kind
-            let maxPerKind = 6
-            var perKind: [PatternStatsEntity.Kind: [PatternStatsEntity]] = [:]
-            for r in rows {
-                perKind[r.kind, default: []].append(r)
-            }
-            for (k, arr) in perKind {
-                let sorted = arr.sorted {
+            // MARK: Lane budgets (inject a little; keep learning broad)
+
+            let stickyCap = 8
+            let seasonalCap = 10
+            let ephemeralCap = 4
+            let globalCap = 24
+
+            // Optional diversity cap per kind within each lane
+            let maxPerKindWithinLane = 6
+
+            func select(from candidates: [PatternStatsEntity], cap: Int) -> [PatternStatsEntity] {
+                guard cap > 0, !candidates.isEmpty else { return [] }
+
+                // Group by kind for diversity
+                var perKind: [PatternStatsEntity.Kind: [PatternStatsEntity]] = [:]
+                for r in candidates {
+                    perKind[r.kind, default: []].append(r)
+                }
+                for (k, arr) in perKind {
+                    let sorted = arr.sorted {
+                        if $0.score == $1.score { return $0.lastSeenAt > $1.lastSeenAt }
+                        return $0.score > $1.score
+                    }
+                    perKind[k] = Array(sorted.prefix(maxPerKindWithinLane))
+                }
+
+                // Flatten and cap
+                var flattened: [PatternStatsEntity] = perKind.values.flatMap { $0 }
+                flattened.sort {
                     if $0.score == $1.score { return $0.lastSeenAt > $1.lastSeenAt }
                     return $0.score > $1.score
                 }
-                perKind[k] = Array(sorted.prefix(maxPerKind))
+                return Array(flattened.prefix(cap))
             }
 
-            // Flatten and global cap
-            var flattened: [PatternStatsEntity] = perKind.values.flatMap { $0 }
-            flattened.sort {
-                if $0.score == $1.score {
-                    return $0.lastSeenAt > $1.lastSeenAt
+            let stickyRows = rows.filter { bucket(for: $0) == .sticky }
+            let seasonalRows = rows.filter { bucket(for: $0) == .seasonal }
+            let ephemeralRows = rows.filter { bucket(for: $0) == .ephemeral }
+
+            let chosenSticky = select(from: stickyRows, cap: stickyCap)
+            let chosenSeasonal = select(from: seasonalRows, cap: seasonalCap)
+            let chosenEphemeral = select(from: ephemeralRows, cap: ephemeralCap)
+
+
+            // Global cap safety (should not usually trip, but keep deterministic)
+            var combined: [PatternStatsEntity] = chosenSticky + chosenSeasonal + chosenEphemeral
+            if combined.count > globalCap {
+                combined.sort {
+                    if $0.score == $1.score { return $0.lastSeenAt > $1.lastSeenAt }
+                    return $0.score > $1.score
                 }
-                return $0.score > $1.score
+                combined = Array(combined.prefix(globalCap))
+                // re-split not required; we only use combined from here
+            } else {
+                // Keep presentation order: sticky -> seasonal -> ephemeral
+                combined = chosenSticky + chosenSeasonal + chosenEphemeral
             }
-            let capped = Array(flattened.prefix(24))
 
             // Map to curated tendencies
-            let projected: [CapsuleTendency] = capped.map { r in
+            let projected: [CapsuleTendency] = combined.map { r in
                 CapsuleTendency(
-                    id: UUID(), // id is not used for equality in idempotency check
+                    id: UUID(),
                     statement: statement(for: r.kind, key: r.key),
                     evidenceCount: r.count,
                     firstSeenAt: r.firstSeenAt,
                     lastSeenAt: r.lastSeenAt,
-                    isOverridden: false
+                    isOverridden: false,
+                    sourceKindRaw: r.kind.rawValue,
+                    sourceKey: r.key
                 )
             }
 
@@ -137,11 +231,51 @@ struct LearningSync {
             }
 
         case .topic_recurrence:
-            if key.hasPrefix("topic:") {
-                let topic = String(key.dropFirst("topic:".count)).replacingOccurrences(of: "_", with: " ")
-                return "Talks about \(topic) frequently"
+
+            func human(_ raw: String) -> String {
+                raw.replacingOccurrences(of: "_", with: " ")
             }
-            return "Talks about \(k) frequently"
+
+            func tail(after prefix: String) -> String {
+                String(key.dropFirst(prefix.count))
+            }
+
+            if key.hasPrefix("topic:") {
+                return "Topic: \(human(tail(after: "topic:")))"
+            }
+
+            if key.hasPrefix("dharma:practice:") {
+                return "Practises \(human(tail(after: "dharma:practice:")))"
+            }
+            if key.hasPrefix("dharma:vehicle:") {
+                return "Vehicle: \(human(tail(after: "dharma:vehicle:")))"
+            }
+            if key.hasPrefix("dharma:lineage:") {
+                return "Lineage: \(human(tail(after: "dharma:lineage:")))"
+            }
+            if key.hasPrefix("dharma:level:") {
+                return "Practice level: \(human(tail(after: "dharma:level:")))"
+            }
+            if key.hasPrefix("dharma:training:") {
+                return "Training: \(human(tail(after: "dharma:training:")))"
+            }
+            if key.hasPrefix("dharma:aim:") {
+                return "Aim: \(human(tail(after: "dharma:aim:")))"
+            }
+
+            if key.hasPrefix("profile:language:") {
+                return "Language: \(human(tail(after: "profile:language:")))"
+            }
+            if key.hasPrefix("profile:country:") {
+                return "Country: \(human(tail(after: "profile:country:")))"
+            }
+            if key.hasPrefix("profile:region:") {
+                return "Region: \(human(tail(after: "profile:region:")))"
+            }
+
+            // Safe fallback (neutral)
+            return "Noted: \(human(key))"
+
 
         case .resolution_pattern:
             switch key {
@@ -215,7 +349,7 @@ struct LearningSync {
             case "contraction:control_pressure": return "Control efforts can add pressure"
             case "contraction:uncertainty_pressure": return "Uncertainty can amplify tension"
             case "contraction:mental_looping": return "Mental replay can sustain tightening"
-            case "contraction:self_attack": return "Self‑critical language can tighten experience"
+            case "contraction:self_attack": return "Self-critical language can tighten experience"
             case "contraction:checking_for_reassurance": return "Checking for reassurance can sustain tightening"
             case "contraction:avoidance_pressure": return "Avoidance language can increase pressure"
             default: return "Tightening can show up under certain conditions"
@@ -236,18 +370,38 @@ struct LearningSync {
         let rhs = normalize(b)
         guard lhs.count == rhs.count else { return false }
         return zip(lhs, rhs).allSatisfy { l, r in
-            l.0 == r.0 && l.1 == r.1 && l.2 == r.2 && l.3 == r.3 && l.4 == r.4
+            // (String, Int, TimeInterval, TimeInterval, Bool, String?, String?)
+            return l.0 == r.0 &&
+                   l.1 == r.1 &&
+                   l.2 == r.2 &&
+                   l.3 == r.3 &&
+                   l.4 == r.4 &&
+                   l.5 == r.5 &&
+                   l.6 == r.6
         }
     }
 
-    private static func normalize(_ arr: [CapsuleTendency]) -> [(String, Int, TimeInterval, TimeInterval, Bool)] {
+    private static func normalize(_ arr: [CapsuleTendency])
+    -> [(String, Int, TimeInterval, TimeInterval, Bool, String?, String?)] {
         arr
-            .map { ( $0.statement, $0.evidenceCount, $0.firstSeenAt.timeIntervalSince1970, $0.lastSeenAt.timeIntervalSince1970, $0.isOverridden ) }
+            .map {
+                (
+                    $0.statement,
+                    $0.evidenceCount,
+                    $0.firstSeenAt.timeIntervalSince1970,
+                    $0.lastSeenAt.timeIntervalSince1970,
+                    $0.isOverridden,
+                    $0.sourceKindRaw,
+                    $0.sourceKey
+                )
+            }
             .sorted { lhs, rhs in
                 if lhs.0 != rhs.0 { return lhs.0 < rhs.0 }
                 if lhs.1 != rhs.1 { return lhs.1 > rhs.1 }
-                if lhs.3 != rhs.3 { return lhs.3 > rhs.3 } // lastSeen desc
-                return lhs.2 > rhs.2 // firstSeen desc
+                if lhs.3 != rhs.3 { return lhs.3 > rhs.3 }
+                // stable-ish tie breakers
+                if lhs.5 != rhs.5 { return (lhs.5 ?? "") < (rhs.5 ?? "") }
+                return (lhs.6 ?? "") < (rhs.6 ?? "")
             }
     }
 }

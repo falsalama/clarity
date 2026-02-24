@@ -83,9 +83,22 @@ final class CloudTapService {
         let encoder = JSONEncoder()
         req.httpBody = try encoder.encode(body)
 
-        // DEBUG-only: prove whether learnedCues is present in the outgoing JSON body.
+        // ============================================================
+        // MARK: - PRISM/TRACE DEBUG HOOK (TEMPORARY)
+        //
+        // Purpose:
+        // - Print a small summary of what we EXPORT to CloudTap:
+        //   preference key count + learnedCues count + key preview.
+        //
+        // Requirements:
+        // - Add file: Clarity/Core/CloudTap/CloudTapTraceHook.swift
+        //
+        // Remove later:
+        // - Delete this block (and the response block below)
+        // - Delete CloudTapTraceHook.swift
+        // ============================================================
         #if DEBUG
-        Self.logLearnedCuesPresence(in: req.httpBody)
+        CloudTapTraceHook.emit(endpoint: endpoint, requestBody: req.httpBody)
         #endif
 
         do {
@@ -96,6 +109,20 @@ final class CloudTapService {
                 let bodyText = String(data: data, encoding: .utf8) ?? ""
                 throw CloudTapError.http(code, bodyText)
             }
+
+            // ============================================================
+            // MARK: - PRISM/TRACE DEBUG HOOK (TEMPORARY)
+            //
+            // Purpose:
+            // - Print a short snippet of what we RECEIVE from CloudTap.
+            //
+            // Remove later:
+            // - Delete this block (and the export block above)
+            // - Delete CloudTapTraceHook.swift
+            // ============================================================
+            #if DEBUG
+            CloudTapTraceHook.emitResponse(endpoint: endpoint, responseBody: data)
+            #endif
 
             do {
                 return try JSONDecoder().decode(U.self, from: data)
@@ -147,23 +174,6 @@ final class CloudTapService {
             throw e
         } catch {
             throw CloudTapError.network(String(describing: error))
-        }
-    }
-
-    private static func logLearnedCuesPresence(in httpBody: Data?) {
-        guard let httpBody else { return }
-        guard
-            let obj = try? JSONSerialization.jsonObject(with: httpBody, options: []),
-            let dict = obj as? [String: Any]
-        else { return }
-
-        if
-            let capsule = dict["capsule"] as? [String: Any],
-            let cues = capsule["learnedCues"] as? [[String: Any]]
-        {
-            logger.debug("CloudTap payload includes learnedCues; count=\(cues.count, privacy: .public)")
-        } else {
-            logger.debug("CloudTap payload has no learnedCues.")
         }
     }
 

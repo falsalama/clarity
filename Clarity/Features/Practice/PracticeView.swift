@@ -1,5 +1,3 @@
-// PracticeView.swift
-
 import SwiftUI
 import SwiftData
 
@@ -11,6 +9,8 @@ import SwiftData
 /// - Mantra: optional per-step mantra shown above tab bar, fades in only after Done.
 /// - Uses PracticeProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct PracticeView: View {
+    @State private var bgPhase = false
+    @State private var isReady = false
 
     // MARK: - Environment
 
@@ -86,14 +86,53 @@ No analysis. Just a clean label.
     // MARK: - View
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                practiceCard
-                optionalHint
-                Spacer(minLength: 24)
+        ZStack {
+            Image("CloudsBG")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .opacity(0.09)
+                .mask(
+                    LinearGradient(
+                        stops: [
+                            .init(color: .clear, location: 0.00),
+                            .init(color: .black, location: 0.28),
+                            .init(color: .black, location: 1.00)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .scaleEffect(x: -1, y: 1) // mirror horizontally
+                .offset(y: bgPhase ? 98 : 120)
+                .allowsHitTesting(false)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+
+                    practiceCard
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: isReady)
+
+                    optionalHint
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: isReady)
+
+                    Spacer(minLength: 24)
+                }
+                .padding()
             }
-            .padding()
+            // Prevent the “layout snap” animation of the scroll container itself.
+            .transaction { $0.animation = nil }
         }
+        .onAppear {
+            bgPhase.toggle()
+            ensureProgramStateExists()
+            isReady = false
+            // IMPORTANT: don't advance yet - wait until remote steps are loaded.
+        }
+        .animation(.easeInOut(duration: 26).repeatForever(autoreverses: true), value: bgPhase)
         .safeAreaInset(edge: .bottom) {
             mantraStrip
         }
@@ -117,18 +156,27 @@ No analysis. Just a clean label.
                 achievementsLink
             }
         }
-        .onAppear {
-            ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
-        }
         .task {
             await loadRemotePracticeStepsIfNeeded()
+            applyDailyAdvanceIfNeeded()
+            withAnimation(.easeOut(duration: 0.55)) {
+                isReady = true
+            }
         }
         .onChange(of: scenePhase) { _, newValue in
-            if newValue == .active {
-                ensureProgramStateExists()
-                applyDailyAdvanceIfNeeded()
-                Task { await loadRemotePracticeStepsIfNeeded() }
+            guard newValue == .active else { return }
+
+            isReady = false
+            ensureProgramStateExists()
+
+            Task {
+                await loadRemotePracticeStepsIfNeeded()
+                await MainActor.run {
+                    applyDailyAdvanceIfNeeded()
+                    withAnimation(.easeOut(duration: 0.55)) {
+                        isReady = true
+                    }
+                }
             }
         }
     }
@@ -236,6 +284,7 @@ No analysis. Just a clean label.
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 6)
     }
 
     // MARK: - Toolbar
@@ -340,10 +389,6 @@ No analysis. Just a clean label.
             if !mapped.isEmpty {
                 remoteItems = mapped
 
-                #if DEBUG
-                print("Practice: loaded \(mapped.count) steps from DB")
-                #endif
-
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
                     state.updatedAt = Date()
@@ -351,9 +396,7 @@ No analysis. Just a clean label.
                 }
             }
         } catch {
-            #if DEBUG
-            print("Practice: fetch failed, using fallback: \(error)")
-            #endif
+            // Silent fallback to local seed items.
         }
     }
 
@@ -382,4 +425,3 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
-

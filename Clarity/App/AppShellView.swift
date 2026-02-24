@@ -37,12 +37,12 @@ struct AppShellView: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppTab.home)
 
-            Tab_CaptureView()
+            CaptureView()
                 .tabItem { Label("Reflect", systemImage: "mic") }
                 .tag(AppTab.reflect)
 
             NavigationStack { FocusView() }
-                .tabItem { Label("Focus", systemImage: "book.closed") }
+                .tabItem { Label("View", systemImage: "book.closed") }
                 .tag(AppTab.focus)
 
             NavigationStack { PracticeView() }

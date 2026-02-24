@@ -55,7 +55,7 @@ struct ProgressScreen: View {
                     Text("\(bloomOpenCount) of 108")
                         .font(.title2.weight(.semibold))
 
-                    Text("Bloom opens with your total completions across Reflect, Focus and Practice.")
+                    Text("Bloom opens with your total completions across Reflect, View and Practice.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

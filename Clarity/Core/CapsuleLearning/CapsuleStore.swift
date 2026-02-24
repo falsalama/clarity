@@ -1,51 +1,41 @@
 // CapsuleStore.swift
 import Foundation
 import Combine
+import os.log
 
 @MainActor
 final class CapsuleStore: ObservableObject {
     @Published private(set) var capsule: CapsuleModel = .empty()
 
     private let fm = FileManager.default
+    private let log = Logger(subsystem: "Clarity", category: "CapsuleStore")
 
     // Bounds for open-ended extras
-    private let extrasMaxItems = 24
-    private let extrasKeyMax = 32
+    private let extrasMaxItems = 34
+    private let extrasKeyMax = 64
     private let extrasValueMax = 128
 
     init() {
         do {
-            self.capsule = try loadFromDisk()
+            let loaded = try loadFromDisk()
+            let migrated = migrateCapsuleIfNeeded(loaded)
+            self.capsule = migrated.capsule
+            if migrated.didChange {
+                persist()
+            }
         } catch {
             self.capsule = .empty()
         }
     }
 
-    @MainActor
+    // MARK: - Public API (typed)
+
     func setPseudonym(_ value: String) {
         let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
         capsule.preferences.pseudonym = v.isEmpty ? nil : v
         capsule.updatedAt = Date()
         persist()
     }
-
-    @MainActor
-    func clearLearnedTendencies() {
-        // Suppress projection of any pre-reset stats; only new evidence will show
-        capsule.learningResetAt = Date()
-        capsule.learnedTendencies = []
-        capsule.updatedAt = Date()
-        persist()
-    }
-
-    // NEW: curated learned cues projection setter (idempotent caller should check, but we still persist once set)
-    func setLearnedTendencies(_ items: [CapsuleTendency]) {
-        capsule.learnedTendencies = items
-        capsule.updatedAt = Date()
-        persist()
-    }
-
-    // MARK: - Public API (typed)
 
     func setPreferences(_ prefs: CapsulePreferences) {
         capsule.preferences = prefs
@@ -61,7 +51,61 @@ final class CapsuleStore: ObservableObject {
 
     func wipe() {
         capsule = .empty()
-        do { try wipeFromDisk() } catch { }
+        do { try wipeFromDisk() } catch {
+            log.error("wipeFromDisk failed: \(String(describing: error), privacy: .private)")
+        }
+    }
+
+    func clearLearnedTendencies() {
+        // Suppress projection of any pre-reset stats; only new evidence will show
+        capsule.learningResetAt = Date()
+        capsule.learnedTendencies = []
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    /// Curated learned cues projection setter (idempotent caller should check, but we still persist once set).
+    func setLearnedTendencies(_ items: [CapsuleTendency]) {
+        capsule.learnedTendencies = items
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    // MARK: - Multi-select (typed)
+
+    enum MultiSelectKey: String, CaseIterable {
+        case dharmaPractices = "dharma:practices"
+        case dharmaDeities = "dharma:deities"
+        case dharmaTerms = "dharma:terms"
+        case dharmaMilestones = "dharma:milestones"
+    }
+
+    func setMultiSelect(_ key: MultiSelectKey, values: [String]) {
+        let cleaned = normaliseMultiSelect(values)
+
+        var p = capsule.preferences
+        switch key {
+        case .dharmaPractices:  p.dharmaPractices = cleaned
+        case .dharmaDeities:    p.dharmaDeities = cleaned
+        case .dharmaTerms:      p.dharmaTerms = cleaned
+        case .dharmaMilestones: p.dharmaMilestones = cleaned
+        }
+
+        // Keep the same data out of extras to avoid dual writes / truncation risks.
+        p.extras.removeValue(forKey: key.rawValue)
+
+        capsule.preferences = p
+        capsule.updatedAt = Date()
+        persist()
+    }
+
+    func multiSelect(_ key: MultiSelectKey) -> [String] {
+        switch key {
+        case .dharmaPractices:  return capsule.preferences.dharmaPractices
+        case .dharmaDeities:    return capsule.preferences.dharmaDeities
+        case .dharmaTerms:      return capsule.preferences.dharmaTerms
+        case .dharmaMilestones: return capsule.preferences.dharmaMilestones
+        }
     }
 
     // MARK: - Public API (compat key/value for your current UI)
@@ -71,6 +115,13 @@ final class CapsuleStore: ObservableObject {
         let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !k.isEmpty else { return }
+
+        // Back-compat: allow the UI to write multi-select as CSV; store it typed.
+        if let msKey = MultiSelectKey(rawValue: k) {
+            let decoded = decodeMultiSelectString(v)
+            setMultiSelect(msKey, values: decoded)
+            return
+        }
 
         var p = capsule.preferences
 
@@ -115,6 +166,11 @@ final class CapsuleStore: ObservableObject {
         let k = normaliseKey(key)
         guard !k.isEmpty else { return }
 
+        if let msKey = MultiSelectKey(rawValue: k) {
+            setMultiSelect(msKey, values: [])
+            return
+        }
+
         var p = capsule.preferences
 
         switch k {
@@ -153,6 +209,20 @@ final class CapsuleStore: ObservableObject {
             out.append((key: "no_persona", value: b ? "true" : "false"))
         }
 
+        // Multi-select (rendered as a readable list, but stored typed)
+        if !p.dharmaPractices.isEmpty {
+            out.append((key: MultiSelectKey.dharmaPractices.rawValue, value: p.dharmaPractices.joined(separator: ", ")))
+        }
+        if !p.dharmaDeities.isEmpty {
+            out.append((key: MultiSelectKey.dharmaDeities.rawValue, value: p.dharmaDeities.joined(separator: ", ")))
+        }
+        if !p.dharmaTerms.isEmpty {
+            out.append((key: MultiSelectKey.dharmaTerms.rawValue, value: p.dharmaTerms.joined(separator: ", ")))
+        }
+        if !p.dharmaMilestones.isEmpty {
+            out.append((key: MultiSelectKey.dharmaMilestones.rawValue, value: p.dharmaMilestones.joined(separator: ", ")))
+        }
+
         // Extras
         let extrasPairs = p.extras
             .map { (key: $0.key, value: $0.value) }
@@ -165,7 +235,11 @@ final class CapsuleStore: ObservableObject {
     // MARK: - Disk
 
     private func persist() {
-        do { try saveToDisk(capsule) } catch { }
+        do {
+            try saveToDisk(capsule)
+        } catch {
+            log.error("saveToDisk failed: \(String(describing: error), privacy: .private)")
+        }
     }
 
     private func loadFromDisk() throws -> CapsuleModel {
@@ -202,6 +276,39 @@ final class CapsuleStore: ObservableObject {
         return dir.appendingPathComponent("capsule.json")
     }
 
+    // MARK: - Migration
+
+    private func migrateCapsuleIfNeeded(_ capsule: CapsuleModel) -> (capsule: CapsuleModel, didChange: Bool) {
+        var c = capsule
+        var didChange = false
+
+        // Move any legacy multi-select values out of extras into typed arrays.
+        var p = c.preferences
+        for key in MultiSelectKey.allCases {
+            if let legacy = p.extras[key.rawValue], !legacy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                let decoded = decodeMultiSelectString(legacy)
+                let cleaned = normaliseMultiSelect(decoded)
+                if !cleaned.isEmpty {
+                    switch key {
+                    case .dharmaPractices:  p.dharmaPractices = cleaned
+                    case .dharmaDeities:    p.dharmaDeities = cleaned
+                    case .dharmaTerms:      p.dharmaTerms = cleaned
+                    case .dharmaMilestones: p.dharmaMilestones = cleaned
+                    }
+                }
+                p.extras.removeValue(forKey: key.rawValue)
+                didChange = true
+            }
+        }
+
+        if didChange {
+            c.preferences = p
+            c.updatedAt = Date()
+        }
+
+        return (c, didChange)
+    }
+
     // MARK: - Helpers
 
     private func normaliseKey(_ input: String) -> String {
@@ -225,7 +332,39 @@ final class CapsuleStore: ObservableObject {
     }
 
     private func isAllowedExtraKey(_ k: String) -> Bool {
-        // after normaliseKey, only allow [a-z0-9_]
-        k.range(of: #"^[a-z0-9_]+$"#, options: .regularExpression) != nil
+        k.range(of: #"^[a-z0-9]+(?:[:_][a-z0-9]+)*$"#, options: .regularExpression) != nil
+    }
+
+    private func decodeMultiSelectString(_ input: String) -> [String] {
+        let s = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !s.isEmpty else { return [] }
+
+        // JSON array (preferred)
+        if s.first == "[" {
+            if let data = s.data(using: .utf8),
+               let arr = try? JSONDecoder().decode([String].self, from: data) {
+                return arr
+            }
+        }
+
+        // CSV fallback (legacy)
+        return s
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+
+    private func normaliseMultiSelect(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        let cleaned = values
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .filter { v in
+                let key = v.lowercased()
+                if seen.contains(key) { return false }
+                seen.insert(key)
+                return true
+            }
+        return cleaned.sorted()
     }
 }
