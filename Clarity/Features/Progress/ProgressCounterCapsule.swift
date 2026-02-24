@@ -6,7 +6,7 @@ import SwiftUI
 /// - No portrait in the capsule (portrait lives in the centre of the lotus only)
 /// - Split into 3 coloured segments:
 ///   - Reflect: soft white
-///   - Focus: muted gold
+///   - View: muted gold
 ///   - Practice: deep oxblood
 struct ProgressCounterCapsule: View {
     let reflectCount: Int
@@ -37,7 +37,7 @@ struct ProgressCounterCapsule: View {
         .clipShape(Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Progress counters")
-        .accessibilityValue("Reflect \(reflectCount), Focus \(focusCount), Practice \(practiceCount)")
+        .accessibilityValue("Reflect \(reflectCount), View \(focusCount), Practice \(practiceCount)")
     }
 
     private var reflectFill: Color { Color.white.opacity(0.92) }

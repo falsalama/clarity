@@ -6,6 +6,7 @@ struct LearningView: View {
     @EnvironmentObject private var capsuleStore: CapsuleStore
 
     @State private var confirmClearLearned = false
+    @AppStorage("learning_show_debug_tags") private var showDebugTags = false
 
     var body: some View {
         Form {
@@ -20,6 +21,7 @@ struct LearningView: View {
                     get: { capsuleStore.capsule.learningEnabled },
                     set: { capsuleStore.setLearningEnabled($0) }
                 ))
+                Toggle("Show debug tags", isOn: $showDebugTags)
 
                 HStack {
                     Text("Learned cues")
@@ -34,9 +36,19 @@ struct LearningView: View {
             if !capsuleStore.capsule.learnedTendencies.isEmpty {
                 Section {
                     ForEach(capsuleStore.capsule.learnedTendencies) { t in
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(t.statement)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(t.statement)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                if showDebugTags {
+                                    Text("\(t.sourceKindRaw ?? "—") • \(t.sourceKey ?? "—")")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                        .textSelection(.enabled)
+                                }
+                            }
+
                             VStack(alignment: .trailing) {
                                 Text("x\(t.evidenceCount)")
                                     .font(.caption)
@@ -46,6 +58,7 @@ struct LearningView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
+
                     }
                 } header: {
                     Text("Learned cues (derived)")

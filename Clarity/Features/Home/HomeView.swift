@@ -96,15 +96,20 @@ struct HomeView: View {
     // MARK: - Background
 
     private var backgroundImage: some View {
-        Group {
-            if let img = dailyUIImage {
-                Image(uiImage: img)
-                    .resizable()
-                    .scaledToFill()
-                    .contentShape(Rectangle())
-            } else {
-                Color(.secondarySystemBackground)
-                    .overlay(ProgressView().progressViewStyle(.circular))
+        GeometryReader { geo in
+            Group {
+                if let img = dailyUIImage {
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .clipped()
+                        .contentShape(Rectangle())
+                } else {
+                    Color(.secondarySystemBackground)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .overlay(ProgressView().progressViewStyle(.circular))
+                }
             }
         }
     }

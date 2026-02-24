@@ -571,7 +571,8 @@ final class TurnCaptureCoordinator: ObservableObject {
         let url: URL?
         if let u = pendingCaptureURL {
             url = u
-        } else if let t = try? repo.fetch(id: id), let stored = t.audioPath, !stored.isEmpty {
+        } else if let t = try? repo.fetch(id: id),
+                  let stored = t.audioPath, !stored.isEmpty {
             url = FileStore.existingAudioURL(from: stored)
         } else {
             url = nil
@@ -587,20 +588,42 @@ final class TurnCaptureCoordinator: ObservableObject {
                 if t.transcriptRaw == fullText { return }
 
                 let redacted = Redactor(tokens: dictionary.tokens).redact(fullText).redactedText
+
                 t.transcriptRaw = fullText
                 t.transcriptRedactedActive = redacted
                 t.redactionTimestamp = Date()
                 t.redactionVersion = max(t.redactionVersion, 1)
 
-                let validated = WALBuilder.buildValidated(from: redacted, now: Date())
+                let now = Date()
+                let validated = WALBuilder.buildValidated(from: redacted, now: now)
                 try repo.updateWAL(id: id, snapshot: validated)
 
                 try modelContext?.save()
+
+                // --- Learning (backfill mirror of streaming path) ---
+                if let capsuleStore,
+                   capsuleStore.capsule.learningEnabled,
+                   !learnedTurnIDs.contains(id),
+                   let context = modelContext {
+
+                    let learner = PatternLearner()
+                    let observations = learner.deriveObservations(from: validated, redactedText: redacted)
+
+                    do {
+                        try learner.apply(observations: observations, into: context, now: now)
+                        LearningSync.sync(context: context, capsuleStore: capsuleStore, now: now)
+                        learnedTurnIDs.insert(id)
+                    } catch {
+                        // silent (best-effort)
+                    }
+                }
+
             } catch {
                 // best-effort
             }
         }
     }
+
 
     // MARK: - Idle timer (iOS only)
 

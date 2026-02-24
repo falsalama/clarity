@@ -1,11 +1,22 @@
 import Foundation
 
+// MARK: - Capsule mode (controls what we inject)
+
+enum CloudTapCapsuleMode: String, Codable, Sendable {
+    case reflect
+    case talk
+}
+
 // MARK: - Learned cues (bounded, optional)
 
 struct CloudTapLearnedCue: Codable, Sendable, Equatable {
     let statement: String
     let evidenceCount: Int
     let lastSeenAtISO: String
+
+    // Optional; back-compat
+    let kindRaw: String?
+    let key: String?
 }
 
 // MARK: - Capsule snapshot (bounded, safe)
@@ -13,15 +24,15 @@ struct CloudTapLearnedCue: Codable, Sendable, Equatable {
 struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
     let version: Int
     let updatedAt: String
-    let preferences: [String: String]
-    let learnedCues: [CloudTapLearnedCue]?    // optional, gated by learningEnabled
+    let preferences: [String: String]?
+    let learnedCues: [CloudTapLearnedCue]?
 
-    static func fromCapsule(_ capsule: CapsuleModel) -> CloudTapCapsuleSnapshot {
+    static func fromCapsule(_ capsule: CapsuleModel, mode: CloudTapCapsuleMode = .reflect) -> CloudTapCapsuleSnapshot {
         CloudTapCapsuleSnapshot(
             version: capsule.version,
             updatedAt: ISO8601DateFormatter().string(from: capsule.updatedAt),
             preferences: boundPreferences(capsule.preferences),
-            learnedCues: capsule.cloudTapLearnedCuesPayload(max: 12) // returns nil unless learningEnabled && non-empty
+            learnedCues: capsule.cloudTapLearnedCuesPayload(max: 12, mode: mode)
         )
     }
 
@@ -41,6 +52,25 @@ struct CloudTapCapsuleSnapshot: Codable, Sendable, Equatable {
         if let b = p.noPersona {
             out["no_persona"] = b ? "true" : "false"
         }
+
+        // Multi-select (typed; inject compact JSON arrays)
+        func encodeJSONArray(_ values: [String], maxLen: Int) -> String? {
+            let cleaned = values
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            guard !cleaned.isEmpty else { return nil }
+
+            if let data = try? JSONEncoder().encode(cleaned),
+               let s = String(data: data, encoding: .utf8) {
+                return String(s.prefix(maxLen))
+            }
+            return nil
+        }
+
+        if let s = encodeJSONArray(p.dharmaPractices, maxLen: 512) { out["dharma:practices"] = s }
+        if let s = encodeJSONArray(p.dharmaDeities, maxLen: 512) { out["dharma:deities"] = s }
+        if let s = encodeJSONArray(p.dharmaTerms, maxLen: 512) { out["dharma:terms"] = s }
+        if let s = encodeJSONArray(p.dharmaMilestones, maxLen: 512) { out["dharma:milestones"] = s }
 
         // Extras (bounded again defensively)
         let maxItems = 24
@@ -91,4 +121,3 @@ struct CloudTapTalkResponse: Decodable {
     let response_id: String
     let prompt_version: String
 }
-

@@ -1,4 +1,4 @@
-// Tab_CaptureView.swift
+// CaptureView.swift
 
 import SwiftUI
 import SwiftData
@@ -6,7 +6,7 @@ import SwiftData
 import UIKit
 #endif
 
-struct Tab_CaptureView: View {
+struct CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
     @Environment(\.modelContext) private var modelContext
 
@@ -26,10 +26,13 @@ struct Tab_CaptureView: View {
     @State private var steps: [CloudTapStep] = []
     @State private var stepsError: String? = nil
     @State private var stepsLoading: Bool = false
+    //fade in of question card
+    @State private var questionReady: Bool = false
 
     // Captures list (unchanged)
     @Query private var completedTurns: [TurnEntity]
-
+    @State private var bgPhase: Bool = false
+    @State private var isReady: Bool = false
     // Progress count (Reflect done-days)
     @Query private var reflectCompletions: [ReflectCompletionEntity]
 
@@ -105,11 +108,18 @@ struct Tab_CaptureView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List {
-                captureSurfaceSection
-                capturesSection
+            ZStack {
+                cloudsBackground
+
+                List {
+                    captureSurfaceSection
+                    capturesSection
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .opacity(isReady ? 1 : 0)
+                .animation(.easeOut(duration: 0.55), value: isReady)
             }
-            .listStyle(.plain)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 2) {
@@ -182,9 +192,19 @@ struct Tab_CaptureView: View {
                 .environmentObject(coordinator)
             }
             .onAppear {
+                bgPhase.toggle()
+                isReady = false
                 ensureProgrammeState()
-                Task { await loadStepsIfNeeded() }
-                advanceIfPending()
+
+                Task {
+                    await loadStepsIfNeeded()
+                    await MainActor.run {
+                        advanceIfPending()
+                        withAnimation(.easeOut(duration: 0.55)) {
+                            isReady = true
+                        }
+                    }
+                }
             }
             .onChange(of: todayKey) { _, _ in
                 // New calendar day: advance if yesterday was marked done.
@@ -192,8 +212,31 @@ struct Tab_CaptureView: View {
             }
         }
     }
-
-    // MARK: - Steps: load + state
+    
+    private var cloudsBackground: some View {
+        Image("CloudsBG")
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .opacity(0.09)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.00),
+                        .init(color: .black, location: 0.28),
+                        .init(color: .black, location: 1.00)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .scaleEffect(bgPhase ? 1.30 : 1.18, anchor: .bottom)
+            .scaleEffect(x: -1, y: 1) // mirror horizontally
+            .offset(y: bgPhase ? 98 : 120)
+            .allowsHitTesting(false)
+        
+    }    // MARK: - Steps: load + state
 
     private func ensureProgrammeState() {
         guard programmeState == nil else { return }
@@ -206,17 +249,20 @@ struct Tab_CaptureView: View {
         guard steps.isEmpty, stepsLoading == false else { return }
         stepsLoading = true
         stepsError = nil
+        questionReady = false
         do {
             let resp = try await cloudTap.reflectSteps(programme: "starter_5day")
             await MainActor.run {
                 self.steps = resp.steps
                 self.stepsLoading = false
                 self.stepsError = resp.steps.isEmpty ? "No steps returned." : nil
+                self.questionReady = !resp.steps.isEmpty
             }
         } catch {
             await MainActor.run {
                 self.stepsLoading = false
                 self.stepsError = "Couldn’t load today’s question."
+                self.questionReady = true
             }
         }
     }
@@ -251,6 +297,7 @@ struct Tab_CaptureView: View {
 
     private var captureSurfaceSection: some View {
         Section {
+
             VStack(spacing: 12) {
 
                 todayQuestionCard
@@ -276,9 +323,12 @@ struct Tab_CaptureView: View {
             .padding(.vertical, -30)
             .listRowInsets(EdgeInsets(top: -26, leading: 16, bottom: 10, trailing: 16))
             .listRowSeparator(.hidden)
+
         } header: {
             EmptyView()
         }
+        .listRowBackground(Color.clear)     // <-- add
+        .listRowSeparator(.hidden)          // <-- add (keeps it consistent)
     }
 
     private var todayQuestionCard: some View {
@@ -287,27 +337,35 @@ struct Tab_CaptureView: View {
             Text("Today’s question")
                 .font(.title3.weight(.semibold))
 
-            if stepsLoading {
-                Text("Loading…")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if let err = stepsError {
-                Text(err)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if let step = currentStep {
-                Text(step.body)
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
+            Group {
+                if stepsLoading {
+                    Text("Loading…")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if let err = stepsError {
+                    Text(err)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else if let step = currentStep {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(step.body)
+                            .font(.body)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                Text("Press mic or type to answer. Speaking is recommended.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else {
-                Text("No question yet.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                        Text("Press mic or type to answer. Speaking is recommended.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .opacity(questionReady ? 1 : 0)
+                    .animation(.easeOut(duration: 0.55), value: questionReady)
+                } else {
+                    Text("No question yet.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .transaction { $0.animation = nil }
+
 
             Divider()
                 .padding(.top, 6)
@@ -552,7 +610,6 @@ struct Tab_CaptureView: View {
 }
 
 #Preview {
-    Tab_CaptureView()
+    CaptureView()
         .environmentObject(TurnCaptureCoordinator())
 }
-

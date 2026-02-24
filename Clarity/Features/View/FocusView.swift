@@ -1,5 +1,3 @@
-// FocusView.swift
-
 import SwiftUI
 import SwiftData
 
@@ -11,13 +9,16 @@ import SwiftData
 /// - Mantra: optional per-step mantra shown above tab bar, fades in only after Done.
 /// - Uses FocusProgramStateEntity (singleton) to future-proof progression (modules/routes later).
 struct FocusView: View {
+    @State private var bgPhase = false
+    @State private var isReady = false
 
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
@@ -89,13 +90,47 @@ Nothing is lost.
     // MARK: - View
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                teachingCard
-                optionalHint
-                Spacer(minLength: 24)
+        ZStack {
+            GeometryReader { geo in
+                Image("CloudsBG")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .clipped()
+                    .scaleEffect(bgPhase ? 1.04 : 0.98, anchor: .bottom)
+                    .offset(x: bgPhase ? 0 : 10, y: bgPhase ? 94 : 44)
+                    .opacity(0.20)
+                    .overlay(
+                        LinearGradient(
+                            colors: colorScheme == .dark
+                                ? [Color.black.opacity(0.0), Color.black.opacity(0.55)]
+                                : [Color.white.opacity(0.0), Color.white.opacity(0.65)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .animation(.easeInOut(duration: 26).repeatForever(autoreverses: true), value: bgPhase)
+                    .allowsHitTesting(false)
             }
-            .padding()
+            .ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+
+                    teachingCard
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: isReady)
+
+                    optionalHint
+                        .opacity(isReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: isReady)
+
+                    Spacer(minLength: 24)
+                }
+                .padding()
+            }
+            // Prevent the “layout snap” animation of the scroll container itself.
+            .transaction { $0.animation = nil }
         }
         .safeAreaInset(edge: .bottom) {
             mantraStrip
@@ -104,7 +139,7 @@ Nothing is lost.
         .toolbar {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
-                    Text("Focus")
+                    Text("View")
                         .font(.headline)
 
                     Text("One small teaching each day.")
@@ -121,17 +156,32 @@ Nothing is lost.
             }
         }
         .onAppear {
+            bgPhase = !reduceMotion
+            isReady = false
             ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
+            // IMPORTANT: don't advance yet - wait until remote steps are loaded.
         }
         .task {
             await loadRemoteFocusStepsIfNeeded()
+            applyDailyAdvanceIfNeeded()
+            withAnimation(.easeOut(duration: 0.55)) {
+                isReady = true
+            }
         }
         .onChange(of: scenePhase) { _, newValue in
-            if newValue == .active {
-                ensureProgramStateExists()
-                applyDailyAdvanceIfNeeded()
-                Task { await loadRemoteFocusStepsIfNeeded() }
+            guard newValue == .active else { return }
+
+            isReady = false
+            ensureProgramStateExists()
+
+            Task {
+                await loadRemoteFocusStepsIfNeeded()
+                await MainActor.run {
+                    applyDailyAdvanceIfNeeded()
+                    withAnimation(.easeOut(duration: 0.55)) {
+                        isReady = true
+                    }
+                }
             }
         }
     }
@@ -156,7 +206,7 @@ Nothing is lost.
 
     private var currentTeaching: Teaching {
         let list = activeTeachings
-        guard !list.isEmpty else { return Teaching(title: "Focus", body: "—", prompt: "", mantra: nil) }
+        guard !list.isEmpty else { return Teaching(title: "View", body: "—", prompt: "", mantra: nil) }
         let idx = max(0, min(currentIndex, list.count - 1))
         return list[idx]
     }
@@ -247,6 +297,7 @@ Nothing is lost.
                 .font(.body)
                 .foregroundStyle(.secondary)
         }
+        .padding(.horizontal, 6)
     }
 
     // MARK: - Toolbar
@@ -265,7 +316,7 @@ Nothing is lost.
             )
             .overlay(Capsule().stroke(.black.opacity(0.10), lineWidth: 1))
         }
-        .accessibilityLabel(Text("Focus completions: \(focusCount)"))
+        .accessibilityLabel(Text("View completions: \(focusCount)"))
     }
 
     private var focusFill: Color {
@@ -351,10 +402,6 @@ Nothing is lost.
             if !mapped.isEmpty {
                 remoteTeachings = mapped
 
-                #if DEBUG
-                print("Focus: loaded \(mapped.count) steps from DB")
-                #endif
-
                 if let state = programState, state.currentIndex > max(0, mapped.count - 1) {
                     state.currentIndex = max(0, mapped.count - 1)
                     state.updatedAt = Date()
@@ -362,9 +409,7 @@ Nothing is lost.
                 }
             }
         } catch {
-            #if DEBUG
-            print("Focus: fetch failed, using fallback: \(error)")
-            #endif
+            // Silent fallback to local seed teachings.
         }
     }
 
@@ -404,3 +449,4 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
+

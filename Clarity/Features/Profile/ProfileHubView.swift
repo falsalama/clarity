@@ -10,6 +10,9 @@ struct ProfileHubView: View {
     // User profile singleton
     @Query private var userProfiles: [UserProfileEntity]
 
+    // Calendar
+    @StateObject private var calendarStore = CalendarStore()
+
     init() {
         _reflectCompletions = Query(
             sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)]
@@ -49,11 +52,28 @@ struct ProfileHubView: View {
                 }
 
                 NavigationLink {
+                    CalendarView()
+                } label: {
+                    HStack(spacing: 10) {
+                        Label("Calendar", systemImage: "calendar")
+
+                        Spacer()
+
+                        if let today = calendarStore.today.first {
+                            Text(today.title)
+                                .font(.footnote)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                
+                NavigationLink {
                     PortraitEditorView()
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         PortraitView(recipe: portraitRecipe)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 65, height: 65)
 
                         Text("Portrait")
 
@@ -61,6 +81,7 @@ struct ProfileHubView: View {
                     }
                     .contentShape(Rectangle())
                 }
+                .listRowInsets(EdgeInsets(top: 1, leading: 4, bottom: 1, trailing: 16))
             } header: {
                 Text("You")
             }
@@ -83,6 +104,9 @@ struct ProfileHubView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await calendarStore.refresh()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 let reflectCount = min(108, reflectCompletions.count)
@@ -105,4 +129,3 @@ struct ProfileHubView: View {
         }
     }
 }
-
