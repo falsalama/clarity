@@ -3,29 +3,24 @@ import SwiftUI
 struct PortraitView: View {
 
     let recipe: PortraitRecipe
-    private let globalRotation: Double = 0.5
+    private let globalRotation: Double = 0.7
 
     var body: some View {
         ZStack {
-            if let halo = recipe.halo {
-                haloView(halo)
-            }
-
             ZStack {
                 Image("PORTRAIT")
                     .resizable()
                     .scaledToFit()
 
-                if let robe = recipe.robe {
-                    Image(robe.rawValue)
+                let robe = recipe.robe ?? .lay
+                Image(robe.rawValue)
+                    .resizable()
+                    .scaledToFit()
+
+                if robe == .western {
+                    Image("shirt")
                         .resizable()
                         .scaledToFit()
-
-                    if robe == .western {
-                        Image("shirt")
-                            .resizable()
-                            .scaledToFit()
-                    }
                 }
 
                 if let hair = recipe.hair {
@@ -33,75 +28,115 @@ struct PortraitView: View {
                         .resizable()
                         .scaledToFit()
                 }
+
+                if let glasses = recipe.glasses {
+                    Image(glasses.rawValue)
+                        .resizable()
+                        .scaledToFit()
+                }
             }
             .rotationEffect(.degrees(globalRotation))
             .clipShape(Circle())
         }
-        .aspectRatio(1, contentMode: .fit)
+        // MARK: - CHANGED: halo moved to background so it does not affect layout sizing (hub-safe)
+        .background {
+            if let halo = recipe.halo {
+                haloView(halo)
+            }
+        }
+        .aspectRatio(1, contentMode: .fill)
+        .clipped()
     }
 
     // MARK: - Halo
 
     private func haloView(_ halo: HaloID) -> some View {
+        let design: CGFloat = 140 // MARK: - CHANGED: author in design-space, then scale to container
+
         switch halo {
-        case .golden, .silver:
-            let bands: [(CGFloat, CGFloat)] = [
-                (8, 0.55),  // (lineWidth, opacity)
-                (8, 0.55),
-                (8, 0.55),
-            ]
-            let spacing: CGFloat = 1.5
 
+        case .golden:
+            // MARK: - CHANGED: single band + larger padding + scaled
             return AnyView(
-                ZStack {
-                    ForEach(Array(bands.enumerated()), id: \.offset) { idx, spec in
-                        let (w, o) = spec
-                        let inset = CGFloat(idx) * (w + spacing)
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
+                    let scale = side / design
 
-                        Circle()
-                            .stroke(haloStroke(halo), lineWidth: w)
-                            .opacity(o)
-                            .padding(inset)
-                            .blur(radius: 0.6) // tiny, survives in 28x28
-                    }
+                    Circle()
+                        .stroke(haloStroke(halo), lineWidth: 10) // MARK: - CHANGED
+                        .opacity(0.70)                            // MARK: - CHANGED
+                        .blur(radius: 0.6)
+                        .padding(6)                               // MARK: - CHANGED
+                        .frame(width: design, height: design)     // MARK: - CHANGED
+                        .scaleEffect(scale, anchor: .center)      // MARK: - CHANGED
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .allowsHitTesting(false)
                 }
-                .padding(2) // small so it doesn’t get pushed out of bounds
-                .allowsHitTesting(false)
+                .aspectRatio(1, contentMode: .fit)
+            )
+
+        case .silver:
+            // MARK: - CHANGED: single band + larger padding + scaled
+            return AnyView(
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
+                    let scale = side / design
+
+                    Circle()
+                        .stroke(haloStroke(halo), lineWidth: 10) // MARK: - CHANGED
+                        .opacity(0.70)                            // MARK: - CHANGED
+                        .blur(radius: 0.6)
+                        .padding(6)                               // MARK: - CHANGED
+                        .frame(width: design, height: design)     // MARK: - CHANGED
+                        .scaleEffect(scale, anchor: .center)      // MARK: - CHANGED
+                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .allowsHitTesting(false)
+                }
+                .aspectRatio(1, contentMode: .fit)
             )
 
         case .rainbow:
             // Concentric banded rings (full circles)
             let bands: [(Color, CGFloat)] = [
-                (.red,    6),
-                (.orange, 6),
-                (.yellow, 6),
-                (.green,  6),
-                (.cyan,   6),
-                (.blue,   6),
-                (.purple, 6),
+                (.red,    5),
+                (.orange, 5),
+                (.yellow, 5),
+                (.green,  5),
+                (.cyan,   5),
+                (.blue,   5),
             ]
 
             let spacing: CGFloat = 1.5
 
+            // MARK: - CHANGED: scaled so fixed stroke/blur sizes don't dominate in hub
             return AnyView(
-                ZStack {
-                    Circle()
-                        .stroke(Color.white.opacity(0.10), lineWidth: 22)
-                        .blur(radius: 10)
-                        .opacity(0.25)
+                GeometryReader { geo in
+                    let side = min(geo.size.width, geo.size.height)
+                    let scale = side / design
 
-                    ForEach(Array(bands.enumerated()), id: \.offset) { idx, band in
-                        let (c, w) = band
-                        let inset = CGFloat(idx) * (w + spacing)
-
+                    ZStack {
                         Circle()
-                            .stroke(c.opacity(0.80), lineWidth: w)
-                            .padding(inset)
-                            .blur(radius: 0.6)
+                            .stroke(Color.white.opacity(0.10), lineWidth: 22)
+                            .blur(radius: 10)
+                            .opacity(0.25)
+
+                        ForEach(Array(bands.enumerated()), id: \.offset) { idx, band in
+                            let (c, w) = band
+                            let inset = CGFloat(idx) * (w + spacing)
+
+                            Circle()
+                                .stroke(c.opacity(0.80), lineWidth: w)
+                                .padding(inset)
+                                .blur(radius: 0.6)
+                        }
                     }
+                    .padding(6)
+                    .frame(width: design, height: design)     // MARK: - CHANGED
+                    .scaleEffect(scale, anchor: .center)      // MARK: - CHANGED
+                    .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                    .allowsHitTesting(false)
                 }
-                .padding(6)
-                .allowsHitTesting(false)
+                .aspectRatio(1, contentMode: .fit)
             )
         }
     }

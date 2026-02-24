@@ -71,9 +71,9 @@ struct ProfileHubView: View {
                 NavigationLink {
                     PortraitEditorView()
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         PortraitView(recipe: portraitRecipe)
-                            .frame(width: 38, height: 38)
+                            .frame(width: 65, height: 65)
 
                         Text("Portrait")
 
@@ -81,6 +81,7 @@ struct ProfileHubView: View {
                     }
                     .contentShape(Rectangle())
                 }
+                .listRowInsets(EdgeInsets(top: 1, leading: 4, bottom: 1, trailing: 16))
             } header: {
                 Text("You")
             }

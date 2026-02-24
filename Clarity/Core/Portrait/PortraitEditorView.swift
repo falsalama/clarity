@@ -11,15 +11,15 @@ struct PortraitEditorView: View {
 
     var body: some View {
         List {
-
+            
             Section {
                 VStack(spacing: 0) {
-
+                    
                     PortraitView(recipe: working)
                         .frame(width: 140, height: 140)
                         .padding(.top, 18)
                         .padding(.bottom, 14)
-
+                    
                     if let err = store.lastError {
                         Text(err)
                             .font(.footnote)
@@ -37,7 +37,7 @@ struct PortraitEditorView: View {
                 .frame(maxWidth: .infinity)
                 .listRowInsets(EdgeInsets())
             }
-
+            
             Section("Hair") {
                 Picker("Style", selection: $working.hair) {
                     Text("None").tag(HairID?.none)
@@ -46,21 +46,29 @@ struct PortraitEditorView: View {
                     }
                 }
             }
-
+            
             Section("Robe") {
                 Picker("Style", selection: $working.robe) {
-                    Text("None").tag(RobeID?.none)
+                    Text("Default").tag(RobeID?.none)
                     ForEach(RobeID.allCases, id: \.self) { id in
                         Text(displayName(for: id)).tag(RobeID?.some(id))
                     }
                 }
             }
-
+            
             Section("Halo") {
                 Picker("Colour", selection: $working.halo) {
                     Text("None").tag(HaloID?.none)
                     ForEach(HaloID.allCases, id: \.self) { id in
                         Text(displayName(for: id)).tag(HaloID?.some(id))
+                    }
+                }
+            }
+            Section("Glasses") {
+                Picker("Style", selection: $working.glasses) {
+                    Text("None").tag(GlassesID?.none)
+                    ForEach(GlassesID.allCases, id: \.self) { id in
+                        Text(displayName(for: id)).tag(GlassesID?.some(id))
                     }
                 }
             }
@@ -94,6 +102,7 @@ struct PortraitEditorView: View {
         switch robe {
         case .lay:     return "Lay"
         case .western: return "Western"
+        case .koromo:  return "Koromo"
         }
     }
 
@@ -102,6 +111,12 @@ struct PortraitEditorView: View {
         case .golden:  return "Golden"
         case .silver:  return "Silver"
         case .rainbow: return "Rainbow"
+        }
+    }
+    private func displayName(for glasses: GlassesID) -> String {
+        switch glasses {
+        case .round:  return "Round"
+        case .square: return "Square"
         }
     }
 }
