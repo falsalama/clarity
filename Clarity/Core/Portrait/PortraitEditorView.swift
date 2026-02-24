@@ -104,6 +104,9 @@ struct PortraitEditorView: View {
         case .lay:     return "Lay"
         case .western: return "Western"
         case .koromo:  return "Koromo"
+        case .gelug:   return "Gelug"
+        case .kagyunyingma:  return "Kagyu/Nyingma"
+            
         }
     }
 

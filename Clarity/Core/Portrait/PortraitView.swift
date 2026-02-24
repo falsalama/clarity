@@ -12,15 +12,16 @@ struct PortraitView: View {
                     .resizable()
                     .scaledToFit()
 
-                let robe = recipe.robe ?? .lay
-                Image(robe.rawValue)
-                    .resizable()
-                    .scaledToFit()
-
-                if robe == .western {
-                    Image("shirt")
+                if let robe = recipe.robe {
+                    Image(robe.rawValue)
                         .resizable()
                         .scaledToFit()
+
+                    if robe == .western {
+                        Image("shirt")
+                            .resizable()
+                            .scaledToFit()
+                    }
                 }
 
                 if let hair = recipe.hair {

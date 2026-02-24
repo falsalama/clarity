@@ -41,6 +41,8 @@ enum RobeID: String, Codable, CaseIterable {
     case lay
     case western
     case koromo
+    case gelug
+    case kagyunyingma
 }
 
 enum HaloID: String, Codable, CaseIterable {
