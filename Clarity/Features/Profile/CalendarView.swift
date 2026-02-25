@@ -6,35 +6,48 @@ struct CalendarView: View {
     @State private var monthCursor: Date = Date()
     @State private var selectedDate: Date = Date()
 
+    /// Bump this when you overwrite images in Storage to force refresh.
+    private let imageVersion = "1"
+
+    private let storageBase =
+        "https://yaxpwhimwktqqxyzitao.supabase.co/storage/v1/object/public/calendar_images"
+
     var body: some View {
         VStack(spacing: 12) {
             header
+                .zIndex(10)
 
-            MonthGrid(
-                month: monthCursor,
-                selectedDate: selectedDate,
-                hasEventOn: { day in store.hasEvent(on: day) },
-                onTapDay: { day in
-                    selectedDate = day
-                    // Optional: keep monthCursor aligned if user taps a trailing/leading day
-                    monthCursor = day
-                }
-            )
-            .padding(.horizontal, 12)
-
-            if let url = headerImageURL(for: store.items(on: selectedDate)) {
-                CachedRemoteImage(url: url, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 190)
-                    .background(Color.primary.opacity(0.03))
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            ScrollView {
+                VStack(spacing: 12) {
+                    MonthGrid(
+                        month: monthCursor,
+                        selectedDate: selectedDate,
+                        hasEventOn: { day in store.hasEvent(on: day) },
+                        onTapDay: { day in
+                            selectedDate = day
+                            monthCursor = day
+                        }
+                    )
                     .padding(.horizontal, 12)
+
+                    if let url = headerImageURL(for: store.items(on: selectedDate)) {
+                        CachedRemoteImage(url: url, contentMode: .fill, maxPixelSize: 1024)
+                            .clipped()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 190)
+                            .background(Color.primary.opacity(0.03))
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .padding(.horizontal, 12)
+                    }
+
+                    inlineDetails
+                        .padding(.horizontal, 12)
+                }
+                .padding(.bottom, 24)
             }
-
-            inlineDetails
-                .padding(.horizontal, 12)
-
-            Spacer(minLength: 0)
+            .refreshable {
+                await store.refresh()
+            }
         }
         .navigationTitle("Calendar")
         .navigationBarTitleDisplayMode(.inline)
@@ -43,7 +56,6 @@ struct CalendarView: View {
             selectedDate = Date()
             monthCursor = Date()
         }
-        .refreshable { await store.refresh() }
     }
 
     private var header: some View {
@@ -99,7 +111,7 @@ struct CalendarView: View {
             } else {
                 VStack(spacing: 10) {
                     ForEach(items) { item in
-                        ObservanceRow(item: item)
+                        ObservanceRow(item: item, imageVersion: imageVersion, storageBase: storageBase)
                     }
                 }
             }
@@ -109,8 +121,26 @@ struct CalendarView: View {
 
     private func headerImageURL(for items: [CalendarObservance]) -> URL? {
         guard let first = items.first else { return nil }
-        let base = "https://yaxpwhimwktqqxyzitao.supabase.co/storage/v1/object/public/calendar_images"
-        return URL(string: "\(base)/category/\(first.category).jpeg")
+        return resolveImageURL(for: first)
+    }
+
+    /// Robust resolver:
+    /// - If image_key is "category/foo.jpg" -> use as-is.
+    /// - If image_key is "foo.jpg" -> assume it's under category/.
+    /// - Else fallback to category/<category>.jpg (category normalised).
+    private func resolveImageURL(for item: CalendarObservance) -> URL? {
+        let rawKey = item.image_key?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if !rawKey.isEmpty {
+            if rawKey.contains("/") {
+                return URL(string: "\(storageBase)/\(rawKey)?v=\(imageVersion)")
+            } else {
+                return URL(string: "\(storageBase)/category/\(rawKey)?v=\(imageVersion)")
+            }
+        }
+
+        let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return URL(string: "\(storageBase)/category/\(cat).jpg?v=\(imageVersion)")
     }
 
     private func monthTitle(_ date: Date) -> String {
@@ -157,9 +187,13 @@ private struct MonthGrid: View {
     }
 
     private var weekdayHeader: some View {
-        let symbols = Calendar.current.shortWeekdaySymbols
+        let cal = Calendar.current
+        let symbols = cal.shortWeekdaySymbols
+        let shift = (cal.firstWeekday - 1 + symbols.count) % symbols.count
+        let rotated = Array(symbols[shift...] + symbols[..<shift])
+
         return HStack {
-            ForEach(symbols, id: \.self) { s in
+            ForEach(rotated, id: \.self) { s in
                 Text(s)
                     .font(.caption2)
                     .foregroundColor(.secondary)
@@ -236,11 +270,14 @@ private struct DayCell: View {
 
 struct ObservanceRow: View {
     let item: CalendarObservance
+    let imageVersion: String
+    let storageBase: String
 
     var body: some View {
         HStack(spacing: 12) {
-            CachedRemoteImage(url: imageURL, contentMode: .fill)
+            CachedRemoteImage(url: imageURL, contentMode: .fill, maxPixelSize: 256)
                 .frame(width: 56, height: 56)
+                .background(Color.primary.opacity(0.03))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             VStack(alignment: .leading, spacing: 4) {
@@ -264,7 +301,17 @@ struct ObservanceRow: View {
     }
 
     private var imageURL: URL? {
-        let base = "https://yaxpwhimwktqqxyzitao.supabase.co/storage/v1/object/public/calendar_images"
-        return URL(string: "\(base)/category/\(item.category).jpeg")
+        let rawKey = item.image_key?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if !rawKey.isEmpty {
+            if rawKey.contains("/") {
+                return URL(string: "\(storageBase)/\(rawKey)?v=\(imageVersion)")
+            } else {
+                return URL(string: "\(storageBase)/category/\(rawKey)?v=\(imageVersion)")
+            }
+        }
+
+        let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return URL(string: "\(storageBase)/category/\(cat).jpg?v=\(imageVersion)")
     }
 }
