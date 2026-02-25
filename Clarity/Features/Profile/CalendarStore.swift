@@ -33,7 +33,7 @@ final class CalendarStore: ObservableObject {
 
         return URL(string:
             "\(supabaseURL)/rest/v1/calendar_observances" +
-            "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key" +
+                   "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key" +
             "&enabled=eq.true" +
             "&date=gte.\(start)" +
             "&date=lte.\(end)" +

@@ -31,7 +31,7 @@ struct CalendarView: View {
                     .padding(.horizontal, 12)
 
                     if let url = headerImageURL(for: store.items(on: selectedDate)) {
-                        CachedRemoteImage(url: url, contentMode: .fill, maxPixelSize: 1024)
+                        CachedRemoteImage(url: url, contentMode: .fit, maxPixelSize: 1024)
                             .clipped()
                             .frame(maxWidth: .infinity)
                             .frame(height: 190)
@@ -124,23 +124,21 @@ struct CalendarView: View {
         return resolveImageURL(for: first)
     }
 
-    /// Robust resolver:
-    /// - If image_key is "category/foo.jpg" -> use as-is.
-    /// - If image_key is "foo.jpg" -> assume it's under category/.
-    /// - Else fallback to category/<category>.jpg (category normalised).
+    /// Robust resolver for a single-folder storage bucket:
+    /// - If image_key is "foo.jpg" -> use as-is (bucket root).
+    /// - If image_key is "/foo.jpg" -> trim leading slash.
+    /// - If image_key contains "/" -> use as-is (legacy paths still supported).
+    /// - Else fallback to "<category>.jpg" (bucket root).
     private func resolveImageURL(for item: CalendarObservance) -> URL? {
-        let rawKey = item.image_key?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let rawKey = (item.image_key ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !rawKey.isEmpty {
-            if rawKey.contains("/") {
-                return URL(string: "\(storageBase)/\(rawKey)?v=\(imageVersion)")
-            } else {
-                return URL(string: "\(storageBase)/category/\(rawKey)?v=\(imageVersion)")
-            }
+            let path = rawKey.hasPrefix("/") ? String(rawKey.dropFirst()) : rawKey
+            return URL(string: "\(storageBase)/\(path)?v=\(imageVersion)")
         }
 
         let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return URL(string: "\(storageBase)/category/\(cat).jpg?v=\(imageVersion)")
+        return URL(string: "\(storageBase)/\(cat).jpg?v=\(imageVersion)")
     }
 
     private func monthTitle(_ date: Date) -> String {
@@ -301,17 +299,14 @@ struct ObservanceRow: View {
     }
 
     private var imageURL: URL? {
-        let rawKey = item.image_key?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let rawKey = (item.image_key ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
         if !rawKey.isEmpty {
-            if rawKey.contains("/") {
-                return URL(string: "\(storageBase)/\(rawKey)?v=\(imageVersion)")
-            } else {
-                return URL(string: "\(storageBase)/category/\(rawKey)?v=\(imageVersion)")
-            }
+            let path = rawKey.hasPrefix("/") ? String(rawKey.dropFirst()) : rawKey
+            return URL(string: "\(storageBase)/\(path)?v=\(imageVersion)")
         }
 
         let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return URL(string: "\(storageBase)/category/\(cat).jpg?v=\(imageVersion)")
+        return URL(string: "\(storageBase)/\(cat).jpg?v=\(imageVersion)")
     }
 }

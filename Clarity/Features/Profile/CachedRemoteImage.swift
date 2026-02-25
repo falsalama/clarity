@@ -1,68 +1,34 @@
 import SwiftUI
+import Foundation
 #if canImport(UIKit)
 import UIKit
 #endif
 import ImageIO
-import CryptoKit
 
-// MARK: - Memory cache (URL+px key)
+// MARK: - In-memory image cache (simple, app-wide)
 
 final class ImageMemoryCache {
     static let shared = ImageMemoryCache()
 
-    private let cache: NSCache<NSString, UIImage> = {
-        let c = NSCache<NSString, UIImage>()
-        c.totalCostLimit = 32 * 1024 * 1024
+    private let cache: NSCache<NSURL, UIImage> = {
+        let c = NSCache<NSURL, UIImage>()
+        c.totalCostLimit = 32 * 1024 * 1024 // ~32MB
         return c
     }()
 
     private init() {}
 
-    func image(forKey key: String) -> UIImage? {
-        cache.object(forKey: key as NSString)
+    func image(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
     }
 
-    func set(_ image: UIImage, forKey key: String) {
+    func set(_ image: UIImage, for url: URL) {
         let cost = Int(image.size.width * image.size.height * image.scale * image.scale)
-        cache.setObject(image, forKey: key as NSString, cost: cost)
+        cache.setObject(image, forKey: url as NSURL, cost: cost)
     }
 }
 
-// MARK: - Disk cache (per URL)
-
-enum ImageDiskCache {
-    static func url(for url: URL) -> URL? {
-        guard let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
-        let name = sha256(url.absoluteString) + ".bin"
-        return dir.appendingPathComponent("calendar_image_cache", isDirectory: true)
-            .appendingPathComponent(name)
-    }
-
-    static func ensureDir() {
-        guard let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return }
-        let folder = dir.appendingPathComponent("calendar_image_cache", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    }
-
-    static func loadData(for url: URL) -> Data? {
-        ensureDir()
-        guard let file = self.url(for: url) else { return nil }
-        return try? Data(contentsOf: file)
-    }
-
-    static func saveData(_ data: Data, for url: URL) {
-        ensureDir()
-        guard let file = self.url(for: url) else { return }
-        try? data.write(to: file, options: [.atomic])
-    }
-
-    private static func sha256(_ s: String) -> String {
-        let digest = SHA256.hash(data: Data(s.utf8))
-        return digest.map { String(format: "%02x", $0) }.joined()
-    }
-}
-
-// MARK: - View
+// MARK: - CachedRemoteImage
 
 struct CachedRemoteImage: View {
     let url: URL?
@@ -70,12 +36,7 @@ struct CachedRemoteImage: View {
     var maxPixelSize: CGFloat = 256
 
     @State private var uiImage: UIImage? = nil
-    @State private var didFail = false
-
-    private var key: String? {
-        guard let url else { return nil }
-        return "\(url.absoluteString)|px=\(Int(maxPixelSize))"
-    }
+    @State private var isLoading = false
 
     var body: some View {
         ZStack {
@@ -84,55 +45,101 @@ struct CachedRemoteImage: View {
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
             } else {
-                Color.gray.opacity(0.10)
+                Color.gray.opacity(0.12)
+
+                if isLoading {
+                    ProgressView()
+                }
             }
         }
-        .task(id: key) { await load() }
+        // iOS 17+ onChange signature (no deprecation warning)
+        .onChange(of: url) {
+            uiImage = nil
+            isLoading = false
+        }
+        .task(id: url) { await load() }
     }
 
     @MainActor
     private func load() async {
-        guard let url, let key else { return }
-        guard !didFail else { return }
+        guard let url else {
+            uiImage = nil
+            return
+        }
 
-        if let cached = ImageMemoryCache.shared.image(forKey: key) {
+        // No stale fallback image
+        uiImage = nil
+
+        if let cached = ImageMemoryCache.shared.image(for: url) {
             uiImage = cached
             return
         }
 
-        // Disk cache stores original data per URL (not px). We downsample per request.
-        if let data = ImageDiskCache.loadData(for: url),
-           let img = downsample(data: data, maxPixelSize: maxPixelSize) {
-            ImageMemoryCache.shared.set(img, forKey: key)
+        guard !isLoading else { return }
+        isLoading = true
+        defer { isLoading = false }
+
+        // 1) Try the given URL
+        if let img = await fetchAndDownsample(from: url) {
+            ImageMemoryCache.shared.set(img, for: url)
             uiImage = img
             return
         }
 
+        // 2) If it failed, try the same filename under /category/
+        if let alt = alternateCategoryURL(from: url), alt != url {
+            if let cachedAlt = ImageMemoryCache.shared.image(for: alt) {
+                uiImage = cachedAlt
+                return
+            }
+
+            if let img = await fetchAndDownsample(from: alt) {
+                ImageMemoryCache.shared.set(img, for: alt)
+                uiImage = img
+                return
+            }
+        }
+
+        // keep placeholder
+    }
+
+    private func fetchAndDownsample(from url: URL) async -> UIImage? {
         var req = URLRequest(url: url)
-        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.cachePolicy = .returnCacheDataElseLoad
         req.timeoutInterval = 20
 
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
-            if let http = resp as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                print("Image HTTP \(http.statusCode):", url.absoluteString)
-                didFail = true
-                return
+            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                return nil
             }
-
-            ImageDiskCache.saveData(data, for: url)
-
-            if let img = downsample(data: data, maxPixelSize: maxPixelSize) {
-                ImageMemoryCache.shared.set(img, forKey: key)
-                uiImage = img
-            } else {
-                print("Downsample failed:", url.absoluteString)
-                didFail = true
-            }
+            return downsample(data: data, maxPixelSize: maxPixelSize)
         } catch {
-            print("Image load error:", error, url.absoluteString)
-            didFail = true
+            return nil
         }
+    }
+
+    /// If current URL is .../calendar_images/<name>.jpg
+    /// return .../calendar_images/category/<name>.jpg
+    private func alternateCategoryURL(from url: URL) -> URL? {
+        let filename = url.lastPathComponent
+        guard !filename.isEmpty else { return nil }
+
+        // Already points at category folder?
+        if url.path.contains("/category/") { return nil }
+
+        // Strip last path component, append "category/<filename>"
+        var base = url
+        base.deleteLastPathComponent()
+        let alt = base.appendingPathComponent("category").appendingPathComponent(filename)
+
+        // Preserve query (e.g. ?v=1)
+        var comps = URLComponents(url: alt, resolvingAgainstBaseURL: false)
+        if let orig = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let q = orig.query, !q.isEmpty {
+            comps?.percentEncodedQuery = q
+        }
+        return comps?.url
     }
 
     private func downsample(data: Data, maxPixelSize: CGFloat) -> UIImage? {
