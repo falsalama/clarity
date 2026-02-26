@@ -12,9 +12,10 @@ struct CalendarObservance: Decodable, Identifiable {
     let practice_angle: String?
     let tradition_scope: String
     let region_scope: String
-
-    let image_key: String?   // <-- add this
+    // NEW: optional per-row image key (e.g. "events/penor_rinpoche.jpg" or "ah.jpg")
+    let image_key: String?
 }
+
 @MainActor
 final class CalendarStore: ObservableObject {
     @Published var today: [CalendarObservance] = []
@@ -24,19 +25,12 @@ final class CalendarStore: ObservableObject {
     private let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlheHB3aGltd2t0cXF4eXppdGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDQ3NTIsImV4cCI6MjA4NTA4MDc1Mn0.-WyjZU2okWufyAmWxdC6TRarsopMBUlx6HR5ttlS77M"
 
     private var feedURL: URL? {
-        let cal = Calendar(identifier: .gregorian)
-        let now = Date()
-
-        let y = cal.component(.year, from: now)
-        let start = String(format: "%04d-01-01", y)
-        let end = String(format: "%04d-12-31", y + 1)
-
-        return URL(string:
-            "\(supabaseURL)/rest/v1/calendar_observances" +
-                   "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key" +
+        URL(string:
+            "https://yaxpwhimwktqqxyzitao.supabase.co/rest/v1/calendar_observances" +
+            "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key" +
             "&enabled=eq.true" +
-            "&date=gte.\(start)" +
-            "&date=lte.\(end)" +
+            "&date=gte.2026-01-01" +
+            "&date=lte.2026-12-31" +
             "&order=date.asc"
         )
     }
@@ -45,7 +39,7 @@ final class CalendarStore: ObservableObject {
         guard let url = feedURL else { return }
 
         var req = URLRequest(url: url)
-        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.cachePolicy = .returnCacheDataElseLoad
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue(anonKey, forHTTPHeaderField: "apikey")
         req.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")

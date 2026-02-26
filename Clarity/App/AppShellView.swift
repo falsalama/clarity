@@ -53,7 +53,7 @@ struct AppShellView: View {
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
                 .tag(AppTab.profile)
         }
-        // Make the tab bar opaque and consistent so it doesn’t flip with background changes.
+        // Make the tab bar opaque at UIKit level; drive translucency via SwiftUI only.
         .toolbarBackground(.visible, for: .tabBar)
         .toolbarBackground(Color(.systemBackground).opacity(0.92), for: .tabBar)
         .toolbarColorScheme(nil, for: .tabBar) // inherit system light/dark (not content behind)
@@ -115,7 +115,8 @@ struct AppShellView: View {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundEffect = nil
-        appearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.92)
+        // IMPORTANT: keep UIKit layer opaque; let SwiftUI’s .toolbarBackground add translucency.
+        appearance.backgroundColor = UIColor.systemBackground
         appearance.shadowColor = UIColor.black.withAlphaComponent(0.08)
 
         UITabBar.appearance().standardAppearance = appearance

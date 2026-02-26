@@ -7,10 +7,12 @@ struct CalendarView: View {
     @State private var selectedDate: Date = Date()
 
     /// Bump this when you overwrite images in Storage to force refresh.
-    private let imageVersion = "1"
+    private let imageVersion =
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1"
 
+    /// Calendar images live under: calendar_images/category/<file>.jpg
     private let storageBase =
-        "https://yaxpwhimwktqqxyzitao.supabase.co/storage/v1/object/public/calendar_images"
+        "https://yaxpwhimwktqqxyzitao.supabase.co/storage/v1/object/public/calendar_images/category"
 
     var body: some View {
         VStack(spacing: 12) {
@@ -46,6 +48,7 @@ struct CalendarView: View {
                 .padding(.bottom, 24)
             }
             .refreshable {
+                ImageMemoryCache.shared.clear()
                 await store.refresh()
             }
         }
@@ -124,21 +127,29 @@ struct CalendarView: View {
         return resolveImageURL(for: first)
     }
 
-    /// Robust resolver for a single-folder storage bucket:
-    /// - If image_key is "foo.jpg" -> use as-is (bucket root).
-    /// - If image_key is "/foo.jpg" -> trim leading slash.
-    /// - If image_key contains "/" -> use as-is (legacy paths still supported).
-    /// - Else fallback to "<category>.jpg" (bucket root).
+    /// Calendar image resolver:
+    /// - If image_key is set (e.g. "ah.jpg", "teacher_parinirvana_v2.jpg") use it.
+    /// - Else fallback to "<category>.jpg".
+    /// Base already points to ".../calendar_images/category".
     private func resolveImageURL(for item: CalendarObservance) -> URL? {
         let rawKey = (item.image_key ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
+        let filename: String
         if !rawKey.isEmpty {
-            let path = rawKey.hasPrefix("/") ? String(rawKey.dropFirst()) : rawKey
-            return URL(string: "\(storageBase)/\(path)?v=\(imageVersion)")
+            filename = rawKey.hasPrefix("/") ? String(rawKey.dropFirst()) : rawKey
+        } else {
+            let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            filename = "\(cat).jpg"
         }
 
-        let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return URL(string: "\(storageBase)/\(cat).jpg?v=\(imageVersion)")
+        // Build URL safely with query item, avoids URL(string:) returning nil for edge cases.
+        guard let base = URL(string: storageBase) else { return nil }
+        var url = base
+        url.appendPathComponent(filename)
+
+        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        comps?.queryItems = [URLQueryItem(name: "v", value: imageVersion)]
+        return comps?.url
     }
 
     private func monthTitle(_ date: Date) -> String {
@@ -301,12 +312,20 @@ struct ObservanceRow: View {
     private var imageURL: URL? {
         let rawKey = (item.image_key ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
 
+        let filename: String
         if !rawKey.isEmpty {
-            let path = rawKey.hasPrefix("/") ? String(rawKey.dropFirst()) : rawKey
-            return URL(string: "\(storageBase)/\(path)?v=\(imageVersion)")
+            filename = rawKey.hasPrefix("/") ? String(rawKey.dropFirst()) : rawKey
+        } else {
+            let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            filename = "\(cat).jpg"
         }
 
-        let cat = item.category.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        return URL(string: "\(storageBase)/\(cat).jpg?v=\(imageVersion)")
+        guard let base = URL(string: storageBase) else { return nil }
+        var url = base
+        url.appendPathComponent(filename)
+
+        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        comps?.queryItems = [URLQueryItem(name: "v", value: imageVersion)]
+        return comps?.url
     }
 }

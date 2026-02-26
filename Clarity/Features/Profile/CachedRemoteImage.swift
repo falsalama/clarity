@@ -26,6 +26,11 @@ final class ImageMemoryCache {
         let cost = Int(image.size.width * image.size.height * image.scale * image.scale)
         cache.setObject(image, forKey: url as NSURL, cost: cost)
     }
+
+    // Allow views to explicitly flush the cache (e.g. pull-to-refresh)
+    func clear() {
+        cache.removeAllObjects()
+    }
 }
 
 // MARK: - CachedRemoteImage
@@ -63,14 +68,18 @@ struct CachedRemoteImage: View {
     @MainActor
     private func load() async {
         guard let url else {
+            print("Image: nil url (no request)")
             uiImage = nil
             return
         }
+
+        print("Image GET:", url.absoluteString)
 
         // No stale fallback image
         uiImage = nil
 
         if let cached = ImageMemoryCache.shared.image(for: url) {
+            print("Image: memory cache hit")
             uiImage = cached
             return
         }
@@ -88,7 +97,10 @@ struct CachedRemoteImage: View {
 
         // 2) If it failed, try the same filename under /category/
         if let alt = alternateCategoryURL(from: url), alt != url {
+            print("Image ALT GET:", alt.absoluteString)
+
             if let cachedAlt = ImageMemoryCache.shared.image(for: alt) {
+                print("Image: memory cache hit (alt)")
                 uiImage = cachedAlt
                 return
             }
@@ -100,21 +112,35 @@ struct CachedRemoteImage: View {
             }
         }
 
+        print("Image: failed (kept placeholder)")
         // keep placeholder
     }
 
     private func fetchAndDownsample(from url: URL) async -> UIImage? {
         var req = URLRequest(url: url)
+        // DEBUG: avoids cached 404/empty responses while you diagnose Release/TestFlight behaviour
         req.cachePolicy = .returnCacheDataElseLoad
         req.timeoutInterval = 20
 
         do {
             let (data, resp) = try await URLSession.shared.data(for: req)
-            guard let http = resp as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let http = resp as? HTTPURLResponse
+            let code = http?.statusCode ?? -1
+            let mime = http?.mimeType ?? "nil"
+
+            print("Image HTTP:", code, "mime:", mime, "bytes:", data.count)
+
+            guard (200...299).contains(code) else {
                 return nil
             }
-            return downsample(data: data, maxPixelSize: maxPixelSize)
+
+            let img = downsample(data: data, maxPixelSize: maxPixelSize)
+            if img == nil {
+                print("Image: downsample/decode failed")
+            }
+            return img
         } catch {
+            print("Image error:", error.localizedDescription)
             return nil
         }
     }
