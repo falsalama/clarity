@@ -12,12 +12,17 @@ struct PracticeView: View {
     @State private var bgPhase = false
     @State private var isReady = false
 
+    // Stored config
+    private let suppressMantra: Bool
+    let goToProgressOnDone: Bool
+
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var flow: AppFlowRouter
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
@@ -71,7 +76,10 @@ No analysis. Just a clean label.
 
     // MARK: - Init
 
-    init() {
+    init(suppressMantra: Bool = false, goToProgressOnDone: Bool = false) {
+        self.suppressMantra = suppressMantra
+        self.goToProgressOnDone = goToProgressOnDone
+
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
                 !turn.transcriptRedactedActive.isEmpty
@@ -83,6 +91,7 @@ No analysis. Just a clean label.
         )
     }
 
+    // MARK: - View
     // MARK: - View
 
     var body: some View {
@@ -151,10 +160,6 @@ No analysis. Just a clean label.
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                achievementsLink
-            }
         }
         .task {
             await loadRemotePracticeStepsIfNeeded()
@@ -216,7 +221,7 @@ No analysis. Just a clean label.
 
     private var mantraStrip: some View {
         Group {
-            if let m = currentMantra {
+            if suppressMantra == false, let m = currentMantra {
                 Text(m)
                     .font(.system(size: 40, weight: .bold, design: .serif))
                     .foregroundStyle(.secondary)
@@ -232,7 +237,6 @@ No analysis. Just a clean label.
             }
         }
     }
-
     // MARK: - Sections
 
     private var practiceCard: some View {
@@ -321,9 +325,20 @@ No analysis. Just a clean label.
         guard !isDoneToday else { return }
 
         let key = todayKey
-        modelContext.insert(PracticeCompletionEntity(dayKey: key))
+        let item = currentItem
 
-        // Mark “pending advance” for tomorrow.
+        modelContext.insert(
+            PracticeCompletionEntity(
+                dayKey: key,
+                completedAt: Date(),
+                programmeSlug: nil,
+                stepIndex: currentIndex,
+                title: item.title,
+                body: item.body,
+                durationSeconds: nil
+            )
+        )
+
         if let state = programState {
             state.pendingAdvanceDayKey = key
             state.updatedAt = Date()
@@ -338,8 +353,10 @@ No analysis. Just a clean label.
         }
 
         do { try modelContext.save() } catch { /* best-effort */ }
-    }
 
+        // Advance flow
+        flow.openProgressWithBeadAnimation()
+    }
     // MARK: - Progression (advance on next day after Done)
 
     private func ensureProgramStateExists() {

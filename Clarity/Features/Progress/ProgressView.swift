@@ -1,3 +1,5 @@
+// Clarity/Features/Progress/ProgressView.swift
+
 import SwiftUI
 import SwiftData
 
@@ -7,6 +9,7 @@ struct ProgressScreen: View {
     @StateObject private var profileStore = UserProfileStore()
     @State private var showPortraitEditor = false
 
+    // Legacy components (used to derive “practice unit” days)
     @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
     @Query private var practiceCompletions: [PracticeCompletionEntity]
@@ -25,59 +28,63 @@ struct ProgressScreen: View {
         )
     }
 
-    private var reflectCount: Int { min(108, reflectCompletions.count) }
-    private var focusCount: Int { focusCompletions.count }
-    private var practiceCount: Int { practiceCompletions.count }
+    /// A “daily unit” exists only when Reflect + View + Practice are all completed on the same dayKey.
+    private var dailyUnitCount: Int {
+        let r = Set(reflectCompletions.map(\.dayKey))
+        let f = Set(focusCompletions.map(\.dayKey))
+        let p = Set(practiceCompletions.map(\.dayKey))
+        return r.intersection(f).intersection(p).count
+    }
 
-    private var bloomOpenCount: Int {
-        let total = max(0, reflectCount) + max(0, focusCount) + max(0, practiceCount)
-        return min(108, total)
+    /// 0...27 beads shown for the current ring.
+    private var ringOpenCount: Int {
+        let total = max(0, dailyUnitCount)
+        if total == 0 { return 0 }
+        let mod = total % 27
+        return mod == 0 ? 27 : mod
+    }
+
+    private var layersCompleted: Int {
+        max(0, dailyUnitCount) / 27
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                Bloom108View(
-                    openCount: bloomOpenCount,
+                Mala27View(
+                    openCount: ringOpenCount,
+                    layersCompleted: layersCompleted,
                     portraitRecipe: profileStore.recipe,
+                    pulseCentre: false,
                     onPortraitTap: { showPortraitEditor = true }
                 )
                 .frame(maxWidth: .infinity)
-                .padding(.top, 12)
+                .padding(.top, 42)
 
-                VStack(spacing: 10) {
-                    ProgressCounterCapsule(
-                        reflectCount: reflectCount,
-                        focusCount: focusCount,
-                        practiceCount: practiceCount
-                    )
+                // Single line only (no extra bracket count)
+                Text("\(ringOpenCount) of 27 complete")
+                    .font(.title2.weight(.semibold))
 
-                    Text("\(bloomOpenCount) of 108")
-                        .font(.title2.weight(.semibold))
-
-                    Text("Bloom opens with your total completions across Reflect, View and Practice.")
-                        .font(.footnote)
+                HStack(spacing: 10) {
+                    Text("Layers completed: \(layersCompleted)")
+                        .font(.callout)
                         .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+
+                    TibetanLayerCountersView(layers: layersCompleted)
                 }
 
                 Spacer(minLength: 10)
             }
             .padding()
         }
-        .navigationTitle("Progress")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showPortraitEditor, onDismiss: {
             profileStore.attach(modelContext: modelContext)
         }) {
-            NavigationStack {
-                PortraitEditorView()
-            }
+            NavigationStack { PortraitEditorView() }
         }
         .onAppear {
             profileStore.attach(modelContext: modelContext)
         }
     }
 }
-

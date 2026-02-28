@@ -8,8 +8,12 @@ import UIKit
 
 struct CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
+    @EnvironmentObject private var flow: AppFlowRouter
     @Environment(\.modelContext) private var modelContext
-
+    @Environment(\.dismiss) private var dismiss
+    let autoPopOnDone: Bool
+    let hideDailyQuestion: Bool
+    
     private let cloudTap = CloudTapService()
 
     @State private var showPermissionAlert: Bool = false
@@ -39,7 +43,10 @@ struct CaptureView: View {
     // Singleton state (programme pointer)
     @Query private var reflectState: [ReflectProgramStateEntity]
 
-    init() {
+    init(autoPopOnDone: Bool = false, hideDailyQuestion: Bool = false) {
+        self.autoPopOnDone = autoPopOnDone
+        self.hideDailyQuestion = hideDailyQuestion
+
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
                 !turn.transcriptRedactedActive.isEmpty
@@ -133,20 +140,7 @@ struct CaptureView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        ProgressScreen()
-                    } label: {
-                        TopCounterBadge(
-                            count: min(108, reflectCompletions.count),
-                            fill: Color.white.opacity(0.92),
-                            textColor: .black
-                        )
-                        .overlay(Capsule().stroke(.black.opacity(0.08), lineWidth: 1))
-                    }
-                    .accessibilityLabel(Text("Progress: \(min(108, reflectCompletions.count)) of 108"))
-                }
+                // Removed trailing counter badge (NavigationLink with TopCounterBadge to ProgressScreen)
             }
 
             .navigationDestination(for: UUID.self) { id in
@@ -266,7 +260,18 @@ struct CaptureView: View {
             }
         }
     }
-
+    private var canRepairTodaySnapshot: Bool {
+        #if DEBUG
+        guard isDoneToday else { return false }
+        let existing = reflectCompletions.first(where: { $0.dayKey == todayKey })
+        // Only show if we have a completion but it's missing snapshot content.
+        let titleEmpty = (existing?.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let bodyEmpty  = (existing?.body  ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return (titleEmpty && bodyEmpty) && (currentStep != nil)
+        #else
+        return false
+        #endif
+    }
     private func advanceIfPending() {
         guard let s = programmeState else { return }
         guard let pending = s.pendingAdvanceDayKey else { return }
@@ -280,9 +285,34 @@ struct CaptureView: View {
     }
 
     private func markDoneToday() {
-        guard isDoneToday == false else { return }
+        let step = currentStep
 
-        let completion = ReflectCompletionEntity(dayKey: todayKey, completedAt: Date())
+        // If a row already exists for today, update it (so older "nil snapshot" rows get filled).
+        if let existing = reflectCompletions.first(where: { $0.dayKey == todayKey }) {
+            existing.programmeSlug = nil
+            existing.stepIndex = step?.stepIndex
+            existing.title = step?.title
+            existing.body = step?.body
+            existing.completedAt = existing.completedAt // keep original time
+
+            if let s = programmeState {
+                s.pendingAdvanceDayKey = todayKey
+                s.updatedAt = Date()
+            }
+
+            do { try modelContext.save() } catch { /* best-effort */ }
+            return
+        }
+
+        // Otherwise insert a new completion.
+        let completion = ReflectCompletionEntity(
+            dayKey: todayKey,
+            completedAt: Date(),
+            programmeSlug: nil,
+            stepIndex: step?.stepIndex,
+            title: step?.title,
+            body: step?.body
+        )
         modelContext.insert(completion)
 
         if let s = programmeState {
@@ -292,7 +322,6 @@ struct CaptureView: View {
 
         do { try modelContext.save() } catch { /* best-effort */ }
     }
-
     // MARK: - Sections
 
     private var captureSurfaceSection: some View {
@@ -300,7 +329,11 @@ struct CaptureView: View {
 
             VStack(spacing: 12) {
 
-                todayQuestionCard
+                if hideDailyQuestion {
+                    reflectExplainerCard
+                } else {
+                    todayQuestionCard
+                }
 
                 // Prompt chips
                 promptChips
@@ -320,8 +353,8 @@ struct CaptureView: View {
                         .padding(.top, -4)
                 }
             }
-            .padding(.vertical, -30)
-            .listRowInsets(EdgeInsets(top: -26, leading: 16, bottom: 10, trailing: 16))
+            .padding(.vertical, 0)
+            .listRowInsets(EdgeInsets(top: -40, leading: 16, bottom: 10, trailing: 16))
             .listRowSeparator(.hidden)
 
         } header: {
@@ -342,10 +375,12 @@ struct CaptureView: View {
                     Text("Loading…")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
                 } else if let err = stepsError {
                     Text(err)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
                 } else if let step = currentStep {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(step.body)
@@ -358,6 +393,7 @@ struct CaptureView: View {
                     }
                     .opacity(questionReady ? 1 : 0)
                     .animation(.easeOut(duration: 0.55), value: questionReady)
+
                 } else {
                     Text("No question yet.")
                         .font(.footnote)
@@ -365,7 +401,6 @@ struct CaptureView: View {
                 }
             }
             .transaction { $0.animation = nil }
-
 
             Divider()
                 .padding(.top, 6)
@@ -377,25 +412,67 @@ struct CaptureView: View {
 
                 Spacer()
 
-                Button { markDoneToday() } label: {
+                Button {
+                    markDoneToday()
+                    flow.go(.focus)
+                    if autoPopOnDone { dismiss() }
+                } label: {
                     Text("Done")
                         .font(.callout.weight(.semibold))
                 }
-                .buttonStyle(.bordered) // <- matches Focus/Practice
-                .disabled(isDoneToday || coordinator.phase != .idle)
+                .buttonStyle(.bordered)
+                .disabled(
+                    isDoneToday ||
+                    coordinator.phase != .idle ||
+                    currentStep == nil
+                )
             }
+
+            #if DEBUG
+            if canRepairTodaySnapshot {
+                Button("Repair snapshot (debug)") {
+                    markDoneToday() // updates existing row (fills snapshot fields)
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
+            }
+            #endif
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding() // 16
+        .padding()
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
                 .stroke(.black.opacity(0.06), lineWidth: 1)
         )
-        // remove extra top padding to match other feature cards
     }
+    private var reflectExplainerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Reflect")
+                .font(.title3.weight(.semibold))
 
+            Text("Use this to speak or type what is on your mind. Use the buttons below for structured reflection through a Buddhist lens.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider().padding(.top, 6)
+
+            Text("Tip: Keep it short. One clear thought is enough.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
+                .stroke(.black.opacity(0.06), lineWidth: 1)
+        )
+    }
 
     private var capturesSection: some View {
         Section {

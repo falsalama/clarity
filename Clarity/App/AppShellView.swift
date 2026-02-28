@@ -17,13 +17,11 @@ struct AppShellView: View {
 
     // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
+    @StateObject private var flow = AppFlowRouter()
 
     @State private var didBind = false
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
-
-    private enum AppTab: Hashable { case home, reflect, focus, practice, profile }
-    @State private var selectedTab: AppTab = .home
 
     init() {
         // Ensure the tab bar is opaque and styled from the very first frame.
@@ -31,32 +29,29 @@ struct AppShellView: View {
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $flow.selectedTab) {
 
             NavigationStack { HomeView() }
                 .tabItem { Label("Home", systemImage: "house") }
-                .tag(AppTab.home)
+                .tag(AppFlowRouter.Tab.home)
 
-            CaptureView()
+            NavigationStack { CaptureView(hideDailyQuestion: true) }
                 .tabItem { Label("Reflect", systemImage: "mic") }
-                .tag(AppTab.reflect)
+                .tag(AppFlowRouter.Tab.reflect)
 
             NavigationStack { FocusView() }
                 .tabItem { Label("View", systemImage: "book.closed") }
-                .tag(AppTab.focus)
+                .tag(AppFlowRouter.Tab.focus)
 
             NavigationStack { PracticeView() }
                 .tabItem { Label("Practice", systemImage: "leaf") }
-                .tag(AppTab.practice)
+                .tag(AppFlowRouter.Tab.practice)
 
             NavigationStack { ProfileHubView() }
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
-                .tag(AppTab.profile)
+                .tag(AppFlowRouter.Tab.profile)
         }
-        // Make the tab bar opaque at UIKit level; drive translucency via SwiftUI only.
-        .toolbarBackground(.visible, for: .tabBar)
-        .toolbarBackground(Color(.systemBackground).opacity(0.92), for: .tabBar)
-        .toolbarColorScheme(nil, for: .tabBar) // inherit system light/dark (not content behind)
+        .environmentObject(flow)
         .environmentObject(captureCoordinator)
         .environmentObject(homeSurface)
         .onAppear {
@@ -73,7 +68,7 @@ struct AppShellView: View {
 
             if SiriLaunchFlag.consumeStartCaptureRequest() {
                 pendingSiriStart = true
-                selectedTab = .reflect
+                flow.selectedTab = .reflect
             }
 
             if scenePhase == .active {
@@ -84,15 +79,15 @@ struct AppShellView: View {
             homeSurface.startDailyAutoRefresh()
             Task { await homeSurface.refreshNow() }
         }
-        .onChange(of: scenePhase) { _, newPhase in
-            captureCoordinator.handleScenePhaseChange(newPhase)
+        // IMPORTANT: this 1-arg closure fixes your current compiler error
+        .onChange(of: scenePhase) { _, newPhase in            captureCoordinator.handleScenePhaseChange(newPhase)
 
             if newPhase == .active {
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
 
                 if SiriLaunchFlag.consumeStartCaptureRequest() {
                     pendingSiriStart = true
-                    selectedTab = .reflect
+                    flow.selectedTab = .reflect
                 }
 
                 scheduleSiriStartIfNeeded()
@@ -113,11 +108,12 @@ struct AppShellView: View {
 
     private static func configureGlobalTabBarAppearance() {
         let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundEffect = nil
-        // IMPORTANT: keep UIKit layer opaque; let SwiftUI’s .toolbarBackground add translucency.
-        appearance.backgroundColor = UIColor.systemBackground
-        appearance.shadowColor = UIColor.black.withAlphaComponent(0.08)
+        appearance.configureWithTransparentBackground()
+
+        // Let the content behind influence the feel again (like before).
+        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.backgroundColor = .clear
+        appearance.shadowColor = UIColor.black.withAlphaComponent(0.10)
 
         UITabBar.appearance().standardAppearance = appearance
         if #available(iOS 15.0, *) {
@@ -137,7 +133,7 @@ struct AppShellView: View {
 
             pendingSiriStart = false
 
-            selectedTab = .reflect
+            flow.selectedTab = .reflect
             try? await Task.sleep(nanoseconds: 150_000_000)
 
             if captureCoordinator.phase == .idle {

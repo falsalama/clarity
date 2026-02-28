@@ -34,7 +34,7 @@ enum HairID: String, Codable, CaseIterable {
     case longhair
     case topknot
     case yogi
-    case tiedBack
+    case tiedback
 }
 
 enum RobeID: String, Codable, CaseIterable {

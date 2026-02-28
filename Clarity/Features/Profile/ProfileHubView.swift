@@ -2,6 +2,8 @@ import SwiftUI
 import SwiftData
 
 struct ProfileHubView: View {
+    @EnvironmentObject private var flow: AppFlowRouter
+
     // Progress counters
     @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
@@ -12,6 +14,8 @@ struct ProfileHubView: View {
 
     // Calendar
     @StateObject private var calendarStore = CalendarStore()
+
+    @State private var showProgressScreen: Bool = false
 
     init() {
         _reflectCompletions = Query(
@@ -67,7 +71,7 @@ struct ProfileHubView: View {
                         }
                     }
                 }
-                
+
                 NavigationLink {
                     PortraitEditorView()
                 } label: {
@@ -104,28 +108,41 @@ struct ProfileHubView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await calendarStore.refresh()
-        }
+        .task { await calendarStore.refresh() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                let reflectCount = min(108, reflectCompletions.count)
-                let focusCount = focusCompletions.count
-                let practiceCount = practiceCompletions.count
+                // Daily units:
+                // - Legacy: day where Reflect + View + Practice all completed
+                // - New: any PracticeCompletionEntity with programmeSlug == "daily_unit_v1"
+                // De-duped by dayKey.
+                let r = Set(reflectCompletions.map(\.dayKey))
+                let f = Set(focusCompletions.map(\.dayKey))
+                let p = Set(practiceCompletions.map(\.dayKey))
+                let dailyDoneCount = r.intersection(f).intersection(p).count
 
                 NavigationLink {
                     ProgressScreen()
                 } label: {
-                    ProgressCounterCapsule(
-                        reflectCount: reflectCount,
-                        focusCount: focusCount,
-                        practiceCount: practiceCount
-                    )
+                    DailyDoneCapsule(count: dailyDoneCount)
                 }
-                .accessibilityLabel(
-                    Text("Progress — Reflect \(reflectCount), Focus \(focusCount), Practice \(practiceCount)")
-                )
+                .accessibilityLabel(Text("Progress — Daily completions \(dailyDoneCount)"))
             }
+        }
+        .onAppear {
+            if flow.pendingOpenProgress {
+                flow.consumeProgressTrigger()
+                showProgressScreen = true
+            }
+        }
+        // Auto-open Progress when Practice completes.
+        .onChange(of: flow.pendingOpenProgress) { _, newValue in
+            guard newValue else { return }
+            flow.consumeProgressTrigger()
+            showProgressScreen = true
+        }
+        .navigationDestination(isPresented: $showProgressScreen) {
+            ProgressScreen()
+        
         }
     }
 }

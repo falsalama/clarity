@@ -376,10 +376,28 @@ final class ReflectCompletionEntity {
 
     var completedAt: Date
 
-    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+    // Snapshot (local-only, minimal)
+    var programmeSlug: String?
+    var stepIndex: Int?
+    var title: String?
+    var body: String?
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        completedAt: Date = Date(),
+        programmeSlug: String? = nil,
+        stepIndex: Int? = nil,
+        title: String? = nil,
+        body: String? = nil
+    ) {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+        self.programmeSlug = programmeSlug
+        self.stepIndex = stepIndex
+        self.title = title
+        self.body = body
     }
 }
 
@@ -423,10 +441,31 @@ final class FocusCompletionEntity {
 
     var completedAt: Date
 
-    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+    // Snapshot (local-only, minimal)
+    var programmeSlug: String?
+    var stepIndex: Int?
+    var title: String?
+    var body: String?
+    var mantra: String?
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        completedAt: Date = Date(),
+        programmeSlug: String? = nil,
+        stepIndex: Int? = nil,
+        title: String? = nil,
+        body: String? = nil,
+        mantra: String? = nil
+    ) {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+        self.programmeSlug = programmeSlug
+        self.stepIndex = stepIndex
+        self.title = title
+        self.body = body
+        self.mantra = mantra
     }
 }
 
@@ -444,10 +483,31 @@ final class PracticeCompletionEntity {
 
     var completedAt: Date
 
-    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+    // Snapshot (local-only, minimal)
+    var programmeSlug: String?
+    var stepIndex: Int?
+    var title: String?
+    var body: String?
+    var durationSeconds: Int?
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        completedAt: Date = Date(),
+        programmeSlug: String? = nil,
+        stepIndex: Int? = nil,
+        title: String? = nil,
+        body: String? = nil,
+        durationSeconds: Int? = nil
+    ) {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+        self.programmeSlug = programmeSlug
+        self.stepIndex = stepIndex
+        self.title = title
+        self.body = body
+        self.durationSeconds = durationSeconds
     }
 }
 
