@@ -45,11 +45,12 @@ struct ClarityApp: App {
                 PatternStatsEntity.self,
                 FocusCompletionEntity.self,
                 PracticeCompletionEntity.self,
-                ReflectCompletionEntity.self,      // NEW
+                ReflectCompletionEntity.self,
+                PilgrimageVisitEntity.self,
                 UserProfileEntity.self,
                 FocusProgramStateEntity.self,
                 PracticeProgramStateEntity.self,
-                ReflectProgramStateEntity.self,    // NEW
+                ReflectProgramStateEntity.self,
                 configurations: config
             )
 

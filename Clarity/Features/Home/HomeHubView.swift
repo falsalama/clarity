@@ -19,8 +19,7 @@ struct HomeHubView: View {
     @Query private var focusCompletions: [FocusCompletionEntity]
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
-    private enum HomeTab: String { case practice, progress }
-    @State private var tab: HomeTab = .practice
+    @EnvironmentObject private var flow: AppFlowRouter
 
     @State private var introExpanded: Bool = false
 
@@ -49,7 +48,7 @@ struct HomeHubView: View {
             VStack(spacing: 14) {
                 headerSegment
 
-                if tab == .practice {
+                if flow.homeTab == .practice {
                     PracticePanel(
                         introExpanded: $introExpanded,
                         todayKey: todayKey,
@@ -74,9 +73,9 @@ struct HomeHubView: View {
     // MARK: - Header
 
     private var headerSegment: some View {
-        Picker("", selection: $tab) {
-            Text("Practice").tag(HomeTab.practice)
-            Text("Progress").tag(HomeTab.progress)
+        Picker("", selection: $flow.homeTab) {
+            Text("Practice").tag(AppFlowRouter.HomeTab.practice)
+            Text("Progress").tag(AppFlowRouter.HomeTab.progress)
         }
         .pickerStyle(.segmented)
         .accessibilityLabel("Home sections")
@@ -133,6 +132,7 @@ private struct PracticePanel: View {
             introductionCard
             todayCard
             recentCard
+            insightsCard
         }
     }
 
@@ -221,7 +221,7 @@ private struct PracticePanel: View {
         }()
 
         let nextSubtitle: String = {
-            if !didReflectToday { return "Begin with Reflect, then View, then Practice." }
+            if !didReflectToday { return "Reflect, View, and Practice." }
             if !didViewToday { return "Next: View." }
             if !didPracticeToday { return "Next: Practice." }
             return "Reflect, View, and Practice are complete."
@@ -239,8 +239,14 @@ private struct PracticePanel: View {
 
             Group {
                 if !didReflectToday {
-                    NavigationLink { CaptureView(autoPopOnDone: true) } label: {
-                        PrimaryCTA(title: nextTitle, subtitle: nextSubtitle)
+                    NavigationLink {
+                        CaptureView(autoPopOnDone: true, hideDailyQuestion: false, embedInNavigationStack: false)
+                    } label: {
+                        PillCTA(
+                            title: nextTitle,
+                            subtitle: nextSubtitle,
+                            systemImage: "sun.max.fill"
+                        )
                     }
                 } else if !didViewToday {
                     NavigationLink { FocusView() } label: {
@@ -312,6 +318,66 @@ private struct PracticePanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
+}
+private struct PillCTA: View {
+    let title: String
+    let subtitle: String
+    var systemImage: String = "sun.max.fill"
+
+    // Deep restrained red (not bright systemRed)
+    private let fill = UIColor(red: 0.55, green: 0.12, blue: 0.16, alpha: 1.0)
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.title3.weight(.semibold))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.headline)
+
+                Text(subtitle)
+                    .font(.footnote)
+                    .opacity(0.9)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.subheadline.weight(.semibold))
+                .opacity(0.85)
+        }
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
+        .foregroundStyle(.white)
+        .background(Color(uiColor: fill))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.25), radius: 8, y: 4)
+        .accessibilityElement(children: .combine)
+    }
+}
+private var insightsCard: some View {
+    VStack(alignment: .leading, spacing: 10) {
+        Text("Insights")
+            .font(.headline)
+
+        Text("These appear here as you use Reflect and fill in Capsule preferences. They are private cues and patterns - not judgments, labels, or identity.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+
+        Text("No insights yet.")
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.secondary)
+            .padding(.top, 2)
+    }
+    .padding(14)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
 }
 
 private struct ProgressPanel: View {

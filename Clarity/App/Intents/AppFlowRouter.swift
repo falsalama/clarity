@@ -6,7 +6,11 @@ final class AppFlowRouter: ObservableObject {
     enum Tab: Hashable {
         case home, reflect, focus, practice, profile
     }
+    @Published var homeTab: HomeTab = .practice
 
+    enum HomeTab: Hashable {
+        case practice, progress
+    }
     @Published var selectedTab: Tab = .home
 
     // When Practice completes, flip to Profile and auto-open Progress once.
@@ -18,7 +22,8 @@ final class AppFlowRouter: ObservableObject {
     func go(_ tab: Tab) { selectedTab = tab }
 
     func openProgressWithBeadAnimation() {
-        selectedTab = .profile
+        selectedTab = .home
+        homeTab = .progress
         pendingOpenProgress = true
         animateNextBead = true
     }

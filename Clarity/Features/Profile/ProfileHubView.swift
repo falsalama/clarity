@@ -60,9 +60,7 @@ struct ProfileHubView: View {
                 } label: {
                     HStack(spacing: 10) {
                         Label("Calendar", systemImage: "calendar")
-
                         Spacer()
-
                         if let today = calendarStore.today.first {
                             Text(today.title)
                                 .font(.footnote)
@@ -72,6 +70,11 @@ struct ProfileHubView: View {
                     }
                 }
 
+                NavigationLink {
+                    PilgrimageView()
+                } label: {
+                    Label("Pilgrimage", systemImage: "map")
+                }
                 NavigationLink {
                     PortraitEditorView()
                 } label: {
@@ -142,7 +145,6 @@ struct ProfileHubView: View {
         }
         .navigationDestination(isPresented: $showProgressScreen) {
             ProgressScreen()
-        
         }
     }
 }

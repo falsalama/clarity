@@ -566,3 +566,32 @@ final class PracticeProgramStateEntity {
         self.updatedAt = updatedAt
     }
 }
+// MARK: - PilgrimageVisitEntity (local-only stamps)
+
+@Model
+final class PilgrimageVisitEntity {
+
+    @Attribute(.unique)
+    var id: UUID
+
+    /// Stable identifier for the place (matches PilgrimagePlace.id)
+    @Attribute(.unique)
+    var placeID: String
+
+    var visitedAt: Date
+
+    /// Optional user note (local-only)
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        placeID: String,
+        visitedAt: Date = Date(),
+        note: String? = nil
+    ) {
+        self.id = id
+        self.placeID = placeID
+        self.visitedAt = visitedAt
+        self.note = note
+    }
+}

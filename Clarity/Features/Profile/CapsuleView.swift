@@ -360,13 +360,13 @@ struct CapsuleView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
 #endif
+        .navigationTitle("Reflect")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    focusedField = nil
-                    hideKeyboard()
-                }
+            ToolbarItem(placement: .topBarTrailing) {
+                Text("express yourself honestly.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
         }
         .safeAreaInset(edge: .bottom) {
