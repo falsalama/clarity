@@ -5,12 +5,29 @@ import CoreLocation
 @MainActor
 final class PilgrimageLocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
-    enum State {
+    enum State: Equatable {
         case idle
         case denied
         case unavailable
         case locating
         case located(CLLocation)
+
+        static func == (lhs: State, rhs: State) -> Bool {
+            switch (lhs, rhs) {
+            case (.idle, .idle),
+                 (.denied, .denied),
+                 (.unavailable, .unavailable),
+                 (.locating, .locating):
+                return true
+            case (.located, .located):
+                // Treat any two .located states as equal for onChange comparisons.
+                // We don't compare CLLocation (not Equatable) and we don't need to
+                // distinguish different coordinates for this UI trigger.
+                return true
+            default:
+                return false
+            }
+        }
     }
 
     @Published private(set) var state: State = .idle

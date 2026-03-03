@@ -76,6 +76,11 @@ struct ProfileHubView: View {
                     Label("Pilgrimage", systemImage: "map")
                 }
                 NavigationLink {
+                    PilgrimageVisionView()
+                } label: {
+                    Label("Open Vision", systemImage: "camera")
+                }
+                NavigationLink {
                     PortraitEditorView()
                 } label: {
                     HStack(spacing: 8) {

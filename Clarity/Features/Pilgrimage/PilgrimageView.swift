@@ -2,10 +2,10 @@ import SwiftUI
 import SwiftData
 import MapKit
 import CoreLocation
+import Combine
 
 struct PilgrimageView: View {
     @Environment(\.modelContext) private var modelContext
-
     @StateObject private var location = PilgrimageLocationManager()
 
     @Query private var visits: [PilgrimageVisitEntity]
@@ -13,17 +13,15 @@ struct PilgrimageView: View {
     @State private var selected: PilgrimagePlace? = nil
     @State private var spin: Double = 0
 
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var didAutoCenter: Bool = false
+
     init() {
         _visits = Query(sort: [SortDescriptor(\PilgrimageVisitEntity.visitedAt, order: .reverse)])
     }
 
-    private var visitedSet: Set<String> {
-        Set(visits.map(\.placeID))
-    }
-
-    private var visitedCount: Int {
-        visitedSet.count
-    }
+    private var visitedSet: Set<String> { Set(visits.map(\.placeID)) }
+    private var visitedCount: Int { visitedSet.count }
 
     private var userLocation: CLLocation? {
         if case let .located(loc) = location.state { return loc }
@@ -39,7 +37,6 @@ struct PilgrimageView: View {
 
     private func markVisited(_ place: PilgrimagePlace) {
         if let existing = visits.first(where: { $0.placeID == place.id }) {
-            // already visited - no-op (or update timestamp if you prefer)
             existing.visitedAt = existing.visitedAt
             return
         }
@@ -79,14 +76,12 @@ struct PilgrimageView: View {
             }
 
             Section {
-                Map(initialPosition: .region(defaultRegion)) {
+                Map(position: $cameraPosition) {
                     ForEach(PilgrimagePlaces.all) { place in
                         Annotation(place.name, coordinate: place.coordinate) {
                             Button {
                                 selected = place
-                                withAnimation(.easeOut(duration: 0.35)) {
-                                    spin += 360
-                                }
+                                withAnimation(.easeOut(duration: 0.35)) { spin += 360 }
                             } label: {
                                 towerMarker(isVisited: visitedSet.contains(place.id))
                             }
@@ -105,9 +100,7 @@ struct PilgrimageView: View {
                 ForEach(PilgrimagePlaces.all) { place in
                     Button {
                         selected = place
-                        withAnimation(.easeOut(duration: 0.35)) {
-                            spin += 360
-                        }
+                        withAnimation(.easeOut(duration: 0.35)) { spin += 360 }
                     } label: {
                         HStack(spacing: 12) {
                             towerRowIcon(isVisited: visitedSet.contains(place.id))
@@ -143,25 +136,29 @@ struct PilgrimageView: View {
         .navigationTitle("Pilgrimage")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(item: $selected) { place in
-            PilgrimagePlaceSheet(
-                place: place,
-                isVisited: visitedSet.contains(place.id),
-                spin: spin,
-                onSpin: { withAnimation(.easeOut(duration: 0.35)) { spin += 360 } },
-                onMarkVisited: { markVisited(place) }
-            )
+            NavigationStack {
+                PilgrimagePlaceSheet(
+                    place: place,
+                    isVisited: visitedSet.contains(place.id),
+                    spin: spin,
+                    onSpin: { withAnimation(.easeOut(duration: 0.35)) { spin += 360 } },
+                    onMarkVisited: { markVisited(place) }
+                )
+                .navigationBarTitleDisplayMode(.inline)
+            }
             .presentationDetents([.medium, .large])
         }
-        .onAppear {
-            // on-demand only; no background tracking
-        }
-    }
+        .onReceive(location.$state) { newValue in
+            guard didAutoCenter == false else { return }
+            guard case let .located(loc) = newValue else { return }
+            didAutoCenter = true
 
-    private var defaultRegion: MKCoordinateRegion {
-        MKCoordinateRegion(
-            center: CLLocationCoordinate2D(latitude: 27.0, longitude: 86.0),
-            span: MKCoordinateSpan(latitudeDelta: 25, longitudeDelta: 25)
-        )
+            let region = MKCoordinateRegion(
+                center: loc.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 6, longitudeDelta: 6)
+            )
+            cameraPosition = .region(region)
+        }
     }
 
     private func towerMarker(isVisited: Bool) -> some View {
@@ -221,6 +218,23 @@ private struct PilgrimagePlaceSheet: View {
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 18)
+
+            NavigationLink {
+                PilgrimageVisionView()
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "camera")
+                    Text("Open Vision")
+                        .font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.bordered)
 
             Button {
                 onMarkVisited()
