@@ -12,13 +12,17 @@ struct FocusView: View {
     @State private var bgPhase = false
     @State private var isReady = false
 
+    private let suppressMantra: Bool
+
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
+    @EnvironmentObject private var flow: AppFlowRouter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+
     // MARK: - Data
 
     @Query private var completedTurns: [TurnEntity]
@@ -75,7 +79,9 @@ Nothing is lost.
 
     // MARK: - Init
 
-    init() {
+    init(suppressMantra: Bool = false) {
+        self.suppressMantra = suppressMantra
+
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
                 !turn.transcriptRedactedActive.isEmpty
@@ -116,7 +122,6 @@ Nothing is lost.
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-
                     teachingCard
                         .opacity(isReady ? 1 : 0)
                         .animation(.easeOut(duration: 0.55), value: isReady)
@@ -149,10 +154,6 @@ Nothing is lost.
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-
-            ToolbarItem(placement: .topBarTrailing) {
-                achievementsLink
             }
         }
         .onAppear {
@@ -221,7 +222,7 @@ Nothing is lost.
 
     private var mantraStrip: some View {
         Group {
-            if let m = currentMantra {
+            if suppressMantra == false, let m = currentMantra {
                 Text(m)
                     .font(.system(size: 40, weight: .bold, design: .serif))
                     .foregroundStyle(.secondary)
@@ -278,6 +279,7 @@ Nothing is lost.
 
             Button {
                 markDoneToday()
+                flow.go(.practice)
             } label: {
                 Text("Done")
                     .font(.callout.weight(.semibold))
@@ -333,7 +335,18 @@ Nothing is lost.
         guard !isDoneToday else { return }
 
         let key = todayKey
-        modelContext.insert(FocusCompletionEntity(dayKey: key))
+        let t = currentTeaching
+        modelContext.insert(
+            FocusCompletionEntity(
+                dayKey: key,
+                completedAt: Date(),
+                programmeSlug: nil,
+                stepIndex: currentIndex,
+                title: t.title,
+                body: t.body,
+                mantra: t.mantra
+            )
+        )
 
         if let state = programState {
             state.pendingAdvanceDayKey = key
@@ -449,4 +462,3 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self
     }
 }
-

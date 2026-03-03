@@ -376,10 +376,28 @@ final class ReflectCompletionEntity {
 
     var completedAt: Date
 
-    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+    // Snapshot (local-only, minimal)
+    var programmeSlug: String?
+    var stepIndex: Int?
+    var title: String?
+    var body: String?
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        completedAt: Date = Date(),
+        programmeSlug: String? = nil,
+        stepIndex: Int? = nil,
+        title: String? = nil,
+        body: String? = nil
+    ) {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+        self.programmeSlug = programmeSlug
+        self.stepIndex = stepIndex
+        self.title = title
+        self.body = body
     }
 }
 
@@ -423,10 +441,31 @@ final class FocusCompletionEntity {
 
     var completedAt: Date
 
-    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+    // Snapshot (local-only, minimal)
+    var programmeSlug: String?
+    var stepIndex: Int?
+    var title: String?
+    var body: String?
+    var mantra: String?
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        completedAt: Date = Date(),
+        programmeSlug: String? = nil,
+        stepIndex: Int? = nil,
+        title: String? = nil,
+        body: String? = nil,
+        mantra: String? = nil
+    ) {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+        self.programmeSlug = programmeSlug
+        self.stepIndex = stepIndex
+        self.title = title
+        self.body = body
+        self.mantra = mantra
     }
 }
 
@@ -444,10 +483,31 @@ final class PracticeCompletionEntity {
 
     var completedAt: Date
 
-    init(id: UUID = UUID(), dayKey: String, completedAt: Date = Date()) {
+    // Snapshot (local-only, minimal)
+    var programmeSlug: String?
+    var stepIndex: Int?
+    var title: String?
+    var body: String?
+    var durationSeconds: Int?
+
+    init(
+        id: UUID = UUID(),
+        dayKey: String,
+        completedAt: Date = Date(),
+        programmeSlug: String? = nil,
+        stepIndex: Int? = nil,
+        title: String? = nil,
+        body: String? = nil,
+        durationSeconds: Int? = nil
+    ) {
         self.id = id
         self.dayKey = dayKey
         self.completedAt = completedAt
+        self.programmeSlug = programmeSlug
+        self.stepIndex = stepIndex
+        self.title = title
+        self.body = body
+        self.durationSeconds = durationSeconds
     }
 }
 
@@ -504,5 +564,34 @@ final class PracticeProgramStateEntity {
         self.currentIndex = currentIndex
         self.pendingAdvanceDayKey = pendingAdvanceDayKey
         self.updatedAt = updatedAt
+    }
+}
+// MARK: - PilgrimageVisitEntity (local-only stamps)
+
+@Model
+final class PilgrimageVisitEntity {
+
+    @Attribute(.unique)
+    var id: UUID
+
+    /// Stable identifier for the place (matches PilgrimagePlace.id)
+    @Attribute(.unique)
+    var placeID: String
+
+    var visitedAt: Date
+
+    /// Optional user note (local-only)
+    var note: String?
+
+    init(
+        id: UUID = UUID(),
+        placeID: String,
+        visitedAt: Date = Date(),
+        note: String? = nil
+    ) {
+        self.id = id
+        self.placeID = placeID
+        self.visitedAt = visitedAt
+        self.note = note
     }
 }
