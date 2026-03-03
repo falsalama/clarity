@@ -8,7 +8,13 @@ import UIKit
 
 struct CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
+    @EnvironmentObject private var flow: AppFlowRouter
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
+
+    let autoPopOnDone: Bool
+    let hideDailyQuestion: Bool
+    let embedInNavigationStack: Bool
 
     private let cloudTap = CloudTapService()
 
@@ -26,20 +32,30 @@ struct CaptureView: View {
     @State private var steps: [CloudTapStep] = []
     @State private var stepsError: String? = nil
     @State private var stepsLoading: Bool = false
-    //fade in of question card
+
+    // fade in of question card
     @State private var questionReady: Bool = false
 
     // Captures list (unchanged)
     @Query private var completedTurns: [TurnEntity]
     @State private var bgPhase: Bool = false
     @State private var isReady: Bool = false
+
     // Progress count (Reflect done-days)
     @Query private var reflectCompletions: [ReflectCompletionEntity]
 
     // Singleton state (programme pointer)
     @Query private var reflectState: [ReflectProgramStateEntity]
 
-    init() {
+    init(
+        autoPopOnDone: Bool = false,
+        hideDailyQuestion: Bool = false,
+        embedInNavigationStack: Bool = true
+    ) {
+        self.autoPopOnDone = autoPopOnDone
+        self.hideDailyQuestion = hideDailyQuestion
+        self.embedInNavigationStack = embedInNavigationStack
+
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
                 !turn.transcriptRedactedActive.isEmpty
@@ -107,112 +123,106 @@ struct CaptureView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            ZStack {
-                cloudsBackground
-
-                List {
-                    captureSurfaceSection
-                    capturesSection
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .opacity(isReady ? 1 : 0)
-                .animation(.easeOut(duration: 0.55), value: isReady)
+        if embedInNavigationStack {
+            NavigationStack(path: $path) {
+                captureRoot
             }
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text("Reflect")
-                            .font(.headline)
-                        Text("One honest answer each day.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    NavigationLink {
-                        ProgressScreen()
-                    } label: {
-                        TopCounterBadge(
-                            count: min(108, reflectCompletions.count),
-                            fill: Color.white.opacity(0.92),
-                            textColor: .black
-                        )
-                        .overlay(Capsule().stroke(.black.opacity(0.08), lineWidth: 1))
-                    }
-                    .accessibilityLabel(Text("Progress: \(min(108, reflectCompletions.count)) of 108"))
-                }
-            }
-
-            .navigationDestination(for: UUID.self) { id in
-                TurnDetailView(turnID: id)
-            }
-            .onChange(of: coordinator.lastCompletedTurnID) { _, newValue in
-                guard let id = newValue else { return }
-                guard coordinator.isCarPlayConnected == false else { return }
-
-                coordinator.clearLiveTranscript()
-                path.append(id)
-                coordinator.lastCompletedTurnID = nil
-            }
-            .onChange(of: coordinator.uiError) { _, newValue in
-                guard let err = newValue else { return }
-
-                switch err {
-                case .micDenied, .micNotGranted:
-                    permissionAlertTitleKey = "perm.mic.title"
-                    permissionAlertMessageKey = "perm.mic.message"
-                    showPermissionAlert = true
-                case .speechDeniedOrNotAuthorised, .speechUnavailable:
-                    permissionAlertTitleKey = "perm.speech.title"
-                    permissionAlertMessageKey = "perm.speech.message"
-                    showPermissionAlert = true
-                default:
-                    break
-                }
-            }
-            .alert(
-                Text(LocalizedStringKey(permissionAlertTitleKey)),
-                isPresented: $showPermissionAlert
-            ) {
-                Button(String(localized: "perm.button.open_settings")) { openAppSettings() }
-                Button(String(localized: "perm.button.cancel"), role: .cancel) {}
-            } message: {
-                Text(LocalizedStringKey(permissionAlertMessageKey))
-            }
-            .sheet(isPresented: $showPasteSheet) {
-                PasteTextTurnSheet { newID in
-                    path.append(newID)
-                }
-                .environmentObject(coordinator)
-            }
-            .onAppear {
-                bgPhase.toggle()
-                isReady = false
-                ensureProgrammeState()
-
-                Task {
-                    await loadStepsIfNeeded()
-                    await MainActor.run {
-                        advanceIfPending()
-                        withAnimation(.easeOut(duration: 0.55)) {
-                            isReady = true
-                        }
-                    }
-                }
-            }
-            .onChange(of: todayKey) { _, _ in
-                // New calendar day: advance if yesterday was marked done.
-                advanceIfPending()
-            }
+        } else {
+            captureRoot
         }
     }
-    
+
+    private var captureRoot: some View {
+        ZStack {
+            cloudsBackground
+
+            List {
+                captureSurfaceSection
+                capturesSection
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .opacity(isReady ? 1 : 0)
+            .animation(.easeOut(duration: 0.55), value: isReady)
+            .padding(.top, hideDailyQuestion ? -52 : 0)
+        }
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Reflect")
+                        .font(.headline)
+                    Text("express yourself honestly.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .navigationDestination(for: UUID.self) { id in
+            TurnDetailView(turnID: id)
+        }
+        .onChange(of: coordinator.lastCompletedTurnID) { _, newValue in
+            guard let id = newValue else { return }
+            guard coordinator.isCarPlayConnected == false else { return }
+
+            coordinator.clearLiveTranscript()
+            path.append(id)
+            coordinator.lastCompletedTurnID = nil
+        }
+        .onChange(of: coordinator.uiError) { _, newValue in
+            guard let err = newValue else { return }
+
+            switch err {
+            case .micDenied, .micNotGranted:
+                permissionAlertTitleKey = "perm.mic.title"
+                permissionAlertMessageKey = "perm.mic.message"
+                showPermissionAlert = true
+            case .speechDeniedOrNotAuthorised, .speechUnavailable:
+                permissionAlertTitleKey = "perm.speech.title"
+                permissionAlertMessageKey = "perm.speech.message"
+                showPermissionAlert = true
+            default:
+                break
+            }
+        }
+        .alert(
+            Text(LocalizedStringKey(permissionAlertTitleKey)),
+            isPresented: $showPermissionAlert
+        ) {
+            Button(String(localized: "perm.button.open_settings")) { openAppSettings() }
+            Button(String(localized: "perm.button.cancel"), role: .cancel) {}
+        } message: {
+            Text(LocalizedStringKey(permissionAlertMessageKey))
+        }
+        .sheet(isPresented: $showPasteSheet) {
+            PasteTextTurnSheet { newID in
+                path.append(newID)
+            }
+            .environmentObject(coordinator)
+        }
+        .onAppear {
+            bgPhase.toggle()
+            isReady = false
+            ensureProgrammeState()
+
+            Task {
+                await loadStepsIfNeeded()
+                await MainActor.run {
+                    advanceIfPending()
+                    withAnimation(.easeOut(duration: 0.55)) {
+                        isReady = true
+                    }
+                }
+            }
+        }
+        .onChange(of: todayKey) { _, _ in
+            // New calendar day: advance if yesterday was marked done.
+            advanceIfPending()
+        }
+    }
+
     private var cloudsBackground: some View {
         Image("CloudsBG")
             .resizable()
@@ -235,8 +245,9 @@ struct CaptureView: View {
             .scaleEffect(x: -1, y: 1) // mirror horizontally
             .offset(y: bgPhase ? 98 : 120)
             .allowsHitTesting(false)
-        
-    }    // MARK: - Steps: load + state
+    }
+
+    // MARK: - Steps: load + state
 
     private func ensureProgrammeState() {
         guard programmeState == nil else { return }
@@ -267,6 +278,18 @@ struct CaptureView: View {
         }
     }
 
+    private var canRepairTodaySnapshot: Bool {
+        #if DEBUG
+        guard isDoneToday else { return false }
+        let existing = reflectCompletions.first(where: { $0.dayKey == todayKey })
+        let titleEmpty = (existing?.title ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let bodyEmpty  = (existing?.body  ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return (titleEmpty && bodyEmpty) && (currentStep != nil)
+        #else
+        return false
+        #endif
+    }
+
     private func advanceIfPending() {
         guard let s = programmeState else { return }
         guard let pending = s.pendingAdvanceDayKey else { return }
@@ -280,9 +303,32 @@ struct CaptureView: View {
     }
 
     private func markDoneToday() {
-        guard isDoneToday == false else { return }
+        let step = currentStep
 
-        let completion = ReflectCompletionEntity(dayKey: todayKey, completedAt: Date())
+        if let existing = reflectCompletions.first(where: { $0.dayKey == todayKey }) {
+            existing.programmeSlug = nil
+            existing.stepIndex = step?.stepIndex
+            existing.title = step?.title
+            existing.body = step?.body
+            existing.completedAt = existing.completedAt
+
+            if let s = programmeState {
+                s.pendingAdvanceDayKey = todayKey
+                s.updatedAt = Date()
+            }
+
+            do { try modelContext.save() } catch { /* best-effort */ }
+            return
+        }
+
+        let completion = ReflectCompletionEntity(
+            dayKey: todayKey,
+            completedAt: Date(),
+            programmeSlug: nil,
+            stepIndex: step?.stepIndex,
+            title: step?.title,
+            body: step?.body
+        )
         modelContext.insert(completion)
 
         if let s = programmeState {
@@ -296,41 +342,37 @@ struct CaptureView: View {
     // MARK: - Sections
 
     private var captureSurfaceSection: some View {
-        Section {
+        VStack(spacing: 12) {
 
-            VStack(spacing: 12) {
-
+            if hideDailyQuestion {
+                reflectExplainerCard
+            } else {
                 todayQuestionCard
-
-                // Prompt chips
-                promptChips
-
-                micButton
-
-                statusPill
-                    .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
-
-                typeTextButton
-
-                if let uiErrorKey = userFacingErrorKey {
-                    Text(LocalizedStringKey(uiErrorKey))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.top, -4)
-                }
             }
-            .padding(.vertical, -30)
-            .listRowInsets(EdgeInsets(top: -26, leading: 16, bottom: 10, trailing: 16))
-            .listRowSeparator(.hidden)
 
-        } header: {
-            EmptyView()
+            // Prompt chips
+            promptChips
+
+            micButton
+
+            statusPill
+                .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
+
+            typeTextButton
+
+            if let uiErrorKey = userFacingErrorKey {
+                Text(LocalizedStringKey(uiErrorKey))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, -4)
+            }
         }
-        .listRowBackground(Color.clear)     // <-- add
-        .listRowSeparator(.hidden)          // <-- add (keeps it consistent)
+        .padding(.vertical, 0)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
-
     private var todayQuestionCard: some View {
         VStack(alignment: .leading, spacing: 10) {
 
@@ -342,10 +384,12 @@ struct CaptureView: View {
                     Text("Loading…")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
                 } else if let err = stepsError {
                     Text(err)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+
                 } else if let step = currentStep {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(step.body)
@@ -358,6 +402,7 @@ struct CaptureView: View {
                     }
                     .opacity(questionReady ? 1 : 0)
                     .animation(.easeOut(duration: 0.55), value: questionReady)
+
                 } else {
                     Text("No question yet.")
                         .font(.footnote)
@@ -365,7 +410,6 @@ struct CaptureView: View {
                 }
             }
             .transaction { $0.animation = nil }
-
 
             Divider()
                 .padding(.top, 6)
@@ -377,25 +421,68 @@ struct CaptureView: View {
 
                 Spacer()
 
-                Button { markDoneToday() } label: {
+                Button {
+                    markDoneToday()
+                    flow.go(.focus)
+                    if autoPopOnDone { dismiss() }
+                } label: {
                     Text("Done")
                         .font(.callout.weight(.semibold))
                 }
-                .buttonStyle(.bordered) // <- matches Focus/Practice
-                .disabled(isDoneToday || coordinator.phase != .idle)
+                .buttonStyle(.bordered)
+                .disabled(
+                    isDoneToday ||
+                    coordinator.phase != .idle ||
+                    currentStep == nil
+                )
             }
+
+            #if DEBUG
+            if canRepairTodaySnapshot {
+                Button("Repair snapshot (debug)") {
+                    markDoneToday()
+                }
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.top, 6)
+            }
+            #endif
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding() // 16
+        .padding()
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
                 .stroke(.black.opacity(0.06), lineWidth: 1)
         )
-        // remove extra top padding to match other feature cards
     }
 
+    private var reflectExplainerCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Reflect")
+                .font(.title3.weight(.semibold))
+
+            Text("Use this to speak or type what is on your mind. Use the buttons below for structured reflection through a Buddhist lens.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider().padding(.top, 6)
+
+            Text("Tip: Keep it short. One clear thought is enough.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
+                .stroke(.black.opacity(0.06), lineWidth: 1)
+        )
+    }
 
     private var capturesSection: some View {
         Section {
@@ -602,14 +689,15 @@ struct CaptureView: View {
     }
 
     private func openAppSettings() {
-#if os(iOS)
+        #if os(iOS)
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
-#endif
+        #endif
     }
 }
 
 #Preview {
     CaptureView()
         .environmentObject(TurnCaptureCoordinator())
+        .environmentObject(AppFlowRouter())
 }

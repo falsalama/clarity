@@ -287,7 +287,18 @@ Nothing is lost.
         guard !isDoneToday else { return }
 
         let key = todayKey
-        modelContext.insert(FocusCompletionEntity(dayKey: key))
+        let t = currentTeaching
+        modelContext.insert(
+            FocusCompletionEntity(
+                dayKey: key,
+                completedAt: Date(),
+                programmeSlug: nil,
+                stepIndex: currentIndex,
+                title: t.title,
+                body: t.body,
+                mantra: t.mantra
+            )
+        )
 
         if let state = programState {
             state.pendingAdvanceDayKey = key
