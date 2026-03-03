@@ -13,13 +13,20 @@ struct PilgrimageView: View {
     @State private var selected: PilgrimagePlace? = nil
     @State private var spin: Double = 0
 
-    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var cameraPosition: MapCameraPosition = .region(Self.defaultRegion)
     @State private var didAutoCenter: Bool = false
 
     init() {
         _visits = Query(sort: [SortDescriptor(\PilgrimageVisitEntity.visitedAt, order: .reverse)])
     }
-
+    
+    private static var defaultRegion: MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: 20.0, longitude: 0.0),
+            span: MKCoordinateSpan(latitudeDelta: 120, longitudeDelta: 180)
+        )
+    }
+    
     private var visitedSet: Set<String> { Set(visits.map(\.placeID)) }
     private var visitedCount: Int { visitedSet.count }
 

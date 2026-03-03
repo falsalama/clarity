@@ -20,9 +20,7 @@ final class PilgrimageLocationManager: NSObject, ObservableObject, CLLocationMan
                  (.locating, .locating):
                 return true
             case (.located, .located):
-                // Treat any two .located states as equal for onChange comparisons.
-                // We don't compare CLLocation (not Equatable) and we don't need to
-                // distinguish different coordinates for this UI trigger.
+                // UI doesn’t need to compare coordinates for equality here.
                 return true
             default:
                 return false
@@ -40,36 +38,50 @@ final class PilgrimageLocationManager: NSObject, ObservableObject, CLLocationMan
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
+    /// Public entry-point from UI. Does the heavy checks off-main.
     func requestOneShotLocation() {
-        guard CLLocationManager.locationServicesEnabled() else {
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+
+            let servicesEnabled = CLLocationManager.locationServicesEnabled()
+
+            // Swift 6: `manager` is main-actor isolated, so read it on MainActor.
+            let status: CLAuthorizationStatus = await MainActor.run {
+                self.manager.authorizationStatus
+            }
+
+            await self.handleRequest(servicesEnabled: servicesEnabled, status: status)
+        }
+    }
+
+    @MainActor
+    private func handleRequest(servicesEnabled: Bool, status: CLAuthorizationStatus) {
+        guard servicesEnabled else {
             state = .unavailable
             return
         }
 
-        switch manager.authorizationStatus {
+        switch status {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
+
         case .restricted, .denied:
             state = .denied
+
         case .authorizedAlways, .authorizedWhenInUse:
             state = .locating
             manager.requestLocation()
+
         @unknown default:
             state = .unavailable
         }
     }
 
+    // MARK: CLLocationManagerDelegate
+
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        switch manager.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
-            requestOneShotLocation()
-        case .restricted, .denied:
-            state = .denied
-        case .notDetermined:
-            state = .idle
-        @unknown default:
-            state = .unavailable
-        }
+        // Delegate callbacks are fine on main; just re-run request flow.
+        requestOneShotLocation()
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
