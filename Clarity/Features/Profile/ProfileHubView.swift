@@ -76,7 +76,12 @@ struct ProfileHubView: View {
                     Label("Pilgrimage", systemImage: "map")
                 }
                 NavigationLink {
-                    PilgrimageVisionView()
+                    PilgrimageVisionView(
+                        placeName: nil,
+                        placeCoordinate: nil,
+                        userLocation: nil,
+                        visionRadiusMeters: 250
+                    )
                 } label: {
                     Label("Open Vision", systemImage: "camera")
                 }

@@ -9,15 +9,41 @@ struct PilgrimagePlace: Identifiable {
     let subtitle: String
     let coordinate: CLLocationCoordinate2D
     let teaching: String
+    let visionRadiusMeters: Double
+
+    init(
+        id: String,
+        name: String,
+        subtitle: String,
+        coordinate: CLLocationCoordinate2D,
+        teaching: String,
+        visionRadiusMeters: Double = 250
+    ) {
+        self.id = id
+        self.name = name
+        self.subtitle = subtitle
+        self.coordinate = coordinate
+        self.teaching = teaching
+        self.visionRadiusMeters = visionRadiusMeters
+    }
 }
 
-/// NOTE:
-/// - Keep ids stable (used for visits).
-/// - Coordinates are “best effort”; a few modern centres may be approximate - adjust if you want precision.
 enum PilgrimagePlaces {
 
     static let all: [PilgrimagePlace] = [
 
+        // ─────────────────────────────
+        // TEST - OXFORD (local)
+        // ─────────────────────────────
+
+        PilgrimagePlace(
+            id: "vajrayogini_oxford_test",
+            name: "Vajra Yogini Sighting",
+            subtitle: "Norham Road, Oxford",
+            coordinate: .init(latitude: 51.765877, longitude: -1.257980),
+            teaching: "Appearance vivid - essence ungraspable.",
+            visionRadiusMeters: 800
+        ),
         // ─────────────────────────────
         // INDIA - BUDDHA PLACES
         // ─────────────────────────────
