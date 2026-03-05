@@ -19,7 +19,7 @@ struct PilgrimageVisionView: View {
             SimplePinnedARView(
                 isActive: true,
                 assetName: visionAssetName,
-                heightMeters: 2.5
+                heightMeters: 2.0
             )
             .ignoresSafeArea()
 
@@ -164,9 +164,8 @@ private struct SimplePinnedARView: UIViewRepresentable {
         let view = ARView(frame: .zero)
 
         let config = ARWorldTrackingConfiguration()
-        config.planeDetection = []                 // no plane / no raycast
+        config.planeDetection = [.horizontal]
         config.environmentTexturing = .automatic
-
         view.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
         context.coordinator.attach(to: view)
@@ -185,9 +184,18 @@ private struct SimplePinnedARView: UIViewRepresentable {
         private var didPlace = false
         private var retryCount = 0
         private var maxRetries = 12    // ~3 seconds at 0.25s intervals
+        private var updateSub: AnyCancellable?
+        private var model: ModelEntity?
+        
+        
 
         func attach(to view: ARView) {
             self.arView = view
+
+            updateSub = view.scene.publisher(for: SceneEvents.Update.self)
+                .sink { [weak self] _ in
+                    self?.faceCameraYaw()
+                }
         }
 
         func update(isActive: Bool, assetName: String, heightMeters: Float) {
@@ -200,7 +208,6 @@ private struct SimplePinnedARView: UIViewRepresentable {
                 return
             }
 
-            // active
             anchor?.isEnabled = true
             guard didPlace == false else { return }
 
@@ -218,7 +225,28 @@ private struct SimplePinnedARView: UIViewRepresentable {
             anchor?.removeFromParent()
             anchor = nil
 
-            // place once: 1.5m in front of camera
+            let plane = makeTexturedPlane(assetName: assetName, heightMeters: heightMeters)
+            model = plane
+
+            // 1) Try: raycast to a horizontal surface (stable world pin)
+            if let query = arView.makeRaycastQuery(
+                from: CGPoint(x: arView.bounds.midX, y: arView.bounds.midY),
+                allowing: .estimatedPlane,
+                alignment: .horizontal
+            ),
+            let result = arView.session.raycast(query).first {
+
+                let newAnchor = AnchorEntity(world: result.worldTransform)
+                newAnchor.addChild(plane)
+                arView.scene.addAnchor(newAnchor)
+
+                anchor = newAnchor
+                didPlace = true
+                retryCount = 0
+                return
+            }
+
+            // 2) Fallback: 1.5m in front of camera (works anywhere)
             let cam = frame.camera.transform
             let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
             let forward = -SIMD3<Float>(cam.columns.2.x, cam.columns.2.y, cam.columns.2.z)
@@ -228,19 +256,30 @@ private struct SimplePinnedARView: UIViewRepresentable {
             t.columns.3 = SIMD4<Float>(pos.x, pos.y, pos.z, 1)
 
             let newAnchor = AnchorEntity(world: t)
-
-            let plane = makeTexturedPlane(assetName: assetName, heightMeters: heightMeters)
             newAnchor.addChild(plane)
-
             arView.scene.addAnchor(newAnchor)
 
             anchor = newAnchor
             didPlace = true
-
-            // Face the camera ONCE at placement (prevents “thin edge” start)
-            faceCameraOnce(arView: arView, anchor: newAnchor, model: plane)
+            retryCount = 0
         }
+        
+        private func faceCameraYaw() {
+            guard let arView, let anchor, let model else { return }
+            guard let frame = arView.session.currentFrame else { return }
 
+            let cam = frame.camera.transform
+            let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
+
+            let worldPos = anchor.position(relativeTo: nil)
+            let dir = camPos - worldPos
+            let yaw = atan2(dir.x, dir.z)
+            let yawOnly = simd_quatf(angle: yaw, axis: [0, 1, 0])
+
+            let standUp = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
+            model.transform.rotation = simd_mul(yawOnly, standUp)
+        }
+        
         private func faceCameraOnce(arView: ARView, anchor: AnchorEntity, model: ModelEntity) {
             guard let frame = arView.session.currentFrame else { return }
 
@@ -261,7 +300,6 @@ private struct SimplePinnedARView: UIViewRepresentable {
             let h = max(0.6, heightMeters)
             let w = h * 0.75
 
-            // plane is XZ; rotate once to stand upright (no other axis work, no camera-facing)
             let mesh = MeshResource.generatePlane(width: w, depth: h)
             var material = UnlitMaterial()
 
@@ -279,8 +317,11 @@ private struct SimplePinnedARView: UIViewRepresentable {
             }
 
             let e = ModelEntity(mesh: mesh, materials: [material])
-            e.transform.rotation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0]) // stand up
+
+            // Stand up (RealityKit plane is XZ)
+            e.transform.rotation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
             e.transform.translation.y = h * 0.5
+
             return e
         }
     }
