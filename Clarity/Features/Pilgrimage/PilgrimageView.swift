@@ -292,8 +292,13 @@ private struct PilgrimagePlaceSheet: View {
                         placeName: place.name,
                         placeCoordinate: place.coordinate,
                         visionRadiusMeters: place.visionRadiusMeters,
-                        visionAssetName: (place.id == "vajra_yogini_norham") ? "vajrayogini" : "gururinpoche"
+                        visionAssetName:
+                            (place.id == "vajra_yogini_norham") ? "vajrayogini" :
+                            (place.id == "shakyamuni_wells") ? "shakyamuni" :
+                            "gururinpoche"
                     )
+                    
+                
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("Close") { showVision = false }

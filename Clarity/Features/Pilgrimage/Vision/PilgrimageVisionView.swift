@@ -17,9 +17,11 @@ struct PilgrimageVisionView: View {
     var body: some View {
         ZStack {
             SimplePinnedARView(
-                isActive: true,
+                isActive: (location.horizontalAccuracy ?? 9999) <= 35,
                 assetName: visionAssetName,
-                heightMeters: 2.0
+                heightMeters: 2.0,
+                bearingDegrees: bearingDegrees,
+                userHeadingDegrees: location.effectiveHeadingDegrees
             )
             .ignoresSafeArea()
 
@@ -59,7 +61,9 @@ struct PilgrimageVisionView: View {
     }
 
     private var relativeArrowDegrees: Double? {
-        guard let b = bearingDegrees, let h = location.effectiveHeadingDegrees else { return nil }
+        guard let b = bearingDegrees,
+              let h = location.effectiveHeadingDegrees else { return nil }
+
         var delta = b - h
         while delta < -180 { delta += 360 }
         while delta > 180 { delta -= 360 }
@@ -160,11 +164,15 @@ private struct SimplePinnedARView: UIViewRepresentable {
     let assetName: String
     let heightMeters: Float
 
+    // NEW: coordinate-derived direction (degrees)
+    let bearingDegrees: Double?
+    let userHeadingDegrees: Double?
+
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero)
 
         let config = ARWorldTrackingConfiguration()
-        config.planeDetection = [.horizontal]
+        config.planeDetection = []                 // we are not placing on planes
         config.environmentTexturing = .automatic
         view.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
@@ -173,7 +181,13 @@ private struct SimplePinnedARView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
-        context.coordinator.update(isActive: isActive, assetName: assetName, heightMeters: heightMeters)
+        context.coordinator.update(
+            isActive: isActive,
+            assetName: assetName,
+            heightMeters: heightMeters,
+            bearingDegrees: bearingDegrees,
+            userHeadingDegrees: userHeadingDegrees
+        )
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
@@ -181,13 +195,17 @@ private struct SimplePinnedARView: UIViewRepresentable {
     final class Coordinator {
         private weak var arView: ARView?
         private var anchor: AnchorEntity?
-        private var didPlace = false
-        private var retryCount = 0
-        private var maxRetries = 12    // ~3 seconds at 0.25s intervals
-        private var updateSub: AnyCancellable?
         private var model: ModelEntity?
-        
-        
+
+        private var updateSub: AnyCancellable?
+
+        // Tunables
+        private let beaconDistance: Float = 12.0
+        private let groundDrop: Float = 1.2   // roughly drop from camera height to “ground-ish”
+
+        private var didPlace = false
+        private var latestBearing: Double? = nil
+        private var latestHeading: Double? = nil
 
         func attach(to view: ARView) {
             self.arView = view
@@ -198,59 +216,57 @@ private struct SimplePinnedARView: UIViewRepresentable {
                 }
         }
 
-        func update(isActive: Bool, assetName: String, heightMeters: Float) {
+        func update(
+            isActive: Bool,
+            assetName: String,
+            heightMeters: Float,
+            bearingDegrees: Double?,
+            userHeadingDegrees: Double?
+        ) {
             guard let arView else { return }
 
             if isActive == false {
                 anchor?.isEnabled = false
-                didPlace = false
-                retryCount = 0
                 return
             }
-
             anchor?.isEnabled = true
-            guard didPlace == false else { return }
 
-            guard let frame = arView.session.currentFrame else {
-                guard retryCount < maxRetries else { return }
-                retryCount += 1
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    guard let self else { return }
-                    self.update(isActive: isActive, assetName: assetName, heightMeters: heightMeters)
-                }
-                return
-            }
+            // keep latest inputs
+            latestBearing = bearingDegrees
+            latestHeading = userHeadingDegrees
+
+            // Place exactly once, only when we have heading + bearing + a frame
+            guard didPlace == false else { return }
+            guard let frame = arView.session.currentFrame else { return }
+            guard let b = latestBearing else { return }
+            let h = latestHeading ?? b   // fallback: if no heading, place straight ahead
 
             // remove any old
             anchor?.removeFromParent()
             anchor = nil
+            model = nil
 
             let plane = makeTexturedPlane(assetName: assetName, heightMeters: heightMeters)
             model = plane
 
-            // 1) Try: raycast to a horizontal surface (stable world pin)
-            if let query = arView.makeRaycastQuery(
-                from: CGPoint(x: arView.bounds.midX, y: arView.bounds.midY),
-                allowing: .estimatedPlane,
-                alignment: .horizontal
-            ),
-            let result = arView.session.raycast(query).first {
+            // delta = where target is relative to where user is facing
+            var delta = b - h
+            while delta < -180 { delta += 360 }
+            while delta > 180 { delta -= 360 }
+            let r = Float(delta * .pi / 180)
 
-                let newAnchor = AnchorEntity(world: result.worldTransform)
-                newAnchor.addChild(plane)
-                arView.scene.addAnchor(newAnchor)
-
-                anchor = newAnchor
-                didPlace = true
-                retryCount = 0
-                return
-            }
-
-            // 2) Fallback: 1.5m in front of camera (works anywhere)
+            // Build a world-space offset using the *camera’s* right/forward axes at placement time.
             let cam = frame.camera.transform
             let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
+            let right = SIMD3<Float>(cam.columns.0.x, cam.columns.0.y, cam.columns.0.z)
             let forward = -SIMD3<Float>(cam.columns.2.x, cam.columns.2.y, cam.columns.2.z)
-            let pos = camPos + forward * 1.5
+
+            // local offset in camera frame (right/forward), rotated by delta
+            let x = sin(r) * beaconDistance
+            let z = cos(r) * beaconDistance
+
+            var pos = camPos + right * x + forward * z
+            pos.y = camPos.y - groundDrop
 
             var t = matrix_identity_float4x4
             t.columns.3 = SIMD4<Float>(pos.x, pos.y, pos.z, 1)
@@ -261,9 +277,8 @@ private struct SimplePinnedARView: UIViewRepresentable {
 
             anchor = newAnchor
             didPlace = true
-            retryCount = 0
         }
-        
+
         private func faceCameraYaw() {
             guard let arView, let anchor, let model else { return }
             guard let frame = arView.session.currentFrame else { return }
@@ -279,22 +294,6 @@ private struct SimplePinnedARView: UIViewRepresentable {
             let standUp = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
             model.transform.rotation = simd_mul(yawOnly, standUp)
         }
-        
-        private func faceCameraOnce(arView: ARView, anchor: AnchorEntity, model: ModelEntity) {
-            guard let frame = arView.session.currentFrame else { return }
-
-            let cam = frame.camera.transform
-            let camPos = SIMD3<Float>(cam.columns.3.x, cam.columns.3.y, cam.columns.3.z)
-
-            let worldPos = anchor.position(relativeTo: nil)
-            let dir = camPos - worldPos
-            let yaw = atan2(dir.x, dir.z)
-            let yawOnly = simd_quatf(angle: yaw, axis: [0, 1, 0])
-
-            // Preserve your “stand up” rotation
-            let standUp = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
-            model.transform.rotation = simd_mul(yawOnly, standUp)
-        }
 
         private func makeTexturedPlane(assetName: String, heightMeters: Float) -> ModelEntity {
             let h = max(0.6, heightMeters)
@@ -302,7 +301,6 @@ private struct SimplePinnedARView: UIViewRepresentable {
 
             let mesh = MeshResource.generatePlane(width: w, depth: h)
             var material = UnlitMaterial()
-
             if #available(iOS 18.0, *) { material.faceCulling = .none }
 
             if let ui = UIImage(named: assetName),
@@ -317,11 +315,8 @@ private struct SimplePinnedARView: UIViewRepresentable {
             }
 
             let e = ModelEntity(mesh: mesh, materials: [material])
-
-            // Stand up (RealityKit plane is XZ)
             e.transform.rotation = simd_quatf(angle: .pi / 2, axis: [1, 0, 0])
             e.transform.translation.y = h * 0.5
-
             return e
         }
     }
@@ -349,10 +344,16 @@ private final class VisionLocationManager: NSObject, ObservableObject, CLLocatio
     var effectiveLocation: CLLocation? { filteredLocation ?? lastLocation }
 
     var effectiveHeadingDegrees: Double? {
-        // Prefer GPS course when moving (typically more trustworthy than compass in urban/indoors).
+        // Prefer GPS course when moving (more stable than compass).
         if let loc = lastLocation, loc.speed >= 0.8, loc.course >= 0 {
             return loc.course
         }
+
+        // If compass accuracy is poor, treat heading as unavailable.
+        if let ha = headingAccuracy, ha > 25 {
+            return nil
+        }
+
         return filteredHeading ?? headingDegrees
     }
 

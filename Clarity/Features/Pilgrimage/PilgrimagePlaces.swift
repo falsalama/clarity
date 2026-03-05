@@ -64,6 +64,17 @@ enum PilgrimagePlaces {
             visionAssetName: "gururinpoche",
             visionMarkerHeightMeters: 2.5
         ),
+        
+        PilgrimagePlace(
+            id: "shakyamuni_wells",
+            name: "Shakyamuni Sighting",
+            subtitle: "Wells, Somerset",
+            coordinate: .init(latitude: 51.209139, longitude: -2.652194),
+            teaching: "",
+            visionRadiusMeters: 350,
+            visionAssetName: "shakyamuni",
+            visionMarkerHeightMeters: 2.5
+        ),
         // ─────────────────────────────
         // INDIA - BUDDHA PLACES
         // ─────────────────────────────
