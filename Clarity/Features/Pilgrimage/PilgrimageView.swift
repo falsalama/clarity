@@ -38,7 +38,8 @@ struct PilgrimageView: View {
 
     private func distanceMeters(to place: PilgrimagePlace) -> Double? {
         guard let loc = userLocation else { return nil }
-        return loc.distance(from: CLLocation(latitude: place.coordinate.latitude, longitude: place.coordinate.longitude))
+        return loc.distance(from: CLLocation(latitude: place.coordinate.latitude,
+                                            longitude: place.coordinate.longitude))
     }
 
     private func distanceString(to place: PilgrimagePlace) -> String? {
@@ -48,9 +49,7 @@ struct PilgrimageView: View {
     }
 
     private func markVisited(_ place: PilgrimagePlace) {
-        if visits.first(where: { $0.placeID == place.id }) != nil {
-            return
-        }
+        if visits.first(where: { $0.placeID == place.id }) != nil { return }
         modelContext.insert(PilgrimageVisitEntity(placeID: place.id, visitedAt: Date()))
         do { try modelContext.save() } catch { /* best-effort */ }
     }
@@ -211,6 +210,9 @@ private struct PilgrimagePlaceSheet: View {
 
     @State private var showVision: Bool = false
 
+    // This fixes the crash: PilgrimageVisionView (or something in its tree) expects CapsuleStore.
+    @EnvironmentObject private var capsuleStore: CapsuleStore
+
     private var visionGateSubtitle: String {
         let radius = Int(place.visionRadiusMeters.rounded())
         guard let d = distanceMeters else {
@@ -255,7 +257,6 @@ private struct PilgrimagePlaceSheet: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 18)
 
-            // Big, clear Vision CTA (full-screen)
             VStack(spacing: 8) {
                 Button {
                     showVision = true
@@ -290,8 +291,8 @@ private struct PilgrimagePlaceSheet: View {
                     PilgrimageVisionView(
                         placeName: place.name,
                         placeCoordinate: place.coordinate,
-                        userLocation: userLocation,
-                        visionRadiusMeters: place.visionRadiusMeters
+                        visionRadiusMeters: place.visionRadiusMeters,
+                        visionAssetName: (place.id == "vajra_yogini_norham") ? "vajrayogini" : "gururinpoche"
                     )
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
@@ -299,6 +300,7 @@ private struct PilgrimagePlaceSheet: View {
                         }
                     }
                 }
+                .environmentObject(capsuleStore)
             }
 
             Button { onMarkVisited() } label: {

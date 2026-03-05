@@ -40,6 +40,13 @@ struct ProfileHubView: View {
         return PortraitRecipe.decodeOrDefault(from: row.portraitRecipeJSON)
     }
 
+    private var dailyDoneCount: Int {
+        let r = Set(reflectCompletions.map(\.dayKey))
+        let f = Set(focusCompletions.map(\.dayKey))
+        let p = Set(practiceCompletions.map(\.dayKey))
+        return r.intersection(f).intersection(p).count
+    }
+
     var body: some View {
         List {
             Section {
@@ -75,16 +82,7 @@ struct ProfileHubView: View {
                 } label: {
                     Label("Pilgrimage", systemImage: "map")
                 }
-                NavigationLink {
-                    PilgrimageVisionView(
-                        placeName: nil,
-                        placeCoordinate: nil,
-                        userLocation: nil,
-                        visionRadiusMeters: 250
-                    )
-                } label: {
-                    Label("Open Vision", systemImage: "camera")
-                }
+
                 NavigationLink {
                     PortraitEditorView()
                 } label: {
@@ -124,15 +122,6 @@ struct ProfileHubView: View {
         .task { await calendarStore.refresh() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                // Daily units:
-                // - Legacy: day where Reflect + View + Practice all completed
-                // - New: any PracticeCompletionEntity with programmeSlug == "daily_unit_v1"
-                // De-duped by dayKey.
-                let r = Set(reflectCompletions.map(\.dayKey))
-                let f = Set(focusCompletions.map(\.dayKey))
-                let p = Set(practiceCompletions.map(\.dayKey))
-                let dailyDoneCount = r.intersection(f).intersection(p).count
-
                 NavigationLink {
                     ProgressScreen()
                 } label: {

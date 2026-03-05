@@ -1,5 +1,4 @@
 // PilgrimagePlaces.swift
-
 import Foundation
 import CoreLocation
 
@@ -9,7 +8,12 @@ struct PilgrimagePlace: Identifiable {
     let subtitle: String
     let coordinate: CLLocationCoordinate2D
     let teaching: String
+
     let visionRadiusMeters: Double
+
+    // NEW
+    let visionAssetName: String
+    let visionMarkerHeightMeters: Double
 
     init(
         id: String,
@@ -17,7 +21,9 @@ struct PilgrimagePlace: Identifiable {
         subtitle: String,
         coordinate: CLLocationCoordinate2D,
         teaching: String,
-        visionRadiusMeters: Double = 250
+        visionRadiusMeters: Double = 250,
+        visionAssetName: String = "vajrayogini",
+        visionMarkerHeightMeters: Double = 2.5
     ) {
         self.id = id
         self.name = name
@@ -25,6 +31,8 @@ struct PilgrimagePlace: Identifiable {
         self.coordinate = coordinate
         self.teaching = teaching
         self.visionRadiusMeters = visionRadiusMeters
+        self.visionAssetName = visionAssetName
+        self.visionMarkerHeightMeters = visionMarkerHeightMeters
     }
 }
 
@@ -35,14 +43,26 @@ enum PilgrimagePlaces {
         // ─────────────────────────────
         // TEST - OXFORD (local)
         // ─────────────────────────────
+        PilgrimagePlace(
+            id: "vajra_yogini_norham",
+            name: "Vajrayogini Sighting",
+            subtitle: "Oxford",
+            coordinate: .init(latitude: 51.765877, longitude: -1.257980),
+            teaching: "…",
+            visionRadiusMeters: 250,
+            visionAssetName: "vajrayogini",
+            visionMarkerHeightMeters: 2.5
+        ),
 
         PilgrimagePlace(
-            id: "vajrayogini_oxford_test",
-            name: "Vajra Yogini Sighting",
-            subtitle: "Norham Road, Oxford",
-            coordinate: .init(latitude: 51.765877, longitude: -1.257980),
-            teaching: "Appearance vivid - essence ungraspable.",
-            visionRadiusMeters: 800
+            id: "guru_rinpoche_abingdon",
+            name: "Guru Rinpoche Sighting",
+            subtitle: "Abingdon",
+            coordinate: .init(latitude: 51.66963, longitude: -1.28421),
+            teaching: "…",
+            visionRadiusMeters: 350,
+            visionAssetName: "gururinpoche",
+            visionMarkerHeightMeters: 2.5
         ),
         // ─────────────────────────────
         // INDIA - BUDDHA PLACES
