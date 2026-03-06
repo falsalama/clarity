@@ -1,44 +1,148 @@
 import SwiftUI
 
 struct FocusSoundsHubView: View {
-    private let soundPlaceholders: [SoundPlaceholder] = [
-        .init(title: "Bell", subtitle: "Short settling tone", duration: "20 sec", gradient: [.orange.opacity(0.22), .yellow.opacity(0.12)]),
-        .init(title: "Wind", subtitle: "Light ambient field", duration: "30 sec", gradient: [.cyan.opacity(0.20), .blue.opacity(0.10)]),
-        .init(title: "Resonance", subtitle: "Held meditative texture", duration: "40 sec", gradient: [.purple.opacity(0.20), .indigo.opacity(0.10)]),
-        .init(title: "Field", subtitle: "Natural recorded space", duration: "45 sec", gradient: [.green.opacity(0.20), .mint.opacity(0.10)]),
-        .init(title: "Drone", subtitle: "Longer grounding bed", duration: "60 sec", gradient: [.indigo.opacity(0.22), .blue.opacity(0.12)])
+    @ObservedObject private var player = FocusAudioPlayer.shared
+    
+    private let sounds: [FocusSoundItem] = [
+        .init(
+            title: "Crystal 1",
+            subtitle: "settling spacious tones",
+            fileName: "focus-crystal cave-1",
+            durationLabel: "1m 38s",
+            tint: Color(red: 0.78, green: 0.58, blue: 0.10) // saffron
+        ),
+        .init(
+            title: "Crystal 2",
+            subtitle: "Clear resonant pace",
+            fileName: "focus-crystal shell-2",
+            durationLabel: "1m 29s",
+            tint: Color(red: 0.55, green: 0.10, blue: 0.14) // maroon
+        ),
+        .init(
+            title: "Crystal 3",
+            subtitle: "Held meditative shimmer",
+            fileName: "focus-crystal chant-3",
+            durationLabel: "1m 29s",
+            tint: Color(red: 0.16, green: 0.28, blue: 0.62) // lapis
+        ),
+        .init(
+            title: "Crystal 4",
+            subtitle: "Soft spacious sustain",
+            fileName: "focus-crystal gompa-4",
+            durationLabel: "1m 50s",
+            tint: Color(red: 0.14, green: 0.44, blue: 0.26) // green
+        ),
+        .init(
+            title: "Crystal 5",
+            subtitle: "Longer reflective tone",
+            fileName: "focus-crystal bowls-5",
+            durationLabel: "1m 27s",
+            tint: Color(red: 0.70, green: 0.52, blue: 0.12) // gold
+        ),
+        .init(
+            title: "Nun Monlam",
+            subtitle: "Prayer and contemplative recitation",
+            fileName: "focus-nuns recite at monlam, Mahabodhi",
+            durationLabel: "1m 45s",
+            tint: Color(red: 0.42, green: 0.08, blue: 0.10) // deep red
+        )
     ]
 
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                headerCard
+    @Environment(\.colorScheme) private var colorScheme
 
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Sounds")
-                        .font(.headline)
-
-                    ForEach(soundPlaceholders) { item in
-                        SoundPlaceholderCard(item: item)
-                    }
-                }
-
-                futureCard
-            }
-            .padding(16)
-        }
-        .background(
-            LinearGradient(
+    private var backgroundGradient: LinearGradient {
+        if colorScheme == .dark {
+            return LinearGradient(
                 colors: [
-                    Color.indigo.opacity(0.06),
-                    Color.clear,
-                    Color.orange.opacity(0.04)
+                    Color(red: 0.10, green: 0.11, blue: 0.09),
+                    Color(red: 0.12, green: 0.10, blue: 0.08),
+                    Color(red: 0.08, green: 0.10, blue: 0.09)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            .ignoresSafeArea()
-        )
+        } else {
+            return LinearGradient(
+                colors: [
+                    Color(red: 0.95, green: 0.93, blue: 0.86),
+                    Color(red: 0.92, green: 0.91, blue: 0.84),
+                    Color(red: 0.90, green: 0.91, blue: 0.86)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+    
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Meditative sounds")
+                        .font(.title3.weight(.semibold))
+
+                    Text("A small collection of carefully made sound for practice, settling, and rest. This is a quiet support space - not a content library.")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 6)
+            }
+
+            Section("Sounds") {
+                ForEach(sounds) { sound in
+                    Button {
+                        player.toggle(id: sound.id, fileName: sound.fileName)
+                    } label: {
+                        HStack(spacing: 12) {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(sound.tint.opacity(0.22))
+                                .frame(width: 42, height: 42)
+                                .overlay(
+                                    Image(systemName: player.isPlaying(id: sound.id) ? "pause.fill" : "play.fill")
+                                        .font(.system(size: 15, weight: .semibold))
+                                        .foregroundStyle(sound.tint)
+                                )
+
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(sound.title)
+                                    .foregroundStyle(.primary)
+
+                                Text(sound.subtitle)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                            }
+
+                            Spacer()
+
+                            VStack(alignment: .trailing, spacing: 3) {
+                                Text(sound.durationLabel)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+
+                                if player.currentID == sound.id {
+                                    Image(systemName: player.isPlaying(id: sound.id) ? "waveform" : "speaker.slash")
+                                        .font(.footnote.weight(.medium))
+                                        .foregroundStyle(sound.tint)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Section("Later") {
+                Text("Sleep and longer listening can live here later without changing the overall structure.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(backgroundGradient.ignoresSafeArea())
         .navigationTitle("Focus")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -54,91 +158,23 @@ struct FocusSoundsHubView: View {
             }
         }
     }
-
-    private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Meditative sounds")
-                .font(.title3.weight(.semibold))
-
-            Text("A small collection of carefully made sound for practice, settling, and rest. This is a quiet support space - not a content library.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.thinMaterial)
-        )
-    }
-
-    private var futureCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Later")
-                .font(.headline)
-
-            Text("Sleep and longer listening can live here later without changing the overall structure.")
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.primary.opacity(0.04))
-        )
-    }
 }
 
-private struct SoundPlaceholder: Identifiable {
-    let id = UUID()
+private struct FocusSoundItem: Identifiable, Hashable {
+    let id: String
     let title: String
     let subtitle: String
-    let duration: String
-    let gradient: [Color]
-}
+    let fileName: String
+    let durationLabel: String
+    let tint: Color
 
-private struct SoundPlaceholderCard: View {
-    let item: SoundPlaceholder
-
-    var body: some View {
-        HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: item.gradient,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 62, height: 62)
-                .overlay(
-                    Image(systemName: "waveform")
-                        .font(.title3)
-                        .foregroundStyle(.primary.opacity(0.75))
-                )
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.headline)
-
-                Text(item.subtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            Text(item.duration)
-                .font(.footnote.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.thinMaterial)
-        )
+    init(title: String, subtitle: String, fileName: String, durationLabel: String, tint: Color) {
+        self.id = fileName
+        self.title = title
+        self.subtitle = subtitle
+        self.fileName = fileName
+        self.durationLabel = durationLabel
+        self.tint = tint
     }
 }
+

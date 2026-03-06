@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 // MARK: - Day snapshot types (file-scope, accessible to subviews)
 
@@ -131,6 +132,9 @@ private struct PracticePanel: View {
         VStack(spacing: 16) {
             introductionCard
             todayCard
+            practiceCard
+            focusCard
+            guidanceCard
             recentCard
             insightsCard
         }
@@ -213,6 +217,33 @@ private struct PracticePanel: View {
     }
 
     private var todayCard: some View {
+        let statusText: String = {
+            if !didReflectToday { return "Not started" }
+            if !didViewToday { return "Reflect complete - next: View" }
+            if !didPracticeToday { return "Reflect and View complete - next: Practice" }
+            return "Reflect, View, and Practice complete"
+        }()
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Today")
+                    .font(.headline)
+                Spacer()
+                Text(todayKey)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(statusText)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
+    }
+    
+    private var practiceCard: some View {
         let nextTitle: String = {
             if !didReflectToday { return "Start today’s practice" }
             if !didViewToday { return "Continue today’s practice" }
@@ -227,45 +258,82 @@ private struct PracticePanel: View {
             return "Reflect, View, and Practice are complete."
         }()
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Today")
-                    .font(.headline)
-                Spacer()
-                Text(todayKey)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Group {
-                if !didReflectToday {
-                    NavigationLink {
-                        CaptureView(autoPopOnDone: true, hideDailyQuestion: false, embedInNavigationStack: false)
-                    } label: {
-                        PillCTA(
-                            title: nextTitle,
-                            subtitle: nextSubtitle,
-                            systemImage: "sun.max.fill"
-                        )
-                    }
-                } else if !didViewToday {
-                    NavigationLink { FocusView() } label: {
-                        PrimaryCTA(title: nextTitle, subtitle: nextSubtitle)
-                    }
-                } else if !didPracticeToday {
-                    NavigationLink { PracticeView() } label: {
-                        PrimaryCTA(title: nextTitle, subtitle: nextSubtitle)
-                    }
-                } else {
-                    PrimaryCTA(title: nextTitle, subtitle: nextSubtitle, isComplete: true)
+        return Group {
+            if !didReflectToday {
+                NavigationLink {
+                    CaptureView(autoPopOnDone: true, hideDailyQuestion: false, embedInNavigationStack: false)
+                } label: {
+                    PillCTA(
+                        title: nextTitle,
+                        subtitle: nextSubtitle,
+                        systemImage: "sun.max.fill",
+                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
+                    )
                 }
+                .buttonStyle(.plain)
+            } else if !didViewToday {
+                NavigationLink {
+                    FocusView()
+                } label: {
+                    PillCTA(
+                        title: nextTitle,
+                        subtitle: nextSubtitle,
+                        systemImage: "book.closed.fill",
+                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
+                    )
+                }
+                .buttonStyle(.plain)
+            } else if !didPracticeToday {
+                NavigationLink {
+                    PracticeView()
+                } label: {
+                    PillCTA(
+                        title: nextTitle,
+                        subtitle: nextSubtitle,
+                        systemImage: "leaf.fill",
+                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
+                    )
+                }
+                .buttonStyle(.plain)
+            } else {
+                PillCTA(
+                    title: nextTitle,
+                    subtitle: nextSubtitle,
+                    systemImage: "checkmark.circle.fill",
+                    fill: Color(red: 0.40, green: 0.40, blue: 0.40)
+                )
             }
-            .buttonStyle(.plain)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
+    
+    private var focusCard: some View {
+        NavigationLink {
+            FocusSoundsHubView()
+        } label: {
+            PillCTA(
+                title: "Focus",
+                subtitle: "Meditative sounds",
+                systemImage: "waveform",
+                fill: Color(red: 0.16, green: 0.36, blue: 0.78)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var guidanceCard: some View {
+        NavigationLink {
+            GuidanceHubView()
+        } label: {
+            PillCTA(
+                title: "Guidance",
+                subtitle: "Book a one-to-one session with a trained Buddhist",
+                systemImage: "person.2.fill",
+                fill: Color(red: 0.18, green: 0.46, blue: 0.28)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+    
     private struct PrimaryCTA: View {
         let title: String
         let subtitle: String
@@ -323,9 +391,7 @@ private struct PillCTA: View {
     let title: String
     let subtitle: String
     var systemImage: String = "sun.max.fill"
-
-    // Deep restrained red (not bright systemRed)
-    private let fill = UIColor(red: 0.55, green: 0.12, blue: 0.16, alpha: 1.0)
+    let fill: Color
 
     var body: some View {
         HStack(spacing: 12) {
@@ -351,7 +417,7 @@ private struct PillCTA: View {
         .padding(.vertical, 14)
         .padding(.horizontal, 16)
         .foregroundStyle(.white)
-        .background(Color(uiColor: fill))
+        .background(fill)
         .clipShape(Capsule())
         .overlay(
             Capsule()
@@ -361,6 +427,7 @@ private struct PillCTA: View {
         .accessibilityElement(children: .combine)
     }
 }
+
 private var insightsCard: some View {
     VStack(alignment: .leading, spacing: 10) {
         Text("Insights")
