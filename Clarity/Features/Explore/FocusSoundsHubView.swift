@@ -5,35 +5,35 @@ struct FocusSoundsHubView: View {
     
     private let sounds: [FocusSoundItem] = [
         .init(
-            title: "Crystal 1",
+            title: "Crystal Cave",
             subtitle: "settling spacious tones",
             fileName: "focus-crystal cave-1",
             durationLabel: "1m 38s",
             tint: Color(red: 0.78, green: 0.58, blue: 0.10) // saffron
         ),
         .init(
-            title: "Crystal 2",
+            title: "Crystal Shell",
             subtitle: "Clear resonant pace",
             fileName: "focus-crystal shell-2",
             durationLabel: "1m 29s",
             tint: Color(red: 0.55, green: 0.10, blue: 0.14) // maroon
         ),
         .init(
-            title: "Crystal 3",
+            title: "Crystal Chant",
             subtitle: "Held meditative shimmer",
             fileName: "focus-crystal chant-3",
             durationLabel: "1m 29s",
             tint: Color(red: 0.16, green: 0.28, blue: 0.62) // lapis
         ),
         .init(
-            title: "Crystal 4",
+            title: "Crystal Gompa",
             subtitle: "Soft spacious sustain",
             fileName: "focus-crystal gompa-4",
             durationLabel: "1m 50s",
             tint: Color(red: 0.14, green: 0.44, blue: 0.26) // green
         ),
         .init(
-            title: "Crystal 5",
+            title: "Crystal bowls",
             subtitle: "Longer reflective tone",
             fileName: "focus-crystal bowls-5",
             durationLabel: "1m 27s",
@@ -42,7 +42,7 @@ struct FocusSoundsHubView: View {
         .init(
             title: "Nun Monlam",
             subtitle: "Prayer and contemplative recitation",
-            fileName: "focus-nuns recite at monlam, Mahabodhi",
+            fileName: "focus-nun-monlam",
             durationLabel: "1m 45s",
             tint: Color(red: 0.42, green: 0.08, blue: 0.10) // deep red
         )
