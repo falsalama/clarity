@@ -131,7 +131,6 @@ private struct PracticePanel: View {
     var body: some View {
         VStack(spacing: 16) {
             introductionCard
-            todayCard
             practiceCard
             focusCard
             guidanceCard
@@ -146,9 +145,6 @@ private struct PracticePanel: View {
             Text("Clarity")
                 .font(.headline)
 
-            // IMPORTANT:
-            // Paste your updated “Clarity about text” here as normal strings.
-            // Do NOT paste code, only text in quotes.
             Text("A Buddhist daily practice app.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -156,12 +152,13 @@ private struct PracticePanel: View {
             DisclosureGroup(isExpanded: $introExpanded) {
                 VStack(alignment: .leading, spacing: 10) {
 
-                    // Replace this block with your updated copy (strings only).
                     Text("How it works")
                         .font(.subheadline.weight(.semibold))
-                    
-                   Text("Begin each day by pressing start practice.")
-                      Text("One Practice has three sections:")
+
+                    Text("Begin each day by pressing start practice.")
+                        .font(.footnote)
+
+                    Text("One practice has three parts:")
                         .font(.footnote.weight(.semibold))
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -174,7 +171,7 @@ private struct PracticePanel: View {
 
                     Divider()
 
-                    Text("Complete all three to form one unit of practice. These will slowely advance. Return each day to build momemtum.")
+                    Text("Complete all three to form one unit of practice. These slowly advance over time. Return each day to build continuity.")
                         .font(.footnote.weight(.semibold))
 
                     Divider()
@@ -182,11 +179,33 @@ private struct PracticePanel: View {
                     Text("Reflect (anytime)")
                         .font(.subheadline.weight(.semibold))
 
-                    Text("Reflect can also be used independently to think clearly, offload thoughts, or explore confusion in private.")
+                    Text("Reflect is a private thinking instrument. It combines structured reflection with a Buddhist-informed AI assistant designed to help clarify experience rather than analyse or judge it.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    Text("On-device mode is fully private. Optional Cloud Tap processing (premium) uses redacted, anonymous text for deeper model responses.")
+                    Text("You can speak or write freely. The system helps organise thoughts, reveal patterns, and support clear seeing.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Text("On-device mode is fully private. Optional Cloud Tap processing uses redacted, anonymous text for deeper model responses.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    Text("Focus")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Focus is an evolving collection of original meditative sounds for settling, listening, and rest.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    Text("Guidance")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Guidance connects you with qualified Buddhist teachers and experienced practitioners for paid one-to-one sessions, practice questions, and personal instruction. These sessions create opportunities for monastics and practitioners while helping support the institutions and traditions they come from. Coming soon.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
@@ -210,33 +229,6 @@ private struct PracticePanel: View {
                 Text(introExpanded ? "Hide details" : "Learn more")
                     .font(.subheadline.weight(.semibold))
             }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
-    }
-
-    private var todayCard: some View {
-        let statusText: String = {
-            if !didReflectToday { return "Not started" }
-            if !didViewToday { return "Reflect complete - next: View" }
-            if !didPracticeToday { return "Reflect and View complete - next: Practice" }
-            return "Reflect, View, and Practice complete"
-        }()
-
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Today")
-                    .font(.headline)
-                Spacer()
-                Text(todayKey)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(statusText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -378,7 +370,7 @@ private struct PracticePanel: View {
                 .padding(.vertical, 2)
             }
 
-            Text("No streaks. This is a simple record of continuity.")
+            Text("No streaks. A simple record of continuity.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

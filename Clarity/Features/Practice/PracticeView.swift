@@ -354,8 +354,12 @@ No analysis. Just a clean label.
 
         do { try modelContext.save() } catch { /* best-effort */ }
 
-        // Advance flow
-        flow.openProgressWithBeadAnimation()
+        if goToProgressOnDone {
+            flow.homeTab = .progress
+            dismiss()
+        } else {
+            flow.openProgressWithBeadAnimation()
+        }
     }
     // MARK: - Progression (advance on next day after Done)
 
