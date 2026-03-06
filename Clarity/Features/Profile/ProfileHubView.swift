@@ -117,6 +117,30 @@ struct ProfileHubView: View {
                 Text("App")
             }
         }
+        
+        NavigationLink {
+            FocusSoundsHubView()
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Focus")
+                Text("Meditative sounds")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+
+        NavigationLink {
+            GuidanceHubView()
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Guidance")
+                Text("Teachings and one-to-one practice support")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+        }
+        
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .task { await calendarStore.refresh() }
