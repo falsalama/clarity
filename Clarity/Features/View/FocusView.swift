@@ -13,13 +13,13 @@ struct FocusView: View {
     @State private var isReady = false
 
     private let suppressMantra: Bool
-
+    private let onDailyDone: (() -> Void)?
+    
     // MARK: - Environment
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-    @EnvironmentObject private var flow: AppFlowRouter
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
 
@@ -79,8 +79,12 @@ Nothing is lost.
 
     // MARK: - Init
 
-    init(suppressMantra: Bool = false) {
+    init(
+        suppressMantra: Bool = false,
+        onDailyDone: (() -> Void)? = nil
+    ) {
         self.suppressMantra = suppressMantra
+        self.onDailyDone = onDailyDone
 
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
@@ -279,7 +283,7 @@ Nothing is lost.
 
             Button {
                 markDoneToday()
-                flow.go(.practice)
+                onDailyDone?()
             } label: {
                 Text("Done")
                     .font(.callout.weight(.semibold))

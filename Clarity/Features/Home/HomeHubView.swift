@@ -23,7 +23,6 @@ struct HomeHubView: View {
     @EnvironmentObject private var flow: AppFlowRouter
 
     @State private var introExpanded: Bool = false
-
     init() {
         _reflectCompletions = Query(sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)])
         _focusCompletions = Query(sort: [SortDescriptor(\FocusCompletionEntity.completedAt, order: .reverse)])
@@ -59,7 +58,6 @@ struct HomeHubView: View {
                         dayItems: lastDays(7)
                     )
                 } else {
-                    // Progress tab: show ProgressScreen directly (no extra header card)
                     ProgressScreen()
                 }
 
@@ -234,7 +232,7 @@ private struct PracticePanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
-    
+
     private var practiceCard: some View {
         let nextTitle: String = {
             if !didReflectToday { return "Start today’s practice" }
@@ -250,39 +248,24 @@ private struct PracticePanel: View {
             return "Reflect, View, and Practice are complete."
         }()
 
+        let startStep: DailyFlowStep? = {
+            if !didReflectToday { return .reflect }
+            if !didViewToday { return .focus }
+            if !didPracticeToday { return .practice }
+            return nil
+        }()
+
         return Group {
-            if !didReflectToday {
+            if let startStep {
                 NavigationLink {
-                    CaptureView(autoPopOnDone: true, hideDailyQuestion: false, embedInNavigationStack: false)
+                    DailyFlowContainerView(startAt: startStep)
                 } label: {
                     PillCTA(
                         title: nextTitle,
                         subtitle: nextSubtitle,
-                        systemImage: "sun.max.fill",
-                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
-                    )
-                }
-                .buttonStyle(.plain)
-            } else if !didViewToday {
-                NavigationLink {
-                    FocusView()
-                } label: {
-                    PillCTA(
-                        title: nextTitle,
-                        subtitle: nextSubtitle,
-                        systemImage: "book.closed.fill",
-                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
-                    )
-                }
-                .buttonStyle(.plain)
-            } else if !didPracticeToday {
-                NavigationLink {
-                    PracticeView()
-                } label: {
-                    PillCTA(
-                        title: nextTitle,
-                        subtitle: nextSubtitle,
-                        systemImage: "leaf.fill",
+                        systemImage: startStep == .reflect
+                            ? "sun.max.fill"
+                            : (startStep == .focus ? "book.closed.fill" : "leaf.fill"),
                         fill: Color(red: 0.55, green: 0.12, blue: 0.16)
                     )
                 }
@@ -297,7 +280,6 @@ private struct PracticePanel: View {
             }
         }
     }
-    
     private var focusCard: some View {
         NavigationLink {
             FocusSoundsHubView()
@@ -311,7 +293,7 @@ private struct PracticePanel: View {
         }
         .buttonStyle(.plain)
     }
-    
+
     private var guidanceCard: some View {
         NavigationLink {
             GuidanceHubView()
@@ -325,32 +307,7 @@ private struct PracticePanel: View {
         }
         .buttonStyle(.plain)
     }
-    
-    private struct PrimaryCTA: View {
-        let title: String
-        let subtitle: String
-        var isComplete: Bool = false
 
-        var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: isComplete ? "checkmark.circle.fill" : "chevron.right")
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.systemBackground)))
-        }
-    }
     private var recentCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Recent")
@@ -379,6 +336,7 @@ private struct PracticePanel: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
 }
+
 private struct PillCTA: View {
     let title: String
     let subtitle: String
@@ -444,7 +402,6 @@ private struct ProgressPanel: View {
 
     var body: some View {
         VStack(spacing: 16) {
-
             VStack(alignment: .leading, spacing: 10) {
                 Text("Progress")
                     .font(.headline)
@@ -470,11 +427,11 @@ private struct ProgressPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
 
-            // Existing full Progress UI (bloom, portrait, unlocking etc)
             ProgressScreen()
         }
     }
 }
+
 // MARK: - Subviews
 
 private struct TodayRow: View {

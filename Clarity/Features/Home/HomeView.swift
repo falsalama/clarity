@@ -1,4 +1,6 @@
 import SwiftUI
+import SwiftData
+import UIKit
 
 /// Home wrapper:
 /// - Welcome shows on each fresh app open (once per session)
@@ -58,4 +60,15 @@ struct HomeView: View {
             showWelcome = false
         }
     }
+}
+
+// MARK: - Day snapshot types (file-scope, accessible to subviews)
+
+fileprivate enum DayStatus { case none, partial, full }
+
+fileprivate struct DayItem: Identifiable {
+    let id: String          // dayKey
+    let dayKey: String
+    let label: String       // Today / Yesterday / "Tue 26"
+    let status: DayStatus
 }

@@ -35,17 +35,19 @@ struct AppShellView: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppFlowRouter.Tab.home)
 
-            NavigationStack { CaptureView(hideDailyQuestion: true) }
-                .tabItem { Label("Reflect", systemImage: "mic") }
-                .tag(AppFlowRouter.Tab.reflect)
+            NavigationStack {
+                CaptureView(
+                    autoPopOnDone: false,
+                    hideDailyQuestion: true,
+                    embedInNavigationStack: false
+                )
+            }
+            .tabItem { Label("Reflect", systemImage: "mic") }
+            .tag(AppFlowRouter.Tab.reflect)
 
-            NavigationStack { FocusView() }
-                .tabItem { Label("View", systemImage: "book.closed") }
-                .tag(AppFlowRouter.Tab.focus)
-
-            NavigationStack { PracticeView(goToProgressOnDone: true) }
-                .tabItem { Label("Practice", systemImage: "leaf") }
-                .tag(AppFlowRouter.Tab.practice)
+            NavigationStack { ExploreView() }
+                .tabItem { Label("Explore", systemImage: "square.grid.2x2") }
+                .tag(AppFlowRouter.Tab.explore)
 
             NavigationStack { ProfileHubView() }
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
