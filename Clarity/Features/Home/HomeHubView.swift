@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 // MARK: - Day snapshot types (file-scope, accessible to subviews)
 
@@ -22,7 +23,6 @@ struct HomeHubView: View {
     @EnvironmentObject private var flow: AppFlowRouter
 
     @State private var introExpanded: Bool = false
-
     init() {
         _reflectCompletions = Query(sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)])
         _focusCompletions = Query(sort: [SortDescriptor(\FocusCompletionEntity.completedAt, order: .reverse)])
@@ -58,7 +58,6 @@ struct HomeHubView: View {
                         dayItems: lastDays(7)
                     )
                 } else {
-                    // Progress tab: show ProgressScreen directly (no extra header card)
                     ProgressScreen()
                 }
 
@@ -130,7 +129,9 @@ private struct PracticePanel: View {
     var body: some View {
         VStack(spacing: 16) {
             introductionCard
-            todayCard
+            practiceCard
+            focusCard
+            guidanceCard
             recentCard
             insightsCard
         }
@@ -142,9 +143,6 @@ private struct PracticePanel: View {
             Text("Clarity")
                 .font(.headline)
 
-            // IMPORTANT:
-            // Paste your updated “Clarity about text” here as normal strings.
-            // Do NOT paste code, only text in quotes.
             Text("A Buddhist daily practice app.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -152,12 +150,13 @@ private struct PracticePanel: View {
             DisclosureGroup(isExpanded: $introExpanded) {
                 VStack(alignment: .leading, spacing: 10) {
 
-                    // Replace this block with your updated copy (strings only).
                     Text("How it works")
                         .font(.subheadline.weight(.semibold))
-                    
-                   Text("Begin each day by pressing start practice.")
-                      Text("One Practice has three sections:")
+
+                    Text("Begin each day by pressing start practice.")
+                        .font(.footnote)
+
+                    Text("One practice has three parts:")
                         .font(.footnote.weight(.semibold))
 
                     VStack(alignment: .leading, spacing: 6) {
@@ -170,7 +169,7 @@ private struct PracticePanel: View {
 
                     Divider()
 
-                    Text("Complete all three to form one unit of practice. These will slowely advance. Return each day to build momemtum.")
+                    Text("Complete all three to form one unit of practice. These slowly advance over time. Return each day to build continuity.")
                         .font(.footnote.weight(.semibold))
 
                     Divider()
@@ -178,11 +177,33 @@ private struct PracticePanel: View {
                     Text("Reflect (anytime)")
                         .font(.subheadline.weight(.semibold))
 
-                    Text("Reflect can also be used independently to think clearly, offload thoughts, or explore confusion in private.")
+                    Text("Reflect is a private thinking instrument. It combines structured reflection with a Buddhist-informed AI assistant designed to help clarify experience rather than analyse or judge it.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
-                    Text("On-device mode is fully private. Optional Cloud Tap processing (premium) uses redacted, anonymous text for deeper model responses.")
+                    Text("You can speak or write freely. The system helps organise thoughts, reveal patterns, and support clear seeing.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Text("On-device mode is fully private. Optional Cloud Tap processing uses redacted, anonymous text for deeper model responses.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    Text("Focus")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Focus is an evolving collection of original meditative sounds for settling, listening, and rest.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    Text("Guidance")
+                        .font(.subheadline.weight(.semibold))
+
+                    Text("Guidance connects you with qualified Buddhist teachers and experienced practitioners for paid one-to-one sessions, practice questions, and personal instruction. These sessions create opportunities for monastics and practitioners while helping support the institutions and traditions they come from. Coming soon.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
@@ -212,7 +233,7 @@ private struct PracticePanel: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
 
-    private var todayCard: some View {
+    private var practiceCard: some View {
         let nextTitle: String = {
             if !didReflectToday { return "Start today’s practice" }
             if !didViewToday { return "Continue today’s practice" }
@@ -227,70 +248,66 @@ private struct PracticePanel: View {
             return "Reflect, View, and Practice are complete."
         }()
 
-        return VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Today")
-                    .font(.headline)
-                Spacer()
-                Text(todayKey)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+        let startStep: DailyFlowStep? = {
+            if !didReflectToday { return .reflect }
+            if !didViewToday { return .focus }
+            if !didPracticeToday { return .practice }
+            return nil
+        }()
 
-            Group {
-                if !didReflectToday {
-                    NavigationLink {
-                        CaptureView(autoPopOnDone: true, hideDailyQuestion: false, embedInNavigationStack: false)
-                    } label: {
-                        PillCTA(
-                            title: nextTitle,
-                            subtitle: nextSubtitle,
-                            systemImage: "sun.max.fill"
-                        )
-                    }
-                } else if !didViewToday {
-                    NavigationLink { FocusView() } label: {
-                        PrimaryCTA(title: nextTitle, subtitle: nextSubtitle)
-                    }
-                } else if !didPracticeToday {
-                    NavigationLink { PracticeView() } label: {
-                        PrimaryCTA(title: nextTitle, subtitle: nextSubtitle)
-                    }
-                } else {
-                    PrimaryCTA(title: nextTitle, subtitle: nextSubtitle, isComplete: true)
+        return Group {
+            if let startStep {
+                NavigationLink {
+                    DailyFlowContainerView(startAt: startStep)
+                } label: {
+                    PillCTA(
+                        title: nextTitle,
+                        subtitle: nextSubtitle,
+                        systemImage: startStep == .reflect
+                            ? "sun.max.fill"
+                            : (startStep == .focus ? "book.closed.fill" : "leaf.fill"),
+                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
+                    )
                 }
+                .buttonStyle(.plain)
+            } else {
+                PillCTA(
+                    title: nextTitle,
+                    subtitle: nextSubtitle,
+                    systemImage: "checkmark.circle.fill",
+                    fill: Color(red: 0.40, green: 0.40, blue: 0.40)
+                )
             }
-            .buttonStyle(.plain)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
-    }
-    private struct PrimaryCTA: View {
-        let title: String
-        let subtitle: String
-        var isComplete: Bool = false
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: isComplete ? "checkmark.circle.fill" : "chevron.right")
-                        .foregroundStyle(.secondary)
-                }
-
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.systemBackground)))
         }
     }
+    private var focusCard: some View {
+        NavigationLink {
+            FocusSoundsHubView()
+        } label: {
+            PillCTA(
+                title: "Focus",
+                subtitle: "Meditative sounds",
+                systemImage: "waveform",
+                fill: Color(red: 0.16, green: 0.36, blue: 0.78)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var guidanceCard: some View {
+        NavigationLink {
+            GuidanceHubView()
+        } label: {
+            PillCTA(
+                title: "Guidance",
+                subtitle: "Book a one-to-one session with a trained Buddhist",
+                systemImage: "person.2.fill",
+                fill: Color(red: 0.18, green: 0.46, blue: 0.28)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
     private var recentCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Recent")
@@ -310,7 +327,7 @@ private struct PracticePanel: View {
                 .padding(.vertical, 2)
             }
 
-            Text("No streaks. This is a simple record of continuity.")
+            Text("No streaks. A simple record of continuity.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -319,13 +336,12 @@ private struct PracticePanel: View {
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
 }
+
 private struct PillCTA: View {
     let title: String
     let subtitle: String
     var systemImage: String = "sun.max.fill"
-
-    // Deep restrained red (not bright systemRed)
-    private let fill = UIColor(red: 0.55, green: 0.12, blue: 0.16, alpha: 1.0)
+    let fill: Color
 
     var body: some View {
         HStack(spacing: 12) {
@@ -351,7 +367,7 @@ private struct PillCTA: View {
         .padding(.vertical, 14)
         .padding(.horizontal, 16)
         .foregroundStyle(.white)
-        .background(Color(uiColor: fill))
+        .background(fill)
         .clipShape(Capsule())
         .overlay(
             Capsule()
@@ -361,6 +377,7 @@ private struct PillCTA: View {
         .accessibilityElement(children: .combine)
     }
 }
+
 private var insightsCard: some View {
     VStack(alignment: .leading, spacing: 10) {
         Text("Insights")
@@ -385,7 +402,6 @@ private struct ProgressPanel: View {
 
     var body: some View {
         VStack(spacing: 16) {
-
             VStack(alignment: .leading, spacing: 10) {
                 Text("Progress")
                     .font(.headline)
@@ -411,11 +427,11 @@ private struct ProgressPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
 
-            // Existing full Progress UI (bloom, portrait, unlocking etc)
             ProgressScreen()
         }
     }
 }
+
 // MARK: - Subviews
 
 private struct TodayRow: View {

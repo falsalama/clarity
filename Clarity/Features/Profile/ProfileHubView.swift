@@ -4,17 +4,12 @@ import SwiftData
 struct ProfileHubView: View {
     @EnvironmentObject private var flow: AppFlowRouter
 
-    // Progress counters
     @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
     @Query private var practiceCompletions: [PracticeCompletionEntity]
-
-    // User profile singleton
     @Query private var userProfiles: [UserProfileEntity]
 
-    // Calendar
     @StateObject private var calendarStore = CalendarStore()
-
     @State private var showProgressScreen: Bool = false
 
     init() {
@@ -117,33 +112,11 @@ struct ProfileHubView: View {
                 Text("App")
             }
         }
-        
-        NavigationLink {
-            FocusSoundsHubView()
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Focus")
-                Text("Meditative sounds")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-
-        NavigationLink {
-            GuidanceHubView()
-        } label: {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Guidance")
-                Text("Teachings and one-to-one practice support")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-        }
-        
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await calendarStore.refresh() }
+        .task {
+            await calendarStore.refresh()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
@@ -151,7 +124,7 @@ struct ProfileHubView: View {
                 } label: {
                     DailyDoneCapsule(count: dailyDoneCount)
                 }
-                .accessibilityLabel(Text("Progress — Daily completions \(dailyDoneCount)"))
+                .accessibilityLabel(Text("Progress - Daily completions \(dailyDoneCount)"))
             }
         }
         .onAppear {
@@ -160,7 +133,6 @@ struct ProfileHubView: View {
                 showProgressScreen = true
             }
         }
-        // Auto-open Progress when Practice completes.
         .onChange(of: flow.pendingOpenProgress) { _, newValue in
             guard newValue else { return }
             flow.consumeProgressTrigger()

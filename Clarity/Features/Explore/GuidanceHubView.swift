@@ -5,6 +5,7 @@ struct GuidanceHubView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introCard
+                waysToEngageCard
                 supportCard
                 futureCard
             }
@@ -56,6 +57,41 @@ struct GuidanceHubView: View {
         )
     }
 
+    private var waysToEngageCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Ways to Engage")
+                .font(.headline)
+
+            VStack(spacing: 12) {
+                guidanceLink(
+                    title: "One-to-One",
+                    subtitle: "Personal guidance sessions."
+                )
+
+                guidanceLink(
+                    title: "Meditation Lessons",
+                    subtitle: "Private meditation instruction."
+                )
+
+                guidanceLink(
+                    title: "Expert Guidance",
+                    subtitle: "Learn from experienced practitioners."
+                )
+
+                guidanceLink(
+                    title: "Counselling",
+                    subtitle: "Professional one-to-one support."
+                )
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
+    }
+
     private var supportCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Purpose")
@@ -88,5 +124,51 @@ struct GuidanceHubView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(Color.primary.opacity(0.04))
         )
+    }
+
+    private func guidanceLink(title: String, subtitle: String) -> some View {
+        NavigationLink {
+            GuidancePlaceholderView(
+                title: title,
+                subtitle: subtitle
+            )
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .foregroundStyle(.primary)
+
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 2)
+        }
+    }
+}
+
+private struct GuidancePlaceholderView: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+
+            Text("Coming soon")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            Text(subtitle)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
