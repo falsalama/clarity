@@ -4,7 +4,7 @@ import Combine
 final class AppFlowRouter: ObservableObject {
 
     enum Tab: Hashable {
-        case home, reflect, focus, practice, profile
+        case home, reflect, focus, practice, explore, profile
     }
     @Published var homeTab: HomeTab = .practice
 

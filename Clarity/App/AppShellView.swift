@@ -39,14 +39,10 @@ struct AppShellView: View {
                 .tabItem { Label("Reflect", systemImage: "mic") }
                 .tag(AppFlowRouter.Tab.reflect)
 
-            NavigationStack { FocusView() }
-                .tabItem { Label("View", systemImage: "book.closed") }
-                .tag(AppFlowRouter.Tab.focus)
-
-            NavigationStack { PracticeView() }
-                .tabItem { Label("Practice", systemImage: "leaf") }
-                .tag(AppFlowRouter.Tab.practice)
-
+            NavigationStack { ExploreView() }
+                .tabItem { Label("Explore", systemImage: "square.grid.2x2") }
+                .tag(AppFlowRouter.Tab.explore)
+            
             NavigationStack { ProfileHubView() }
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
                 .tag(AppFlowRouter.Tab.profile)

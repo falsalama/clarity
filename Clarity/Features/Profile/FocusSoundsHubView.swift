@@ -81,7 +81,7 @@ struct FocusSoundsHubView: View {
                     Text("Meditative sounds")
                         .font(.title3.weight(.semibold))
 
-                    Text("A small collection of carefully made sound for practice, settling, and rest. This is a quiet support space - not a content library.")
+                    Text("An evolving collection of carefully composed sounds for practice, settling, and rest. This is a quiet support space - not a content library.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
