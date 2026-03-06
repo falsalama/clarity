@@ -46,29 +46,33 @@ struct Mala27View: View {
                     let angle = (Double(i) / Double(beadCount)) * 2.0 * Double.pi + angleOffset
                     let isOpen = i < min(max(openCount, 0), beadCount)
 
-                    Circle()
-                        .fill(isOpen ? fill : Color.clear)
-                        .overlay(
-                            Circle().stroke(isOpen ? Color.clear : ghostStroke, lineWidth: 2.2)
-                        )
-                        .overlay(
-                            Circle()
-                                .fill(Color.white.opacity(isOpen ? 0.10 : 0.0))
-                                .blur(radius: 0.6)
-                                .offset(x: -0.6, y: -0.9)
-                                .mask(Circle())
-                        )
-                        .shadow(
-                            color: .black.opacity(isOpen ? 0.22 : 0.00),
-                            radius: isOpen ? 2.4 : 0,
-                            x: 0,
-                            y: isOpen ? 1.7 : 0
-                        )
-                        .frame(width: bead, height: bead)
-                        .position(
-                            x: size * 0.5 + cos(angle) * ringRadius,
-                            y: size * 0.5 + sin(angle) * ringRadius
-                        )
+                    ZStack {
+                        Circle()
+                            .stroke(ghostStroke, lineWidth: 2.2)
+
+                        Circle()
+                            .fill(fill)
+                            .opacity(isOpen ? 1 : 0)
+                            .scaleEffect(isOpen ? 1 : 0.7)
+                            .shadow(
+                                color: .black.opacity(isOpen ? 0.22 : 0.0),
+                                radius: isOpen ? 2.4 : 0,
+                                x: 0,
+                                y: isOpen ? 1.7 : 0
+                            )
+
+                        Circle()
+                            .fill(Color.white.opacity(isOpen ? 0.10 : 0.0))
+                            .blur(radius: 0.6)
+                            .offset(x: -0.6, y: -0.9)
+                            .mask(Circle())
+                    }
+                    .frame(width: bead, height: bead)
+                    .position(
+                        x: size * 0.5 + cos(angle) * ringRadius,
+                        y: size * 0.5 + sin(angle) * ringRadius
+                    )
+                    .animation(.easeOut(duration: 1.2), value: openCount)
                 }
 
                 // Centre portrait + optional pulse halo

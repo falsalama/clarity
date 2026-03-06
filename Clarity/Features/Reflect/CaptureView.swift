@@ -8,14 +8,14 @@ import UIKit
 
 struct CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
-    @EnvironmentObject private var flow: AppFlowRouter
+
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
 
     let autoPopOnDone: Bool
     let hideDailyQuestion: Bool
     let embedInNavigationStack: Bool
-
+    let onDailyDone: (() -> Void)?
+    
     private let cloudTap = CloudTapService()
 
     @State private var showPermissionAlert: Bool = false
@@ -27,6 +27,7 @@ struct CaptureView: View {
 
     // Sheet toggle for typing text
     @State private var showPasteSheet: Bool = false
+    @State private var goToDailyFocus = false
 
     // Steps (Reflect onboarding)
     @State private var steps: [CloudTapStep] = []
@@ -50,11 +51,13 @@ struct CaptureView: View {
     init(
         autoPopOnDone: Bool = false,
         hideDailyQuestion: Bool = false,
-        embedInNavigationStack: Bool = true
+        embedInNavigationStack: Bool = true,
+        onDailyDone: (() -> Void)? = nil
     ) {
         self.autoPopOnDone = autoPopOnDone
         self.hideDailyQuestion = hideDailyQuestion
         self.embedInNavigationStack = embedInNavigationStack
+        self.onDailyDone = onDailyDone
 
         _completedTurns = Query(
             filter: #Predicate<TurnEntity> { turn in
@@ -162,6 +165,9 @@ struct CaptureView: View {
         }
         .navigationDestination(for: UUID.self) { id in
             TurnDetailView(turnID: id)
+        }
+        .navigationDestination(isPresented: $goToDailyFocus) {
+            FocusView()
         }
         .onChange(of: coordinator.lastCompletedTurnID) { _, newValue in
             guard let id = newValue else { return }
@@ -423,8 +429,12 @@ struct CaptureView: View {
 
                 Button {
                     markDoneToday()
-                    flow.go(.focus)
-                    if autoPopOnDone { dismiss() }
+
+                    if let onDailyDone {
+                        onDailyDone()
+                    } else if autoPopOnDone {
+                        goToDailyFocus = true
+                    }
                 } label: {
                     Text("Done")
                         .font(.callout.weight(.semibold))

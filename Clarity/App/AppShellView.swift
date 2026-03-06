@@ -35,17 +35,19 @@ struct AppShellView: View {
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppFlowRouter.Tab.home)
 
-            NavigationStack { CaptureView(hideDailyQuestion: true) }
-                .tabItem { Label("Reflect", systemImage: "mic") }
-                .tag(AppFlowRouter.Tab.reflect)
+            NavigationStack {
+                CaptureView(
+                    autoPopOnDone: false,
+                    hideDailyQuestion: true,
+                    embedInNavigationStack: false
+                )
+            }
+            .tabItem { Label("Reflect", systemImage: "mic") }
+            .tag(AppFlowRouter.Tab.reflect)
 
-            NavigationStack { FocusView() }
-                .tabItem { Label("View", systemImage: "book.closed") }
-                .tag(AppFlowRouter.Tab.focus)
-
-            NavigationStack { PracticeView() }
-                .tabItem { Label("Practice", systemImage: "leaf") }
-                .tag(AppFlowRouter.Tab.practice)
+            NavigationStack { ExploreView() }
+                .tabItem { Label("Explore", systemImage: "square.grid.2x2") }
+                .tag(AppFlowRouter.Tab.explore)
 
             NavigationStack { ProfileHubView() }
                 .tabItem { Label("Profile", systemImage: "person.crop.circle") }
@@ -75,12 +77,11 @@ struct AppShellView: View {
                 scheduleSiriStartIfNeeded()
             }
 
-            // Start daily scheduling + refresh once at launch
             homeSurface.startDailyAutoRefresh()
             Task { await homeSurface.refreshNow() }
         }
-        // IMPORTANT: this 1-arg closure fixes your current compiler error
-        .onChange(of: scenePhase) { _, newPhase in            captureCoordinator.handleScenePhaseChange(newPhase)
+        .onChange(of: scenePhase) { _, newPhase in
+            captureCoordinator.handleScenePhaseChange(newPhase)
 
             if newPhase == .active {
                 LearningSync.sync(context: modelContext, capsuleStore: capsuleStore)
@@ -92,7 +93,6 @@ struct AppShellView: View {
 
                 scheduleSiriStartIfNeeded()
 
-                // Refresh when returning to foreground (not on tab switches)
                 homeSurface.startDailyAutoRefresh()
                 Task { await homeSurface.refreshNow() }
 
@@ -103,7 +103,6 @@ struct AppShellView: View {
             }
         }
     }
-
     // MARK: - Fixed tab bar appearance
 
     private static func configureGlobalTabBarAppearance() {
