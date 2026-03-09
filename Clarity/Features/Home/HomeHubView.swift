@@ -130,9 +130,9 @@ private struct PracticePanel: View {
         VStack(spacing: 16) {
             introductionCard
             practiceCard
+            recentCard
             focusCard
             guidanceCard
-            recentCard
             insightsCard
         }
     }
@@ -326,10 +326,6 @@ private struct PracticePanel: View {
                 }
                 .padding(.vertical, 2)
             }
-
-            Text("No streaks. A simple record of continuity.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

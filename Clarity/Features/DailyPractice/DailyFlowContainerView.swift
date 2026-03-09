@@ -1,4 +1,5 @@
 import SwiftUI
+import AVFoundation
 
 enum DailyFlowStep: Hashable {
     case reflect
@@ -13,7 +14,9 @@ struct DailyFlowContainerView: View {
     @EnvironmentObject private var flow: AppFlowRouter
 
     @State private var currentStep: DailyFlowStep
-
+    @State private var sparklePlayer: AVAudioPlayer?
+    @State private var hasPlayedCompletionSound = false
+    
     init(startAt: DailyFlowStep) {
         self.startAt = startAt
         _currentStep = State(initialValue: startAt)
@@ -45,8 +48,27 @@ struct DailyFlowContainerView: View {
         }
         .onChange(of: flow.pendingOpenProgress) { _, shouldOpen in
             if shouldOpen {
+                playCompletionSparkle()
                 dismiss()
             }
+        }
+    }
+            private func playCompletionSparkle() {
+                guard !hasPlayedCompletionSound else { return }
+                
+                if let url = Bundle.main.url(forResource: "sparkle", withExtension: "mp3") {
+                    do {
+                        let session = AVAudioSession.sharedInstance()
+                        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                        try session.setActive(true)
+                        
+                        sparklePlayer = try AVAudioPlayer(contentsOf: url)
+                        sparklePlayer?.prepareToPlay()
+                        sparklePlayer?.play()
+                        hasPlayedCompletionSound = true
+                    } catch {
+                        print("Failed to play sparkle.mp3: \(error)")
+                    }
         }
     }
 }

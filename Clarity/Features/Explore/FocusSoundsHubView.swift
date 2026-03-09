@@ -5,6 +5,13 @@ struct FocusSoundsHubView: View {
     
     private let sounds: [FocusSoundItem] = [
         .init(
+            title: "Singing Bowl",
+            subtitle: "simple focus sound",
+            fileName: "singing-bowl",
+            durationLabel: "1m 27s",
+            tint: Color(red: 0.70, green: 0.52, blue: 0.12) // gold
+        ),
+        .init(
             title: "Crystal Cave",
             subtitle: "settling spacious tones",
             fileName: "focus-crystal cave-1",
@@ -45,6 +52,27 @@ struct FocusSoundsHubView: View {
             fileName: "focus-nun-monlam",
             durationLabel: "1m 45s",
             tint: Color(red: 0.42, green: 0.08, blue: 0.10) // deep red
+        ),
+        .init(
+            title: "Pristine Space",
+            subtitle: "Clear vast space",
+            fileName: "pristine-space",
+            durationLabel: "3m 27s",
+            tint: Color(red: 0.55, green: 0.10, blue: 0.14) // maroon
+        ),
+        .init(
+            title: "Pristine Space-2",
+            subtitle: "Vast Expanse",
+            fileName: "pristine-space-2",
+            durationLabel: "4m 00s",
+            tint: Color(red: 0.70, green: 0.52, blue: 0.12) // gold
+        ),
+        .init(
+            title: "Untangle",
+            subtitle: "open focus field",
+            fileName: "untangle",
+            durationLabel: "4m 16s",
+            tint: Color(red: 0.16, green: 0.28, blue: 0.62) // lapis
         )
     ]
 
