@@ -81,7 +81,19 @@ struct WelcomeSurfaceView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 16)
         }
-        .contextMenu { dailyContextMenu }
+        .contextMenu {
+            dailyContextMenu
+        } preview: {
+            if let img = dailyUIImage {
+                ZStack {
+                    Color.black
+                    Image(uiImage: img)
+                        .resizable()
+                        .scaledToFit()
+                        .padding(8)
+                }
+            }
+        }
     }
 
     // MARK: - Background
