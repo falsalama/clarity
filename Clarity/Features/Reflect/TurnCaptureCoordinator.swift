@@ -460,20 +460,20 @@ final class TurnCaptureCoordinator: ObservableObject {
             )
 
             let now = Date()
-            let validated = WALBuilder.buildValidated(from: redacted, now: now)
-            try repo.updateWAL(id: id, snapshot: validated)
+            try modelContext?.save()
 
-            if let context = self.modelContext,
-               let store = self.capsuleStore,
-               store.capsule.learningEnabled,
-               learnedTurnIDs.contains(id) == false
-            {
-                let learner = PatternLearner()
-                let observations = learner.deriveObservations(from: validated, redactedText: redacted)
-                try learner.apply(observations: observations, into: context, now: now)
+            let didLearn = try TraceEngine.processSavedTurn(
+                turnID: id,
+                redactedText: redacted,
+                repo: repo,
+                modelContext: modelContext,
+                capsuleStore: capsuleStore,
+                learningAllowed: learnedTurnIDs.contains(id) == false,
+                now: now
+            )
 
+            if didLearn {
                 learnedTurnIDs.insert(id)
-                LearningSync.sync(context: context, capsuleStore: store, now: now)
             }
 
             lastCompletedTurnID = id
@@ -595,27 +595,20 @@ final class TurnCaptureCoordinator: ObservableObject {
                 t.redactionVersion = max(t.redactionVersion, 1)
 
                 let now = Date()
-                let validated = WALBuilder.buildValidated(from: redacted, now: now)
-                try repo.updateWAL(id: id, snapshot: validated)
-
                 try modelContext?.save()
 
-                // --- Learning (backfill mirror of streaming path) ---
-                if let capsuleStore,
-                   capsuleStore.capsule.learningEnabled,
-                   !learnedTurnIDs.contains(id),
-                   let context = modelContext {
+                let didLearn = try TraceEngine.processSavedTurn(
+                    turnID: id,
+                    redactedText: redacted,
+                    repo: repo,
+                    modelContext: modelContext,
+                    capsuleStore: capsuleStore,
+                    learningAllowed: learnedTurnIDs.contains(id) == false,
+                    now: now
+                )
 
-                    let learner = PatternLearner()
-                    let observations = learner.deriveObservations(from: validated, redactedText: redacted)
-
-                    do {
-                        try learner.apply(observations: observations, into: context, now: now)
-                        LearningSync.sync(context: context, capsuleStore: capsuleStore, now: now)
-                        learnedTurnIDs.insert(id)
-                    } catch {
-                        // silent (best-effort)
-                    }
+                if didLearn {
+                    learnedTurnIDs.insert(id)
                 }
 
             } catch {
@@ -623,7 +616,6 @@ final class TurnCaptureCoordinator: ObservableObject {
             }
         }
     }
-
 
     // MARK: - Idle timer (iOS only)
 

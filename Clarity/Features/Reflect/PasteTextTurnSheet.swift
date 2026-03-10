@@ -93,20 +93,16 @@ struct PasteTextTurnSheet: View {
                 try? modelContext.save()
             }
 
-            // Build validated WAL unconditionally and always persist locally.
             let now = Date()
-            let validated = WALBuilder.buildValidated(from: redacted, now: now)
-            try repo.updateWAL(id: id, snapshot: validated)
-
-            // Run learning only if enabled.
-            if capsuleStore.capsule.learningEnabled {
-                let learner = PatternLearner()
-                let observations = learner.deriveObservations(from: validated, redactedText: redacted)
-                try learner.apply(observations: observations, into: modelContext, now: now)
-
-                // Project PatternStats -> Capsule.learnedTendencies
-                LearningSync.sync(context: modelContext, capsuleStore: capsuleStore, now: now)
-            }
+            _ = try TraceEngine.processSavedTurn(
+                turnID: id,
+                redactedText: redacted,
+                repo: repo,
+                modelContext: modelContext,
+                capsuleStore: capsuleStore,
+                learningAllowed: true,
+                now: now
+            )
 
             onCreated(id)
             dismiss()
