@@ -29,7 +29,7 @@ final class HomeSurfaceStore: ObservableObject {
     // MARK: - Public
 
     /// Always fetch the manifest (small). Only download image if URL changed or missing locally.
-    func refreshNow() async {
+    func refreshNow(forceImageReload: Bool = false) async {
         guard let endpointURL else { return }
 
         do {
@@ -48,10 +48,6 @@ final class HomeSurfaceStore: ObservableObject {
             try persistManifest(data)
             setLastFetchNow()
 
-            // Re-download image if:
-            // - the URL changed, OR
-            // - it's a new day (dateKey changed), OR
-            // - we don't actually have a cached image file.
             if let urlString = newManifest.imageURL,
                let imageURL = URL(string: urlString) {
 
@@ -59,16 +55,16 @@ final class HomeSurfaceStore: ObservableObject {
                 let imageChanged = (oldImageURL != urlString)
                 let dateChanged = (oldDateKey != newManifest.dateKey)
 
-                if imageChanged || dateChanged || !hasCachedImage {
+                if forceImageReload {
+                    let path = imagePath()
+                    try? fm.removeItem(at: path)
+                    cachedImageFileURL = nil
+                }
+
+                if forceImageReload || imageChanged || dateChanged || !hasCachedImage {
                     await fetchAndCacheImage(from: imageURL)
                 }
-            } else {
-                // If server removed imageURL, keep cached image as-is (best UX).
             }
-
-
-            // Note: message changes will reflect immediately because manifest is updated.
-            _ = oldDateKey // retained for clarity; dateKey is used by refreshIfNeededForToday()
         } catch {
             // best-effort silent failure
         }
@@ -86,7 +82,9 @@ final class HomeSurfaceStore: ObservableObject {
         guard needsRefreshForToday() else { return }
         await refreshNow()
     }
-
+    func forceRefresh() async {
+        await refreshNow(forceImageReload: true)
+    }
     // MARK: - Auto refresh
 
     func startDailyAutoRefresh() {

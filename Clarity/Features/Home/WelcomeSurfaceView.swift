@@ -35,7 +35,7 @@ struct WelcomeSurfaceView: View {
 
                 VStack {
                     Spacer()
-
+                    
                     VStack(spacing: 10) {
 
                         if let message = homeSurface.manifest?.message,

@@ -62,7 +62,7 @@ enum PilgrimagePlaces {
             teaching: "…",
             visionRadiusMeters: 350,
             visionAssetName: "gururinpoche",
-            visionMarkerHeightMeters: 2.5
+            visionMarkerHeightMeters: 3.0
         ),
         
         PilgrimagePlace(
@@ -70,9 +70,9 @@ enum PilgrimagePlaces {
             name: "Shakyamuni Sighting",
             subtitle: "Wells, Somerset",
             coordinate: .init(latitude: 51.209139, longitude: -2.652194),
-            teaching: "",
+            teaching: "...",
             visionRadiusMeters: 350,
-            visionAssetName: "shakyamuni",
+            visionAssetName: "buddha",
             visionMarkerHeightMeters: 2.5
         ),
         // ─────────────────────────────
