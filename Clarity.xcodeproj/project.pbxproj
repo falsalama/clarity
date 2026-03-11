@@ -292,6 +292,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Clarity;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Used to show a pilgrimage overlay. Video is not recorded or stored.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Clarity can read your mindful sessions, sleep, heart rate, and steps to show patterns alongside your reflections.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Clarity can save completed meditation sessions to Apple Health as mindful minutes.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Used to show nearby pilgrimage places. Location is processed on-device and not stored.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app saves daily images to your photo library.";
@@ -349,6 +351,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Clarity;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSCameraUsageDescription = "Used to show a pilgrimage overlay. Video is not recorded or stored.";
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Clarity can read your mindful sessions, sleep, heart rate, and steps to show patterns alongside your reflections.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Clarity can save completed meditation sessions to Apple Health as mindful minutes.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Used to show nearby pilgrimage places. Location is processed on-device and not stored.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app saves daily images to your photo library.";

@@ -18,6 +18,8 @@ struct MeditationZoneView: View {
     @State private var endDate: Date?
 
     @State private var activeSheet: MeditationSupportSheet?
+    @StateObject private var healthKit = HealthKitManager()
+    @State private var sessionStartDate: Date?
     @State private var bellPlayer: AVAudioPlayer?
     @State private var timer: Timer?
     @State private var bowlStrike = false
@@ -88,9 +90,10 @@ struct MeditationZoneView: View {
         }
         .onAppear {
             syncDurationIfIdle()
+            healthKit.refreshAuthorizationState()
         }
         .onDisappear {
-            invalidateTimer()
+            resetSession()
         }
         .onChange(of: selectedMinutes) { _, _ in
             syncDurationIfIdle()
@@ -359,7 +362,7 @@ struct MeditationZoneView: View {
             Text("Why this space")
                 .font(.headline)
 
-            Text("Meditation is not counted here. The point is steadiness, clarity, and insight.")
+            Text("The point is steadiness, clarity, and insight. Completed Meditation Zone sessions can also be saved to Apple Health as mindful minutes.")
                 .foregroundStyle(.secondary)
         }
         .padding(18)
@@ -402,9 +405,11 @@ struct MeditationZoneView: View {
     }
 
     private func startSession() {
+        let start = Date()
+        sessionStartDate = start
         totalSeconds = resolvedMinutes * 60
         secondsRemaining = totalSeconds
-        endDate = Date().addingTimeInterval(TimeInterval(totalSeconds))
+        endDate = start.addingTimeInterval(TimeInterval(totalSeconds))
         isRunning = true
         bowlGlow = true
 
@@ -419,18 +424,22 @@ struct MeditationZoneView: View {
     }
 
     private func stopSession() {
+        stopBell()
         invalidateTimer()
         isRunning = false
         bowlGlow = false
         endDate = nil
+        sessionStartDate = nil
         syncDurationIfIdle()
     }
 
     private func resetSession() {
+        stopBell()
         invalidateTimer()
         isRunning = false
         bowlGlow = false
         endDate = nil
+        sessionStartDate = nil
         totalSeconds = resolvedMinutes * 60
         secondsRemaining = totalSeconds
     }
@@ -448,9 +457,14 @@ struct MeditationZoneView: View {
 
     private func finishSession() {
         invalidateTimer()
+
+        let completedEnd = Date()
+        let completedStart = sessionStartDate ?? completedEnd.addingTimeInterval(-TimeInterval(totalSeconds))
+
         isRunning = false
         bowlGlow = false
         endDate = nil
+        sessionStartDate = nil
         secondsRemaining = 0
 
         totalCompletedSeconds += totalSeconds
@@ -458,13 +472,21 @@ struct MeditationZoneView: View {
         if playEndBell {
             ringBell()
         }
+
+        Task {
+            _ = await healthKit.saveMindfulSession(start: completedStart, end: completedEnd)
+        }
     }
 
     private func invalidateTimer() {
         timer?.invalidate()
         timer = nil
     }
-
+    private func stopBell() {
+        bellPlayer?.stop()
+        bellPlayer?.currentTime = 0
+        bellPlayer = nil
+    }
     private func ringBell() {
         if let url = Bundle.main.url(forResource: "singing-bowl", withExtension: "m4a") {
             do {

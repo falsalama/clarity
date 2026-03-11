@@ -1,9 +1,11 @@
 import SwiftUI
+import HealthKit
 
 struct ExploreView: View {
     private let meditationGold = Color(red: 0.84, green: 0.70, blue: 0.24)
     private let guidanceGreen = Color(red: 0.18, green: 0.46, blue: 0.28)
     private let focusBlue = Color(red: 0.16, green: 0.36, blue: 0.78)
+    private let healthRose = Color(red: 0.82, green: 0.23, blue: 0.36)
 
     var body: some View {
         ScrollView {
@@ -22,6 +24,24 @@ struct ExploreView: View {
                     .buttonStyle(.plain)
 
                     Text("A quiet space for sitting practice.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    NavigationLink {
+                        AppleHealthExploreView()
+                    } label: {
+                        ExplorePillCTA(
+                            title: "Apple Health",
+                            subtitle: "Sleep, heart, steps, and mindful minutes",
+                            systemImage: "heart.text.square.fill",
+                            fill: healthRose
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("Connect Apple Health to surface patterns alongside your reflections.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -55,7 +75,7 @@ struct ExploreView: View {
                     )
                 }
                 .buttonStyle(.plain)
-                
+
                 NavigationLink {
                     TextsView()
                 } label: {
@@ -120,6 +140,244 @@ struct ExploreView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle("Explore")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct AppleHealthExploreView: View {
+    @StateObject private var healthKit = HealthKitManager()
+    @State private var showManageAccessAlert = false
+
+    private let healthRose = Color(red: 0.82, green: 0.23, blue: 0.36)
+
+    private var isConnected: Bool {
+        healthKit.mindfulShareAuthorizationStatus == .sharingAuthorized
+    }
+
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "heart.text.square.fill")
+                            .font(.system(size: 28, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 54, height: 54)
+                            .background(healthRose)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Apple Health")
+                                .font(.title3.weight(.semibold))
+                            
+                            Text(isConnected ? "Connected" : "Optional health context for Clarity")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        
+                        Spacer()
+                    }
+                    
+                    Text("Connect Apple Health to help Clarity notice patterns around sleep, heart rhythm, daily movement, and mindful time alongside your reflections.")
+                        .foregroundStyle(.secondary)
+                }
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("What Clarity can use")
+                        .font(.headline)
+                    
+                    AppleHealthBulletRow(
+                        systemImage: "bed.double.fill",
+                        title: "Sleep",
+                        subtitle: "Spot possible links between rest and reflective tone, friction, or ease."
+                    )
+                    
+                    AppleHealthBulletRow(
+                        systemImage: "heart.fill",
+                        title: "Heart rhythm",
+                        subtitle: "Use heart-rate patterns as gentle context, not diagnosis."
+                    )
+                    
+                    AppleHealthBulletRow(
+                        systemImage: "figure.walk",
+                        title: "Steps and movement",
+                        subtitle: "Notice whether steadier days and more movement shift your overall pattern."
+                    )
+                    
+                    AppleHealthBulletRow(
+                        systemImage: "brain.head.profile",
+                        title: "Mindful minutes",
+                        subtitle: "Read mindful sessions and save completed Meditation Zone sessions back to Apple Health."
+                    )
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                
+                VStack(alignment: .leading, spacing: 0) {
+                    Button {
+                        if isConnected {
+                            showManageAccessAlert = true
+                        } else {
+                            Task {
+                                await healthKit.requestAuthorization()
+                                healthKit.refreshAuthorizationState()
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Connect Apple Health")
+                                    .foregroundStyle(.primary)
+                                
+                                Text(
+                                    isConnected
+                                    ? "Apple Health access has been granted."
+                                    : "Request access to sleep, heart rate, steps, and mindful sessions."
+                                )
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            }
+                            
+                            Spacer()
+                            
+                            Image(systemName: isConnected ? "checkmark.circle.fill" : "chevron.right")
+                                .font(.headline)
+                                .foregroundStyle(isConnected ? .green : .secondary)
+                        }
+                        .contentShape(Rectangle())
+                        .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(healthKit.isBusy)
+                    
+                    Divider()
+                    
+                    Toggle(isOn: $healthKit.writeMindfulSessionsEnabled) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Save Meditation Zone sessions to Apple Health")
+                            Text("Completed Meditation Zone sessions can be written as mindful minutes.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .disabled(!isConnected || healthKit.isBusy)
+                    .padding(.vertical, 14)
+                }
+                .padding(.horizontal, 16)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                
+                if let errorMessage = healthKit.lastErrorMessage, !errorMessage.isEmpty {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Button {
+                            if isConnected {
+                                showManageAccessAlert = true
+                            } else {
+                                Task {
+                                    await healthKit.requestAuthorization()
+                                    healthKit.refreshAuthorizationState()
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("Connect Apple Health")
+                                        .foregroundStyle(.primary)
+                                    
+                                    Text(
+                                        isConnected
+                                        ? "Apple Health access has been granted."
+                                        : "Request access to sleep, heart rate, steps, and mindful sessions."
+                                    )
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: isConnected ? "checkmark.circle.fill" : "chevron.right")
+                                    .font(.headline)
+                                    .foregroundStyle(isConnected ? .green : .secondary)
+                            }
+                            .contentShape(Rectangle())
+                            .padding(.vertical, 14)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(healthKit.isBusy)
+                        
+                        Divider()
+                        
+                        Toggle(isOn: $healthKit.writeMindfulSessionsEnabled) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Save Meditation Zone sessions to Apple Health")
+                                Text("Completed Meditation Zone sessions can be written as mindful minutes.")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .disabled(!isConnected || healthKit.isBusy)
+                        .padding(.vertical, 14)
+                    }
+                    .padding(.horizontal, 16)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+                
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Privacy")
+                        .font(.headline)
+                    
+                    Text("Health data is sensitive. Clarity should keep raw Apple Health data on device, ask only for the types it genuinely uses, and make read and write behaviour clear before permission is requested.")
+                        .foregroundStyle(.secondary)
+                    
+                    Text("For now, only completed Meditation Zone sessions should count as mindful minutes.")
+                        .font(.footnote)
+                        .foregroundStyle(.tertiary)
+                }
+                .padding(16)
+                .background(Color(.secondarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .padding(16)
+        }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .navigationTitle("Apple Health")
+        .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            healthKit.refreshAuthorizationState()
+        }
+        .alert("Manage Apple Health access", isPresented: $showManageAccessAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("To remove access later, change Clarity’s permissions in the Health app or Settings.")
+        }
+    }
+}
+
+private struct AppleHealthBulletRow: View {
+    let systemImage: String
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.headline)
+                .frame(width: 22)
+                .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+
+                Text(subtitle)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
     }
 }
 
