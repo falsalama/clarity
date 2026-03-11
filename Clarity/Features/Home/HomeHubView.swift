@@ -229,7 +229,20 @@ private struct PracticePanel: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.secondarySystemBackground))
+                .overlay(alignment: .topTrailing) {
+                    Image("clarityMark")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 950, height: 950)
+                        .opacity(0.16)
+                        .offset(x: 140, y: -260)
+                        .allowsHitTesting(false)
+                }
+                .clipped()
+        )
     }
 
     private var practiceCard: some View {

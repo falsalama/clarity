@@ -23,6 +23,32 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         static let daily = "clarity_nudge_daily"
     }
 
+    private let dailyNudgeMessages: [(title: String, body: String)] = [
+        (
+            title: "Clarity",
+            body: "A few minutes of practice can change the tone of a whole day."
+        ),
+        (
+            title: "Clarity",
+            body: "Return to stillness. Practice when you are ready."
+        ),
+        (
+            title: "Clarity",
+            body: "Meditation builds steadiness slowly. Small daily returns matter."
+        ),
+        (
+            title: "Clarity",
+            body: "Completed Meditation Zone sessions can count toward Apple Health mindful minutes."
+        ),
+        (
+            title: "Clarity",
+            body: "Continuity is built by returning."
+        ),
+        (
+            title: "Clarity",
+            body: "A short sit is enough. Clarity grows through repetition, not force."
+        )
+    ]
     // MARK: - Permission
 
     /// Returns true if notifications are authorised (or provisionally authorised).
@@ -66,14 +92,20 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     /// Repeating daily notification at the specified local time (hour/minute).
     /// Replaces any existing Clarity daily request.
-    func scheduleDaily(hour: Int, minute: Int, title: String, body: String) async {
+    func scheduleDaily(hour: Int, minute: Int, title: String? = nil, body: String? = nil) async {
         guard await requestPermissionIfNeeded() else { return }
 
         await cancelDaily()
 
+        let messages = dailyNudgeMessages
+        let chosen = messages.randomElement() ?? (
+            title: "Clarity",
+            body: "Return to practice."
+        )
+
         let content = UNMutableNotificationContent()
-        content.title = title
-        content.body = body
+        content.title = title ?? chosen.title
+        content.body = body ?? chosen.body
         content.sound = .default
 
         var comps = DateComponents()

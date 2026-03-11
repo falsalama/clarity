@@ -65,12 +65,13 @@ struct ProgressScreen: View {
                 Text("\(ringOpenCount) of 27 complete")
                     .font(.title2.weight(.semibold))
 
-                HStack(spacing: 10) {
-                    Text("Layers completed: \(layersCompleted)")
-                        .font(.callout)
+                VStack(spacing: 8) {
+                    Text("Quarter Malas completed")
+                        .font(.headline)
                         .foregroundStyle(.secondary)
 
-                    TibetanLayerCountersView(layers: layersCompleted)
+                    QuarterMalaCountersView(rounds: layersCompleted)                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
                 }
 
                 Spacer(minLength: 10)

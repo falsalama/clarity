@@ -225,44 +225,95 @@ private struct GuruBeadView: View {
 /// Tibetan “male abacus” style layer counter (horizontal).
 /// - Shows up to 20 layers as two rows of 10.
 /// - Row 1 fills 0...10, then Row 2 fills 0...10.
-struct TibetanLayerCountersView: View {
-    let layers: Int
-
+struct QuarterMalaCountersView: View {
+    let rounds: Int
+    
     var body: some View {
-        let v = max(0, min(layers, 20))
-        let top = min(v, 10)
-        let bottom = min(max(v - 10, 0), 10)
-
-        VStack(spacing: 6) {
+        let v = max(0, min(rounds, 27))
+        let top = min(v, 9)
+        let middle = min(max(v - 9, 0), 9)
+        let bottom = min(max(v - 18, 0), 9)
+        
+        VStack(spacing: 10) {
             row(filled: top)
+            row(filled: middle)
             row(filled: bottom)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Layer counters")
-        .accessibilityValue("\(v) layers")
+        .accessibilityLabel("Quarter mala counters")
+        .accessibilityValue("\(v) rounds")
     }
-
+    
     private func row(filled: Int) -> some View {
-        let ghost = Color.primary.opacity(0.10)
-        let cord = Color.primary.opacity(0.12)
+        let ghost = Color.primary.opacity(0.12)
+        let cord = Color.primary.opacity(0.16)
         let fill = Color(red: 0.14, green: 0.13, blue: 0.12)
 
         return ZStack {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
+            // cord
+            RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(cord)
-                .frame(height: 4)
+                .frame(height: 5)
 
-            HStack(spacing: 4) {
-                ForEach(0..<10, id: \.self) { i in
+            // end stopper beads
+            HStack {
+                Circle()
+                    .fill(fill.opacity(0.92))
+                    .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 1))
+                    .frame(width: 9, height: 9)
+
+                Spacer()
+
+                Circle()
+                    .fill(fill.opacity(0.92))
+                    .overlay(Circle().stroke(Color.white.opacity(0.10), lineWidth: 1))
+                    .frame(width: 9, height: 9)
+            }
+            .padding(.horizontal, 2)
+
+            // beads
+            HStack(spacing: 8) {
+                ForEach(0..<9, id: \.self) { i in
                     let on = i < filled
-                    Circle()
-                        .fill(on ? fill : Color.clear)
-                        .overlay(Circle().stroke(on ? Color.clear : ghost, lineWidth: 1.4))
-                        .frame(width: 7, height: 7)
+
+                    ZStack {
+                        Circle()
+                            .fill(on ? fill : Color.clear)
+
+                        Circle()
+                            .stroke(on ? Color.clear : ghost, lineWidth: 1.8)
+
+                        Circle()
+                            .fill(Color.white.opacity(on ? 0.14 : 0.0))
+                            .frame(width: 7, height: 7)
+                            .offset(x: -2, y: -2)
+                    }
+                    .frame(width: 28, height: 28)
                 }
             }
-            .padding(.horizontal, 6)
+            .padding(.horizontal, 18)
+
+            // little knots just inside the stopper beads
+            HStack {
+                knotView
+                Spacer()
+                knotView
+            }
+            .padding(.horizontal, 10)
         }
-        .frame(width: 110, height: 18)
+        .frame(width: 220, height: 34)
+    }
+
+    private var knotView: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .stroke(Color.primary.opacity(0.18), lineWidth: 1.6)
+                .frame(width: 7, height: 7)
+
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .stroke(Color.primary.opacity(0.18), lineWidth: 1.6)
+                .frame(width: 7, height: 7)
+                .rotationEffect(.degrees(45))
+        }
     }
 }
