@@ -5,7 +5,7 @@ import UIKit
 /// Presented full-screen by HomeView wrapper.
 struct WelcomeSurfaceView: View {
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-
+    
     var body: some View {
         ZStack {
             backgroundImage
@@ -38,7 +38,8 @@ struct WelcomeSurfaceView: View {
                     
                     VStack(spacing: 10) {
 
-                        if let message = homeSurface.manifest?.message,
+                        if !isShowingStaleWelcome,
+                           let message = homeSurface.manifest?.message,
                            !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 
                             Text(wrapped(message))
@@ -53,7 +54,8 @@ struct WelcomeSurfaceView: View {
                                 .frame(width: textWidth, alignment: .center)
                         }
 
-                        if let a = homeSurface.manifest?.attribution,
+                        if !isShowingStaleWelcome,
+                           let a = homeSurface.manifest?.attribution,
                            !a.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 
                             Text(wrappedAttribution(a))
@@ -96,6 +98,19 @@ struct WelcomeSurfaceView: View {
         }
     }
 
+    private var todayDateKey: String {
+        let fmt = DateFormatter()
+        fmt.calendar = Calendar.current
+        fmt.timeZone = .current
+        fmt.dateFormat = "yyyy-MM-dd"
+        return fmt.string(from: Date())
+    }
+
+    private var isShowingStaleWelcome: Bool {
+        guard let manifest = homeSurface.manifest else { return false }
+        return manifest.dateKey != todayDateKey
+    }
+
     // MARK: - Background
 
     private var backgroundImage: some View {
@@ -116,12 +131,13 @@ struct WelcomeSurfaceView: View {
             }
         }
     }
-
+  
     private var dailyUIImage: UIImage? {
+        guard !isShowingStaleWelcome else { return nil }
         guard let url = homeSurface.cachedImageFileURL else { return nil }
         return UIImage(contentsOfFile: url.path)
     }
-
+    
     // MARK: - Layout helpers
 
     private func responsiveFontSize(for width: CGFloat) -> CGFloat {

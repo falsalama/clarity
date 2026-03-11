@@ -211,7 +211,70 @@ struct LearningSync {
             case "prefers_no_fluff": return "Prefers direct, no-fluff replies"
             default: return "Prefers \(k)"
             }
+        case .afflictive_pattern:
+            switch key {
+            case "anger_pressure": return "Anger pressure has been active"
+            case "jealousy_pressure": return "Jealousy pressure has been active"
+            case "comparison_pressure": return "Comparison pressure has been active"
+            case "fear_contraction": return "Fear and contraction have been active"
+            case "shame_pressure": return "Shame pressure has been active"
+            case "self_attack_pressure": return "Self-attack has been active"
+            case "low_mood_pressure": return "Low mood has been active"
+            case "control_pressure": return "Control pressure has been active"
+            case "status_tightening": return "Status and image tightening have been active"
+            case "grasping_pressure": return "Grasping has been active"
+            case "rigidity_pressure": return "Rigidity has been active"
+            case "looping_pressure": return "Looping has been active"
+            case "aversion_pressure": return "Aversion has been active"
+            case "self_protective_framing": return "Self-protective framing has been active"
+            default: return "Afflictive pressure: \(k)"
+            }
 
+        case .opening_factor:
+            switch key {
+            case "warmth_present": return "Warmth is present at times"
+            case "humour_present": return "Humour is present at times"
+            case "generosity_present": return "Generosity is present at times"
+            case "patience_present": return "Patience is present at times"
+            case "honesty_present": return "Honesty is present at times"
+            case "flexibility_present": return "Flexibility is present at times"
+            case "courage_present": return "Courage is present at times"
+            case "steadiness_present": return "Steadiness is present at times"
+            default: return "Opening factor: \(k)"
+            }
+
+        case .self_stated_concern:
+            return "Self-stated concern: \(k)"
+
+        case .dharma_arc:
+            switch key {
+            case "grasping": return "Grasping is a recurring arc"
+            case "aversion": return "Aversion is a recurring arc"
+            case "fear_contraction": return "Fear and contraction are a recurring arc"
+            case "self_tightening": return "Self-tightening is a recurring arc"
+            case "confusion": return "Confusion is a recurring arc"
+            case "opening": return "Opening is present at times"
+            case "compassion": return "Compassion is present at times"
+            case "spaciousness": return "Spaciousness is present at times"
+            default: return "Dharma arc: \(k)"
+            }
+
+        case .antidote_lean:
+            switch key {
+            case "rejoicing": return "Rejoicing may be a helpful leaning"
+            case "generosity": return "Generosity may be a helpful leaning"
+            case "letting_be": return "Letting be may be a helpful leaning"
+            case "patience": return "Patience may be a helpful leaning"
+            case "compassionate_witnessing": return "Compassionate witnessing may be a helpful leaning"
+            case "softening": return "Softening may be a helpful leaning"
+            case "steadiness": return "Steadiness may be a helpful leaning"
+            case "widening": return "Widening may be a helpful leaning"
+            case "non_identification": return "Non-identification may be a helpful leaning"
+            case "clarifying": return "Clarifying may be a helpful leaning"
+            case "equanimity": return "Equanimity may be a helpful leaning"
+            case "lightening": return "Lightness may be a helpful leaning"
+            default: return "Helpful leaning: \(k)"
+            }
         case .workflow_preference:
             switch key {
             case "options_first": return "Wants options before questions"

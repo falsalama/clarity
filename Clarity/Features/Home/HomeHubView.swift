@@ -21,7 +21,6 @@ struct HomeHubView: View {
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
     @EnvironmentObject private var flow: AppFlowRouter
-
     @State private var introExpanded: Bool = false
     init() {
         _reflectCompletions = Query(sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)])
@@ -133,7 +132,7 @@ private struct PracticePanel: View {
             recentCard
             focusCard
             guidanceCard
-            insightsCard
+            InsightsCard()
         }
     }
 
@@ -374,23 +373,66 @@ private struct PillCTA: View {
     }
 }
 
-private var insightsCard: some View {
-    VStack(alignment: .leading, spacing: 10) {
-        Text("Insights")
-            .font(.headline)
+private struct InsightsCard: View {
+    @EnvironmentObject private var capsuleStore: CapsuleStore
 
-        Text("These appear here as you use Reflect and fill in Capsule preferences. They are private cues and patterns - not judgments, labels, or identity.")
-            .font(.footnote)
-            .foregroundStyle(.secondary)
+    var body: some View {
+        let priority: [String: Int] = [
+            "antidote_lean": 0,
+            "opening_factor": 1,
+            "dharma_arc": 2,
+            "afflictive_pattern": 3
+        ]
 
-        Text("No insights yet.")
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.top, 2)
+        let items = Array(
+            capsuleStore.capsule.learnedTendencies
+                .filter { item in
+                    guard let kind = item.sourceKindRaw else { return false }
+                    return priority[kind] != nil
+                }
+                .sorted { a, b in
+                    let pa = priority[a.sourceKindRaw ?? ""] ?? 99
+                    let pb = priority[b.sourceKindRaw ?? ""] ?? 99
+
+                    if pa != pb { return pa < pb }
+                    if a.evidenceCount != b.evidenceCount { return a.evidenceCount > b.evidenceCount }
+                    return a.lastSeenAt > b.lastSeenAt
+                }
+                .reduce(into: [CapsuleTendency]()) { acc, item in
+                    if !acc.contains(where: { $0.statement == item.statement }) {
+                        acc.append(item)
+                    }
+                }
+                .prefix(3)
+        )
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Insights")
+                .font(.headline)
+
+            Text("Insights will appear here and evolve over time if learning is enabled.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            if items.isEmpty {
+                Text("No insights yet.")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(items) { item in
+                        Text(item.statement)
+                            .font(.subheadline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
-    .padding(14)
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
 }
 
 private struct ProgressPanel: View {

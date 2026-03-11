@@ -308,10 +308,36 @@ struct CaptureView: View {
         do { try modelContext.save() } catch { /* best-effort */ }
     }
 
+    private var latestTurnIDToday: UUID? {
+        let cal = Calendar.current
+        let now = Date()
+
+        return completedTurns.first(where: { turn in
+            cal.isDate(turn.recordedAt, inSameDayAs: now)
+        })?.id
+    }
+
+    private func applyDailyPromptSnapshot(to turnID: UUID?) {
+        guard let turnID else { return }
+        guard let step = currentStep else { return }
+        guard let turn = completedTurns.first(where: { $0.id == turnID }) else { return }
+
+        turn.promptKindRaw = "daily_reflect"
+        turn.promptProgrammeSlug = "starter_5day"
+        turn.promptStepIndex = step.stepIndex
+        turn.promptTitle = step.title
+        turn.promptBody = step.body
+        turn.promptDayKey = todayKey
+    }
+    
     private func markDoneToday() {
         let step = currentStep
+        let linkedTurnID = latestTurnIDToday
+
+        applyDailyPromptSnapshot(to: linkedTurnID)
 
         if let existing = reflectCompletions.first(where: { $0.dayKey == todayKey }) {
+            existing.turnId = linkedTurnID
             existing.programmeSlug = nil
             existing.stepIndex = step?.stepIndex
             existing.title = step?.title
@@ -328,6 +354,7 @@ struct CaptureView: View {
         }
 
         let completion = ReflectCompletionEntity(
+            turnId: linkedTurnID,
             dayKey: todayKey,
             completedAt: Date(),
             programmeSlug: nil,
@@ -344,7 +371,6 @@ struct CaptureView: View {
 
         do { try modelContext.save() } catch { /* best-effort */ }
     }
-
     // MARK: - Sections
 
     private var captureSurfaceSection: some View {

@@ -23,11 +23,21 @@ final class TurnEntity {
 
     var captureContextRaw: String = CaptureContext.unknown.rawValue
 
+    // MARK: Prompt context snapshot
+
+    /// Structured prompt context captured with the turn.
+    /// This lets the trace engine interpret an answer in relation to the question asked.
+    var promptKindRaw: String?
+    var promptProgrammeSlug: String?
+    var promptStepIndex: Int?
+    var promptTitle: String?
+    var promptBody: String?
+    var promptDayKey: String?
+
     // MARK: Title
 
     /// User-editable title. Empty string means "no manual title".
     var title: String = ""
-
     // MARK: Flags
 
     /// User mark to highlight important captures.
@@ -282,6 +292,13 @@ final class PatternStatsEntity {
         case constraint_trigger
         case contraction_pattern
         case release_pattern
+
+        // Richer non-reifying learning families
+        case afflictive_pattern
+        case opening_factor
+        case self_stated_concern
+        case dharma_arc
+        case antidote_lean
     }
 
     // MARK: Identity
@@ -369,6 +386,7 @@ final class ReflectCompletionEntity {
 
     @Attribute(.unique)
     var id: UUID
+    var turnId: UUID? = nil
 
     /// Calendar-day key (local timezone), e.g. "2026-02-12"
     @Attribute(.unique)
@@ -384,6 +402,7 @@ final class ReflectCompletionEntity {
 
     init(
         id: UUID = UUID(),
+        turnId: UUID? = nil,
         dayKey: String,
         completedAt: Date = Date(),
         programmeSlug: String? = nil,
@@ -392,6 +411,7 @@ final class ReflectCompletionEntity {
         body: String? = nil
     ) {
         self.id = id
+        self.turnId = turnId
         self.dayKey = dayKey
         self.completedAt = completedAt
         self.programmeSlug = programmeSlug

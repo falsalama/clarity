@@ -212,9 +212,15 @@ struct PatternLearner {
 
             // MARK: Explicit deactivation phrases (agency-first; no inference)
             out.append(contentsOf: deriveDeactivations(from: text))
-        }
 
-        // Keep bounded and deduplicated per (kind,key) with deterministic ordering.
+            out.append(contentsOf: deriveAfflictiveAndOpeningPatterns(from: text))
+            
+            out.append(contentsOf: deriveSelfStatedConcerns(from: text))
+        
+            out.append(contentsOf: deriveDharmaArcsAndAntidotes(from: out))
+    }
+
+            // Keep bounded and deduplicated per (kind,key) with deterministic ordering.
         // Dedupe keeps the max strength for a given (kind,key).
         var unique: [String: PatternObservation] = [:]
         for o in out {
@@ -445,6 +451,121 @@ struct PatternLearner {
         return out
     }
 
+    private func deriveAfflictiveAndOpeningPatterns(from text: String) -> [PatternObservation] {
+        var out: [PatternObservation] = []
+
+        func add(_ kind: PatternStatsEntity.Kind, _ key: String, _ strength: Double = 0.34) {
+            out.append(.init(kind: kind, key: key, strength: strength))
+        }
+
+        func hitAny(_ phrases: [String]) -> Bool {
+            phrases.contains(where: { text.contains($0) })
+        }
+
+        let afflictive: [(String, [String])] = [
+            ("anger_pressure", [
+                "angry", "anger", "mad", "pissed", "pissed off", "fuming", "furious", "rage", "raging",
+                "livid", "fed up", "frustrated", "frustration", "annoyed", "irritated", "vexed",
+                "resentful", "resentment", "bitter", "cross"
+            ]),
+            ("jealousy_pressure", [
+                "jealous", "jealousy", "envious", "envy", "why them not me", "wish i had what they have",
+                "resent their success", "bitter about their success"
+            ]),
+            ("comparison_pressure", [
+                "comparing myself", "compare myself", "comparison", "compared to them", "behind everyone",
+                "falling behind", "not as good as", "less than", "inferior", "inadequate", "not enough"
+            ]),
+            ("fear_contraction", [
+                "afraid", "fearful", "scared", "terrified", "frightened", "panic", "panicking", "panicked",
+                "anxious", "anxiety", "dread", "dreading", "phobia", "phobic"
+            ]),
+            ("shame_pressure", [
+                "ashamed", "shame", "embarrassed", "embarrassing", "humiliated", "humiliating", "mortified",
+                "disgusted with myself", "cringe at myself", "cringing at myself"
+            ]),
+            ("self_attack_pressure", [
+                "stupid", "dumb", "idiot", "moron", "pathetic", "useless", "failure", "loser", "crappy",
+                "worthless", "awful person", "broken", "psycho", "crazy", "insane", "messed up",
+                "what is wrong with me", "hate myself", "self loathing"
+            ]),
+            ("low_mood_pressure", [
+                "low", "down", "depressed", "bleak", "hopeless", "empty", "numb", "flat", "miserable", "dark"
+            ]),
+            ("control_pressure", [
+                "need to control", "must control", "control everything", "cover every angle", "make sure everything",
+                "perfect plan", "lock it down", "stop anything going wrong", "prevent anything going wrong"
+            ]),
+            ("status_tightening", [
+                "status", "pride", "ego", "reputation", "image", "appearances", "saving face", "losing face",
+                "look weak", "look stupid", "look foolish", "look bad", "look pathetic", "seem incompetent",
+                "what will people think of me", "respect me", "status games"
+            ]),
+            ("grasping_pressure", [
+                "clinging", "grasping", "attached", "cant let go", "holding on", "need more", "want more",
+                "not enough", "must have", "craving", "obsessed", "fixated", "fixation"
+            ]),
+            ("rigidity_pressure", [
+                "strict", "rigid", "inflexible", "black and white", "all or nothing", "uncompromising",
+                "has to be exact", "must be exact"
+            ]),
+            ("looping_pressure", [
+                "looping", "stuck in a loop", "going round in circles", "round in circles", "over and over",
+                "replaying", "ruminating", "spiralling", "spiraling", "stuck in my head", "cant stop thinking"
+            ]),
+            ("aversion_pressure", [
+                "avoiding", "avoidance", "aversion", "resisting", "cant face", "put it off", "putting it off",
+                "recoil", "hate the idea", "dont want to deal with", "do not want to deal with"
+            ]),
+            ("self_protective_framing", [
+                "not my fault", "they made me", "i had no choice", "i was only trying to", "anyone would have",
+                "obviously i had to", "i didnt want to look", "i did not want to look"
+            ])
+        ]
+
+        let opening: [(String, [String])] = [
+            ("warmth_present", [
+                "kind", "warm", "caring", "gentle", "tender", "compassionate", "soft hearted", "friendly"
+            ]),
+            ("humour_present", [
+                "funny", "laughed", "laughing", "humour", "humor", "joking", "joked", "playful", "lightness"
+            ]),
+            ("generosity_present", [
+                "generous", "gave", "giving", "shared", "offered to help", "helped them", "made space for",
+                "offered support", "gave my time"
+            ]),
+            ("patience_present", [
+                "patient", "waited", "stayed calm", "held back", "paused", "took a breath", "let it be",
+                "didnt react", "did not react"
+            ]),
+            ("honesty_present", [
+                "honest", "truthfully", "told the truth", "admitted", "owned it", "came clean",
+                "straightforward", "direct with"
+            ]),
+            ("flexibility_present", [
+                "adapted", "flexible", "let it change", "changed approach", "went with it", "softened my position",
+                "open to changing"
+            ]),
+            ("courage_present", [
+                "brave", "courage", "faced it", "did it anyway", "showed up", "spoke up", "went through with it"
+            ]),
+            ("steadiness_present", [
+                "steady", "grounded", "balanced", "even minded", "equanimity", "equanimous"
+            ])
+        ]
+
+        for (key, phrases) in afflictive where hitAny(phrases) {
+            add(.afflictive_pattern, key)
+        }
+
+        for (key, phrases) in opening where hitAny(phrases) {
+            add(.opening_factor, key)
+        }
+
+        return Array(out.prefix(18))
+    }
+    
+    
     // explicit-phrase v1 for the four cues
     private func deriveQuestionAndBreadthPreferences(from text: String) -> [PatternObservation] {
         var out: [PatternObservation] = []
@@ -856,6 +977,196 @@ struct PatternLearner {
         return Array(out.prefix(8))
     }
 
+    private func deriveDharmaArcsAndAntidotes(from observations: [PatternObservation]) -> [PatternObservation] {
+        var out: [PatternObservation] = []
+
+        func has(_ kind: PatternStatsEntity.Kind, _ key: String) -> Bool {
+            observations.contains { $0.kind == kind && $0.key == key }
+        }
+
+        func add(_ kind: PatternStatsEntity.Kind, _ key: String, _ strength: Double = 0.36) {
+            out.append(.init(kind: kind, key: key, strength: strength))
+        }
+
+        // Grasping / comparison / wanting more
+        if has(.afflictive_pattern, "jealousy_pressure")
+            || has(.afflictive_pattern, "comparison_pressure")
+            || has(.afflictive_pattern, "grasping_pressure")
+            || has(.narrative_pattern, "outcome_fixation")
+            || has(.contraction_pattern, "contraction:outcome_fixation")
+        {
+            add(.dharma_arc, "grasping")
+            add(.antidote_lean, "rejoicing")
+            add(.antidote_lean, "generosity")
+            add(.antidote_lean, "letting_be")
+        }
+
+        // Aversion / resistance / anger
+        if has(.afflictive_pattern, "anger_pressure")
+            || has(.afflictive_pattern, "aversion_pressure")
+            || has(.narrative_pattern, "avoidance_language")
+            || has(.contraction_pattern, "contraction:avoidance_pressure")
+        {
+            add(.dharma_arc, "aversion")
+            add(.antidote_lean, "patience")
+            add(.antidote_lean, "compassionate_witnessing")
+            add(.antidote_lean, "softening")
+        }
+
+        // Fear / uncertainty / contraction
+        if has(.afflictive_pattern, "fear_contraction")
+            || has(.narrative_pattern, "uncertainty_pressure")
+            || has(.contraction_pattern, "contraction:uncertainty_pressure")
+            || has(.resolution_pattern, "decision_stuck")
+        {
+            add(.dharma_arc, "fear_contraction")
+            add(.antidote_lean, "steadiness")
+            add(.antidote_lean, "widening")
+            add(.antidote_lean, "letting_be")
+        }
+
+        // Self-tightening / shame / image / control
+        if has(.afflictive_pattern, "shame_pressure")
+            || has(.afflictive_pattern, "self_attack_pressure")
+            || has(.afflictive_pattern, "status_tightening")
+            || has(.afflictive_pattern, "control_pressure")
+            || has(.afflictive_pattern, "rigidity_pressure")
+            || has(.narrative_pattern, "identity_frame_present")
+            || has(.contraction_pattern, "contraction:identity_fixation")
+            || has(.contraction_pattern, "contraction:control_pressure")
+            || has(.contraction_pattern, "contraction:self_attack")
+        {
+            add(.dharma_arc, "self_tightening")
+            add(.antidote_lean, "non_identification")
+            add(.antidote_lean, "softening")
+            add(.antidote_lean, "compassionate_witnessing")
+        }
+
+        // Confusion / looping / fog
+        if has(.afflictive_pattern, "looping_pressure")
+            || has(.afflictive_pattern, "low_mood_pressure")
+            || has(.narrative_pattern, "replay_loop")
+            || has(.contraction_pattern, "contraction:mental_looping")
+        {
+            add(.dharma_arc, "confusion")
+            add(.antidote_lean, "clarifying")
+            add(.antidote_lean, "widening")
+            add(.antidote_lean, "steadiness")
+        }
+
+        // Opening / positive resources already present
+        if has(.opening_factor, "warmth_present")
+            || has(.opening_factor, "generosity_present")
+            || has(.opening_factor, "honesty_present")
+            || has(.opening_factor, "patience_present")
+            || has(.opening_factor, "humour_present")
+            || has(.opening_factor, "flexibility_present")
+            || has(.opening_factor, "courage_present")
+            || has(.opening_factor, "steadiness_present")
+            || has(.release_pattern, "release:ease_present")
+            || has(.release_pattern, "release:settling")
+            || has(.release_pattern, "release:openness")
+        {
+            add(.dharma_arc, "opening")
+        }
+
+        if has(.opening_factor, "warmth_present")
+            || has(.opening_factor, "generosity_present")
+            || has(.opening_factor, "honesty_present")
+        {
+            add(.dharma_arc, "compassion")
+            add(.antidote_lean, "compassionate_witnessing")
+            add(.antidote_lean, "generosity")
+        }
+
+        if has(.opening_factor, "patience_present")
+            || has(.opening_factor, "steadiness_present")
+        {
+            add(.antidote_lean, "patience")
+            add(.antidote_lean, "equanimity")
+        }
+
+        if has(.opening_factor, "humour_present")
+            || has(.opening_factor, "flexibility_present")
+        {
+            add(.antidote_lean, "lightening")
+            add(.antidote_lean, "widening")
+        }
+
+        if has(.release_pattern, "release:openness")
+            || has(.release_pattern, "release:settling")
+            || has(.opening_factor, "steadiness_present")
+        {
+            add(.dharma_arc, "spaciousness")
+            add(.antidote_lean, "letting_be")
+            add(.antidote_lean, "equanimity")
+        }
+
+        return out
+    }
+    private func deriveSelfStatedConcerns(from text: String) -> [PatternObservation] {
+        var out: [PatternObservation] = []
+
+        func add(_ key: String, _ strength: Double = 0.38) {
+            out.append(.init(kind: .self_stated_concern, key: key, strength: strength))
+        }
+
+        func hitAny(_ phrases: [String]) -> Bool {
+            phrases.contains(where: { text.contains($0) })
+        }
+
+        let concerns: [(String, [String])] = [
+            ("anger", [
+                "i have anger issues", "my anger", "i get angry a lot", "i lose my temper", "short tempered"
+            ]),
+            ("jealousy", [
+                "i get jealous", "i am jealous", "jealousy is a problem", "envy is a problem"
+            ]),
+            ("fear", [
+                "i am fearful", "i get scared easily", "fear is a problem", "i live in fear"
+            ]),
+            ("anxiety", [
+                "i have anxiety", "i am anxious a lot", "anxiety is a problem", "my anxiety"
+            ]),
+            ("depression", [
+                "i am depressed", "i have depression", "depression is a problem", "my depression"
+            ]),
+            ("shame", [
+                "i carry shame", "i feel a lot of shame", "shame is a problem", "i feel ashamed a lot"
+            ]),
+            ("addiction", [
+                "i have an addiction", "addiction is a problem", "i am addicted", "my addiction"
+            ]),
+            ("insomnia", [
+                "i cant sleep", "i can't sleep", "i have insomnia", "sleep is a problem", "i do not sleep well"
+            ]),
+            ("phobia", [
+                "i have a phobia", "phobias are a problem", "i am phobic", "my phobia"
+            ]),
+            ("control", [
+                "i am controlling", "i need to control everything", "control is a problem for me"
+            ]),
+            ("rigidity", [
+                "i am rigid", "i am inflexible", "i can be rigid", "i get stuck in black and white thinking"
+            ]),
+            ("self_criticism", [
+                "i am too hard on myself", "i attack myself", "i am very self critical", "i hate myself"
+            ]),
+            ("comparison", [
+                "i compare myself too much", "comparison is a problem for me", "i am always comparing myself"
+            ]),
+            ("pride", [
+                "my pride", "pride is a problem", "ego is a problem", "i care too much what people think"
+            ])
+        ]
+
+        for (key, phrases) in concerns where hitAny(phrases) {
+            add(key)
+        }
+
+        return Array(out.prefix(8))
+    }
+    
     // MARK: NEW — Buddhist practice signals (explicit phrases only; no inference)
     private func deriveBuddhistSignals(from text: String) -> [PatternObservation] {
         var out: [PatternObservation] = []
