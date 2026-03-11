@@ -141,9 +141,27 @@ struct LearningSync {
             let ephemeralRows = rows.filter { bucket(for: $0) == .ephemeral }
 
             let chosenSticky = select(from: stickyRows, cap: stickyCap)
-            let chosenSeasonal = select(from: seasonalRows, cap: seasonalCap)
-            let chosenEphemeral = select(from: ephemeralRows, cap: ephemeralCap)
 
+            let seasonalAntidoteRows = seasonalRows.filter { $0.kind == .antidote_lean }
+            let seasonalOpeningRows = seasonalRows.filter { $0.kind == .opening_factor }
+            let otherSeasonalRows = seasonalRows.filter {
+                $0.kind != .antidote_lean && $0.kind != .opening_factor
+            }
+
+            let chosenAntidote = select(from: seasonalAntidoteRows, cap: 1)
+            let chosenOpening = select(from: seasonalOpeningRows, cap: 1)
+            let chosenOtherSeasonal = select(
+                from: otherSeasonalRows,
+                cap: max(0, seasonalCap - chosenAntidote.count - chosenOpening.count)
+            )
+
+            var chosenSeasonal = chosenAntidote + chosenOpening + chosenOtherSeasonal
+            chosenSeasonal.sort {
+                if $0.score == $1.score { return $0.lastSeenAt > $1.lastSeenAt }
+                return $0.score > $1.score
+            }
+
+            let chosenEphemeral = select(from: ephemeralRows, cap: ephemeralCap)
 
             // Global cap safety (should not usually trip, but keep deterministic)
             var combined: [PatternStatsEntity] = chosenSticky + chosenSeasonal + chosenEphemeral
@@ -211,52 +229,32 @@ struct LearningSync {
             case "prefers_no_fluff": return "Prefers direct, no-fluff replies"
             default: return "Prefers \(k)"
             }
+
         case .afflictive_pattern:
-            switch key {
-            case "anger_pressure": return "Anger pressure has been active"
-            case "jealousy_pressure": return "Jealousy pressure has been active"
-            case "comparison_pressure": return "Comparison pressure has been active"
-            case "fear_contraction": return "Fear and contraction have been active"
-            case "shame_pressure": return "Shame pressure has been active"
-            case "self_attack_pressure": return "Self-attack has been active"
-            case "low_mood_pressure": return "Low mood has been active"
-            case "control_pressure": return "Control pressure has been active"
-            case "status_tightening": return "Status and image tightening have been active"
-            case "grasping_pressure": return "Grasping has been active"
-            case "rigidity_pressure": return "Rigidity has been active"
-            case "looping_pressure": return "Looping has been active"
-            case "aversion_pressure": return "Aversion has been active"
-            case "self_protective_framing": return "Self-protective framing has been active"
-            default: return "Afflictive pressure: \(k)"
-            }
+            return insightStatement(for: key)
 
         case .opening_factor:
             switch key {
-            case "warmth_present": return "Warmth is present at times"
-            case "humour_present": return "Humour is present at times"
-            case "generosity_present": return "Generosity is present at times"
-            case "patience_present": return "Patience is present at times"
-            case "honesty_present": return "Honesty is present at times"
-            case "flexibility_present": return "Flexibility is present at times"
-            case "courage_present": return "Courage is present at times"
-            case "steadiness_present": return "Steadiness is present at times"
-            default: return "Opening factor: \(k)"
+            case "warmth_present": return "Warmth has been more available lately"
+            case "humour_present": return "Humour has been more available lately"
+            case "generosity_present": return "Generosity has been more available lately"
+            case "patience_present": return "Patience has been more available lately"
+            case "honesty_present": return "Honesty has been more available lately"
+            case "flexibility_present": return "Flexibility has been more available lately"
+            case "courage_present": return "Courage has been more available lately"
+            case "steadiness_present": return "Steadiness has been more available lately"
+            default: return "Something steadying has been more available lately"
             }
-
+            
         case .self_stated_concern:
             return "Self-stated concern: \(k)"
 
         case .dharma_arc:
             switch key {
-            case "grasping": return "Grasping is a recurring arc"
-            case "aversion": return "Aversion is a recurring arc"
-            case "fear_contraction": return "Fear and contraction are a recurring arc"
-            case "self_tightening": return "Self-tightening is a recurring arc"
-            case "confusion": return "Confusion is a recurring arc"
-            case "opening": return "Opening is present at times"
-            case "compassion": return "Compassion is present at times"
-            case "spaciousness": return "Spaciousness is present at times"
-            default: return "Dharma arc: \(k)"
+            case "opening": return "Opening has been more available lately"
+            case "compassion": return "Compassion has been more available lately"
+            case "spaciousness": return "A little more spaciousness has been appearing"
+            default: return insightStatement(for: key)
             }
 
         case .antidote_lean:
@@ -264,7 +262,7 @@ struct LearningSync {
             case "rejoicing": return "Rejoicing may be a helpful leaning"
             case "generosity": return "Generosity may be a helpful leaning"
             case "letting_be": return "Letting be may be a helpful leaning"
-            case "patience": return "Patience may be a helpful leaning"
+            case "patience": return "Finding your optimum pace may be a helpful leaning"
             case "compassionate_witnessing": return "Compassionate witnessing may be a helpful leaning"
             case "softening": return "Softening may be a helpful leaning"
             case "steadiness": return "Steadiness may be a helpful leaning"
@@ -275,6 +273,7 @@ struct LearningSync {
             case "lightening": return "Lightness may be a helpful leaning"
             default: return "Helpful leaning: \(k)"
             }
+
         case .workflow_preference:
             switch key {
             case "options_first": return "Wants options before questions"
@@ -283,13 +282,10 @@ struct LearningSync {
             case "prefers_just_answer": return "Prefers a direct answer"
             case "prefers_few_questions": return "Prefers fewer questions"
             case "prefers_no_clarifying_questions": return "Prefers no clarifying questions"
-
-            // New explicit-phrase v1 cues
             case "question_light": return "Prefers lighter questioning"
             case "question_guided": return "Prefers guided questioning"
             case "narrow_first": return "Prefers one path first"
             case "explore_space": return "Prefers exploring options"
-
             default: return "Often wants \(k)"
             }
 
@@ -336,9 +332,7 @@ struct LearningSync {
                 return "Region: \(human(tail(after: "profile:region:")))"
             }
 
-            // Safe fallback (neutral)
             return "Noted: \(human(key))"
-
 
         case .resolution_pattern:
             switch key {
@@ -363,17 +357,7 @@ struct LearningSync {
             }
 
         case .narrative_pattern:
-            switch key {
-            case "replay_loop": return "Tends to replay the story"
-            case "identity_frame_present": return "Framing often involves identity"
-            case "outcome_fixation": return "Fixates on a single outcome"
-            case "control_frame": return "Framing leans toward control"
-            case "uncertainty_pressure": return "Feels pressure from uncertainty"
-            case "self_attack_language": return "Uses self-critical language"
-            case "reassurance_checking": return "Seeks reassurance"
-            case "avoidance_language": return "Uses avoidance language"
-            default: return "Narrative pattern: \(k)"
-            }
+            return insightStatement(for: key)
 
         case .lens_preference:
             switch key {
@@ -387,7 +371,6 @@ struct LearningSync {
             }
 
         case .constraint_trigger:
-            // Avoid the word “trigger” in UI; phrase as situational constraints
             switch key {
             case "trigger:noise": return "Often harder in noisy environments"
             case "trigger:bright_light": return "Often harder with bright light"
@@ -406,28 +389,90 @@ struct LearningSync {
             }
 
         case .contraction_pattern:
-            switch key {
-            case "contraction:identity_fixation": return "Identity framing can tighten experience"
-            case "contraction:outcome_fixation": return "Outcome fixation can increase pressure"
-            case "contraction:control_pressure": return "Control efforts can add pressure"
-            case "contraction:uncertainty_pressure": return "Uncertainty can amplify tension"
-            case "contraction:mental_looping": return "Mental replay can sustain tightening"
-            case "contraction:self_attack": return "Self-critical language can tighten experience"
-            case "contraction:checking_for_reassurance": return "Checking for reassurance can sustain tightening"
-            case "contraction:avoidance_pressure": return "Avoidance language can increase pressure"
-            default: return "Tightening can show up under certain conditions"
-            }
+            return insightStatement(for: key)
 
         case .release_pattern:
             switch key {
-            case "release:ease_present": return "Ease can show up under some conditions"
-            case "release:settling": return "Settling can appear at times"
-            case "release:openness": return "A sense of space can open when pressure drops"
-            default: return "Ease can appear under certain conditions"
+            case "release:ease_present": return "A little more ease has been available lately"
+            case "release:settling": return "Settling has been coming more readily"
+            case "release:openness": return "More space has been appearing when pressure drops"
+            default: return "A little more ease has been appearing"
             }
         }
     }
 
+    private static func insightStatement(for key: String) -> String {
+        switch key {
+        case "aversion", "aversion_pressure", "avoidance_language", "avoidance_pressure":
+            return "Reactivity often forms around blame, judgement, and the wish to push away"
+
+        case "grasping", "grasping_pressure", "outcome_fixation", "contraction:outcome_fixation":
+            return "Attachment strengthens when relief or completion is expected from the object"
+
+        case "desire_pressure", "lust_pressure":
+            return "Desire grows when changing form is taken as lasting or able to satisfy"
+
+        case "fear_contraction", "uncertainty_pressure", "contraction:uncertainty_pressure":
+            return "Fear often shows up as contraction around uncertainty"
+
+        case "self_tightening", "self_attack_pressure", "self_attack_language", "contraction:self_attack", "shame_pressure":
+            return "Under pressure, the mind can turn against itself"
+
+        case "comparison_pressure", "jealousy_pressure", "status_tightening":
+            return "Comparison tightens when worth gets measured against others"
+
+        case "control_pressure", "control_frame", "rigidity_pressure", "contraction:control_pressure":
+            return "Control hardens where uncertainty feels difficult to bear"
+
+        case "looping_pressure", "replay_loop", "contraction:mental_looping", "contraction:checking_for_reassurance", "checking_for_reassurance", "reassurance_checking":
+            return "The mind tends to loop when it cannot let the unresolved remain unresolved"
+
+        case "confusion":
+            return "Confusion grows when too many moving parts are held at once"
+
+        case "identity_frame_present", "contraction:identity_fixation":
+            return "Suffering thickens when experience gets pulled into a solid sense of self"
+
+        default:
+            return "A familiar knot seems to form under pressure"
+        }
+    }
+    private static func supportiveInsight(for key: String) -> String {
+        switch key {
+        case "aversion", "aversion_pressure", "avoidance_language", "avoidance_pressure":
+            return "Reactivity often forms around blame, judgement, and the wish to push away"
+
+        case "grasping", "grasping_pressure", "outcome_fixation":
+            return "Attachment strengthens when relief or completion is expected from the object"
+
+        case "desire_pressure", "lust_pressure":
+            return "Desire grows when changing form is taken as lasting or able to satisfy"
+
+        case "fear_contraction", "uncertainty_pressure", "contraction:uncertainty_pressure":
+            return "Fear often shows up as contraction around uncertainty"
+
+        case "self_tightening", "self_attack_pressure", "self_attack_language", "shame_pressure":
+            return "Under pressure, the mind can turn against itself"
+
+        case "comparison_pressure", "jealousy_pressure", "status_tightening":
+            return "Comparison tightens when worth gets measured against others"
+
+        case "control_pressure", "control_frame", "rigidity_pressure", "contraction:control_pressure":
+            return "Control hardens where uncertainty feels difficult to bear"
+
+        case "looping_pressure", "replay_loop", "contraction:mental_looping", "checking_for_reassurance", "reassurance_checking":
+            return "The mind tends to loop when it cannot let the unresolved remain unresolved"
+
+        case "confusion":
+            return "Confusion grows when too many moving parts are held at once"
+
+        case "identity_frame_present", "contraction:identity_fixation":
+            return "Suffering thickens when experience gets pulled into a solid sense of self"
+
+        default:
+            return "A familiar knot seems to form under pressure"
+        }
+    }
     private static func equalIgnoringIDs(_ a: [CapsuleTendency], _ b: [CapsuleTendency]) -> Bool {
         let lhs = normalize(a)
         let rhs = normalize(b)

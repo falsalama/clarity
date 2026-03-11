@@ -375,56 +375,120 @@ private struct PillCTA: View {
 
 private struct InsightsCard: View {
     @EnvironmentObject private var capsuleStore: CapsuleStore
+    @State private var expanded: Bool = false
+
+    private enum Lane {
+        case insight
+        case leaning
+        case shift
+    }
+
+    private var allItems: [CapsuleTendency] {
+        capsuleStore.capsule.learnedTendencies
+            .reduce(into: [CapsuleTendency]()) { acc, item in
+                if !acc.contains(where: { $0.statement == item.statement }) {
+                    acc.append(item)
+                }
+            }
+    }
+
+    private func lane(for item: CapsuleTendency) -> Lane? {
+        guard
+            let raw = item.sourceKindRaw,
+            let kind = PatternStatsEntity.Kind(rawValue: raw)
+        else {
+            return nil
+        }
+
+        switch kind {
+        case .antidote_lean:
+            return .leaning
+
+        case .opening_factor, .release_pattern:
+            return .shift
+
+        case .dharma_arc:
+            if ["opening", "compassion", "spaciousness"].contains(item.sourceKey ?? "") {
+                return .shift
+            }
+            return .insight
+
+        case .afflictive_pattern, .narrative_pattern, .contraction_pattern:
+            return .insight
+
+        default:
+            return nil
+        }
+    }
+
+    private func sortItems(_ items: [CapsuleTendency]) -> [CapsuleTendency] {
+        items.sorted {
+            if $0.evidenceCount != $1.evidenceCount { return $0.evidenceCount > $1.evidenceCount }
+            return $0.lastSeenAt > $1.lastSeenAt
+        }
+    }
+
+    private var insightItems: [CapsuleTendency] {
+        sortItems(allItems.filter { lane(for: $0) == .insight })
+    }
+
+    private var leaningItems: [CapsuleTendency] {
+        sortItems(allItems.filter { lane(for: $0) == .leaning })
+    }
+
+    private var shiftItems: [CapsuleTendency] {
+        sortItems(allItems.filter { lane(for: $0) == .shift })
+    }
+
+    private var visibleInsightItems: [CapsuleTendency] {
+        expanded ? Array(insightItems.prefix(3)) : Array(insightItems.prefix(1))
+    }
+
+    private var visibleLeaningItems: [CapsuleTendency] {
+        expanded ? Array(leaningItems.prefix(3)) : Array(leaningItems.prefix(1))
+    }
+
+    private var visibleShiftItems: [CapsuleTendency] {
+        expanded ? Array(shiftItems.prefix(3)) : Array(shiftItems.prefix(1))
+    }
+
+    private var hasAnything: Bool {
+        !insightItems.isEmpty || !leaningItems.isEmpty || !shiftItems.isEmpty
+    }
+
+    private var canExpand: Bool {
+        insightItems.count > 1 || leaningItems.count > 1 || shiftItems.count > 1
+    }
 
     var body: some View {
-        let priority: [String: Int] = [
-            "antidote_lean": 0,
-            "opening_factor": 1,
-            "dharma_arc": 2,
-            "afflictive_pattern": 3
-        ]
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Insights")
+                    .font(.headline)
 
-        let items = Array(
-            capsuleStore.capsule.learnedTendencies
-                .filter { item in
-                    guard let kind = item.sourceKindRaw else { return false }
-                    return priority[kind] != nil
-                }
-                .sorted { a, b in
-                    let pa = priority[a.sourceKindRaw ?? ""] ?? 99
-                    let pb = priority[b.sourceKindRaw ?? ""] ?? 99
+                Spacer()
 
-                    if pa != pb { return pa < pb }
-                    if a.evidenceCount != b.evidenceCount { return a.evidenceCount > b.evidenceCount }
-                    return a.lastSeenAt > b.lastSeenAt
-                }
-                .reduce(into: [CapsuleTendency]()) { acc, item in
-                    if !acc.contains(where: { $0.statement == item.statement }) {
-                        acc.append(item)
+                if canExpand {
+                    Button(expanded ? "Show less" : "Show more") {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            expanded.toggle()
+                        }
                     }
+                    .font(.footnote.weight(.semibold))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                 }
-                .prefix(3)
-        )
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Insights")
-                .font(.headline)
+            }
 
-            Text("Insights will appear here and evolve over time if learning is enabled.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            if items.isEmpty {
-                Text("No insights yet.")
-                    .font(.subheadline.weight(.semibold))
+            if !hasAnything {
+                Text("Patterns will surface over time as you use Clarity.")                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(items) { item in
-                        Text(item.statement)
-                            .font(.subheadline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    laneSection(title: "Pattern", items: visibleInsightItems)
+                    laneSection(title: "Leaning", items: visibleLeaningItems)
+                    laneSection(title: "Shift", items: visibleShiftItems)
                 }
                 .padding(.top, 2)
             }
@@ -433,8 +497,28 @@ private struct InsightsCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
-}
 
+    @ViewBuilder
+    private func laneSection(title: String, items: [CapsuleTendency]) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            if items.isEmpty {
+                Text("Nothing surfaced yet.")
+                    .font(.subheadline)
+                    .foregroundStyle(.tertiary)
+            } else {
+                ForEach(items) { item in
+                    Text(item.statement)
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+    }
+}
 private struct ProgressPanel: View {
     let practiceUnitCount: Int
 
