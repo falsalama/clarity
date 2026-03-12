@@ -10,59 +10,54 @@ struct ExploreView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 10) {
-                    NavigationLink {
-                        MeditationZoneView()
-                    } label: {
-                        ExplorePillCTA(
-                            title: "Meditation Zone",
-                            subtitle: "Timer, posture, shamatha, and recitation",
-                            systemImage: "figure.mind.and.body",
-                            fill: meditationGold
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Text("A quiet space for sitting practice.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                NavigationLink {
+                    MeditationZoneView()
+                } label: {
+                    ExplorePillCTA(
+                        title: "Meditation Zone",
+                        subtitle: "Timer, posture, shamatha, and recitation",
+                        systemImage: "figure.mind.and.body",
+                        fill: meditationGold
+                    )
                 }
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    NavigationLink {
-                        AppleHealthExploreView()
-                    } label: {
-                        ExplorePillCTA(
-                            title: "Apple Health",
-                            subtitle: "Sleep, heart, steps, and mindful minutes",
-                            systemImage: "heart.text.square.fill",
-                            fill: healthRose
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Text("Connect Apple Health to surface patterns alongside your reflections.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                NavigationLink {
+                    AppleHealthExploreView()
+                } label: {
+                    ExplorePillCTA(
+                        title: "Apple Health",
+                        subtitle: "Sleep, heart, steps, and mindful minutes",
+                        systemImage: "heart.text.square.fill",
+                        fill: healthRose
+                    )
                 }
+                .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: 10) {
-                    NavigationLink {
-                        GuidanceHubView()
-                    } label: {
-                        ExplorePillCTA(
-                            title: "Guidance",
-                            subtitle: "Book a one-to-one session with a trained Buddhist",
-                            systemImage: "person.2.fill",
-                            fill: guidanceGreen
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    Text("Connect with teachers, practitioners, and future one-to-one offerings. Some options may also help support monasteries, nunneries, and universities.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                NavigationLink {
+                    WisdomView()
+                } label: {
+                    ExplorePillCTA(
+                        title: "Wisdom",
+                        subtitle: "Answer one of three questions each day",
+                        systemImage: "sparkles.rectangle.stack.fill",
+                        fill: .white,
+                        textColor: Color.black.opacity(0.92)
+                    )
                 }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    GuidanceHubView()
+                } label: {
+                    ExplorePillCTA(
+                        title: "Guidance",
+                        subtitle: "Book a one-to-one session",
+                        systemImage: "person.2.fill",
+                        fill: guidanceGreen
+                    )
+                }
+                .buttonStyle(.plain)
 
                 NavigationLink {
                     FocusSoundsHubView()
@@ -148,7 +143,6 @@ struct ExploreView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 }
-
 private struct AppleHealthExploreView: View {
     @StateObject private var healthKit = HealthKitManager()
     @State private var showManageAccessAlert = false
@@ -392,6 +386,10 @@ private struct ExplorePillCTA: View {
     let subtitle: String
     let systemImage: String
     let fill: Color
+    var textColor: Color = .white
+
+    // Matches the outer ExploreView .padding(16)
+    private let horizontalBleed: CGFloat = 16
 
     var body: some View {
         HStack(spacing: 12) {
@@ -415,15 +413,23 @@ private struct ExplorePillCTA: View {
                 .opacity(0.85)
         }
         .padding(.vertical, 14)
-        .padding(.horizontal, 16)
-        .foregroundStyle(.white)
-        .background(fill)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.25), radius: 8, y: 4)
+        .padding(.horizontal, 16)   // keeps text/icons where they are now
+        .foregroundStyle(textColor)
+        .background {
+            Rectangle()
+                .fill(fill)
+                .padding(.horizontal, -horizontalBleed) // extends stripe to screen edge
+        }
+        .overlay {
+            Rectangle()
+                .stroke(
+                    textColor == .white
+                        ? Color.white.opacity(0.08)
+                        : Color.black.opacity(0.08),
+                    lineWidth: 1
+                )
+                .padding(.horizontal, -horizontalBleed)
+        }
         .accessibilityElement(children: .combine)
     }
 }

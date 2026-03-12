@@ -2,19 +2,19 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-// MARK: - Day snapshot types (file-scope, accessible to subviews)
+// MARK: - Day snapshot types
 
 fileprivate enum DayStatus { case none, partial, full }
 
 fileprivate struct DayItem: Identifiable {
-    let id: String          // dayKey
+    let id: String
     let dayKey: String
-    let label: String       // Today / Yesterday / "Tue 26"
+    let label: String
     let status: DayStatus
 }
 
 /// Home hub content only (no NavigationStack, no toolbar).
-/// Top segmented header: Practice | Progress (Strava-like, but non-gamified).
+/// Top segmented header: Practice | Progress
 struct HomeHubView: View {
     @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
@@ -22,24 +22,31 @@ struct HomeHubView: View {
 
     @EnvironmentObject private var flow: AppFlowRouter
     @State private var introExpanded: Bool = false
+
     init() {
-        _reflectCompletions = Query(sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)])
-        _focusCompletions = Query(sort: [SortDescriptor(\FocusCompletionEntity.completedAt, order: .reverse)])
-        _practiceCompletions = Query(sort: [SortDescriptor(\PracticeCompletionEntity.completedAt, order: .reverse)])
+        _reflectCompletions = Query(
+            sort: [SortDescriptor(\ReflectCompletionEntity.completedAt, order: .reverse)]
+        )
+        _focusCompletions = Query(
+            sort: [SortDescriptor(\FocusCompletionEntity.completedAt, order: .reverse)]
+        )
+        _practiceCompletions = Query(
+            sort: [SortDescriptor(\PracticeCompletionEntity.completedAt, order: .reverse)]
+        )
     }
 
     private var todayKey: String { Date().dayKey() }
 
-    private var didReflectToday: Bool { reflectCompletions.first(where: { $0.dayKey == todayKey }) != nil }
-    private var didViewToday: Bool { focusCompletions.first(where: { $0.dayKey == todayKey }) != nil }
-    private var didPracticeToday: Bool { practiceCompletions.first(where: { $0.dayKey == todayKey }) != nil }
+    private var didReflectToday: Bool {
+        reflectCompletions.first(where: { $0.dayKey == todayKey }) != nil
+    }
 
-    // A “practice unit” = all three completed on the same dayKey
-    private var practiceUnitCount: Int {
-        let r = Set(reflectCompletions.map { $0.dayKey })
-        let v = Set(focusCompletions.map { $0.dayKey })
-        let p = Set(practiceCompletions.map { $0.dayKey })
-        return r.intersection(v).intersection(p).count
+    private var didViewToday: Bool {
+        focusCompletions.first(where: { $0.dayKey == todayKey }) != nil
+    }
+
+    private var didPracticeToday: Bool {
+        practiceCompletions.first(where: { $0.dayKey == todayKey }) != nil
     }
 
     var body: some View {
@@ -57,7 +64,7 @@ struct HomeHubView: View {
                         dayItems: lastDays(7)
                     )
                 } else {
-                    ProgressScreen()
+                    ProgressPanel(dayItems: lastDays(7))
                 }
 
                 Spacer(minLength: 12)
@@ -105,16 +112,20 @@ struct HomeHubView: View {
             let status: DayStatus = (count == 0) ? .none : (count == 3 ? .full : .partial)
 
             let label: String
-            if offset == 0 { label = "Today" }
-            else if offset == 1 { label = "Yesterday" }
-            else { label = df.string(from: d) }
+            if offset == 0 {
+                label = "Today"
+            } else if offset == 1 {
+                label = "Yesterday"
+            } else {
+                label = df.string(from: d)
+            }
 
             return DayItem(id: key, dayKey: key, label: label, status: status)
         }
     }
 }
 
-// MARK: - Panels
+// MARK: - Practice tab
 
 private struct PracticePanel: View {
     @Binding var introExpanded: Bool
@@ -130,15 +141,12 @@ private struct PracticePanel: View {
             introductionCard
             practiceCard
             recentCard
-            focusCard
-            guidanceCard
             InsightsCard()
         }
     }
 
     private var introductionCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-
             Text("Clarity")
                 .font(.headline)
 
@@ -148,7 +156,6 @@ private struct PracticePanel: View {
 
             DisclosureGroup(isExpanded: $introExpanded) {
                 VStack(alignment: .leading, spacing: 10) {
-
                     Text("How it works")
                         .font(.subheadline.weight(.semibold))
 
@@ -185,24 +192,6 @@ private struct PracticePanel: View {
                         .foregroundStyle(.secondary)
 
                     Text("On-device mode is fully private. Optional Cloud Tap processing uses redacted, anonymous text for deeper model responses.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    Text("Focus")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Focus is an evolving collection of original meditative sounds for settling, listening, and rest.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    Text("Guidance")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Guidance connects you with qualified Buddhist teachers and experienced practitioners for paid one-to-one sessions, practice questions, and personal instruction. These sessions create opportunities for monastics and practitioners while helping support the institutions and traditions they come from. Coming soon.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
 
@@ -272,52 +261,29 @@ private struct PracticePanel: View {
                 NavigationLink {
                     DailyFlowContainerView(startAt: startStep)
                 } label: {
-                    PillCTA(
+                    HomePracticeCard(
                         title: nextTitle,
                         subtitle: nextSubtitle,
                         systemImage: startStep == .reflect
                             ? "sun.max.fill"
                             : (startStep == .focus ? "book.closed.fill" : "leaf.fill"),
-                        fill: Color(red: 0.55, green: 0.12, blue: 0.16)
+                        fill: Color(red: 0.55, green: 0.12, blue: 0.16),
+                        imageAssetName: HomePracticeCardStyle.imageAssetName,
+                        showsChevron: true
                     )
                 }
                 .buttonStyle(.plain)
             } else {
-                PillCTA(
+                HomePracticeCard(
                     title: nextTitle,
                     subtitle: nextSubtitle,
                     systemImage: "checkmark.circle.fill",
-                    fill: Color(red: 0.40, green: 0.40, blue: 0.40)
+                    fill: Color(red: 0.40, green: 0.40, blue: 0.40),
+                    imageAssetName: HomePracticeCardStyle.imageAssetName,
+                    showsChevron: false
                 )
             }
         }
-    }
-    private var focusCard: some View {
-        NavigationLink {
-            FocusSoundsHubView()
-        } label: {
-            PillCTA(
-                title: "Focus",
-                subtitle: "Meditative sounds",
-                systemImage: "waveform",
-                fill: Color(red: 0.16, green: 0.36, blue: 0.78)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var guidanceCard: some View {
-        NavigationLink {
-            GuidanceHubView()
-        } label: {
-            PillCTA(
-                title: "Guidance",
-                subtitle: "Book a one-to-one session with a trained Buddhist",
-                systemImage: "person.2.fill",
-                fill: Color(red: 0.18, green: 0.46, blue: 0.28)
-            )
-        }
-        .buttonStyle(.plain)
     }
 
     private var recentCard: some View {
@@ -345,46 +311,131 @@ private struct PracticePanel: View {
     }
 }
 
-private struct PillCTA: View {
+// MARK: - Bigger home practice card
+
+private struct HomePracticeCard: View {
     let title: String
     let subtitle: String
-    var systemImage: String = "sun.max.fill"
+    let systemImage: String
     let fill: Color
+    let imageAssetName: String
+    let showsChevron: Bool
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.title3.weight(.semibold))
+        VStack(spacing: 0) {
+            heroImage
+                .frame(height: HomePracticeCardStyle.imageHeight)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.headline)
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
 
-                Text(subtitle)
-                    .font(.footnote)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.headline)
+
+                    Text(subtitle)
+                        .font(.footnote)
+                        .opacity(0.9)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: showsChevron ? "chevron.right" : "checkmark.circle.fill")
+                    .font(.subheadline.weight(.semibold))
                     .opacity(0.9)
-                    .lineLimit(2)
             }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.subheadline.weight(.semibold))
-                .opacity(0.85)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 16)
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 16)
         .foregroundStyle(.white)
         .background(fill)
-        .clipShape(Capsule())
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(
-            Capsule()
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
-        .shadow(color: Color.black.opacity(0.25), radius: 8, y: 4)
+        .shadow(color: Color.black.opacity(0.22), radius: 10, y: 5)
         .accessibilityElement(children: .combine)
     }
+
+    @ViewBuilder
+    private var heroImage: some View {
+        if UIImage(named: imageAssetName) != nil {
+            Image(imageAssetName)
+                .resizable()
+                .aspectRatio(contentMode: HomePracticeCardStyle.imageContentMode)
+                .scaleEffect(HomePracticeCardStyle.imageScale, anchor: .center)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .offset(y: HomePracticeCardStyle.imageVerticalOffset)
+        } else {
+            ZStack {
+                LinearGradient(
+                    colors: [
+                        fill.opacity(0.95),
+                        fill.opacity(0.72)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                Image("clarityMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 220, height: 220)
+                    .opacity(0.12)
+                    .offset(x: 56, y: -14)
+            }
+        }
+    }
 }
+
+private enum HomePracticeCardStyle {
+    static let imageAssetName = "kailash"            // your asset name
+    static let imageHeight: CGFloat = 248           // try 100–180 to change the photo area height
+    static let imageScale: CGFloat = 1.0            // e.g. 0.9 smaller, 1.1 larger inside the area
+    static let imageVerticalOffset: CGFloat = 0     // e.g. -10 moves photo up, +10 down
+    static let imageContentMode: ContentMode = .fill // .fill (crop) or .fit (show more)
+}
+
+// MARK: - Progress tab wrapper
+
+private struct ProgressPanel: View {
+    let dayItems: [DayItem]
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressScreen()
+            compactRecentCard
+        }
+    }
+
+    private var compactRecentCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(dayItems) { item in
+                        NavigationLink {
+                            DayDetailView(dayKey: item.dayKey, label: item.label)
+                        } label: {
+                            CompactDayChip(label: item.label, status: item.status)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+    }
+}
+
+// MARK: - Insights
 
 private struct InsightsCard: View {
     @EnvironmentObject private var capsuleStore: CapsuleStore
@@ -494,7 +545,8 @@ private struct InsightsCard: View {
             }
 
             if !hasAnything {
-                Text("Patterns will surface over time as you use Clarity.")                    .font(.subheadline.weight(.semibold))
+                Text("Patterns will surface over time as you use Clarity.")
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
             } else {
@@ -532,69 +584,8 @@ private struct InsightsCard: View {
         }
     }
 }
-private struct ProgressPanel: View {
-    let practiceUnitCount: Int
 
-    var body: some View {
-        VStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Progress")
-                    .font(.headline)
-
-                Text("A practice unit is formed when Reflect, View, and Practice are all completed on the same day.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                HStack {
-                    Text("Practice units")
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Text("\(practiceUnitCount)")
-                        .font(.title3.weight(.semibold))
-                }
-                .padding(.vertical, 6)
-
-                Text("")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
-
-            ProgressScreen()
-        }
-    }
-}
-
-// MARK: - Subviews
-
-private struct TodayRow: View {
-    let title: String
-    let subtitle: String
-    let isDone: Bool
-    let systemImage: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage).frame(width: 22)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(subtitle).font(.footnote).foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Image(systemName: isDone ? "checkmark.circle.fill" : "chevron.right")
-                .foregroundStyle(.secondary)
-        }
-        .padding(.vertical, 10)
-        .padding(.horizontal, 12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.systemBackground)))
-        .contentShape(Rectangle())
-    }
-}
+// MARK: - Day chips
 
 private struct DayChip: View {
     let label: String
@@ -624,6 +615,38 @@ private struct DayChip: View {
             }
         }
         .frame(width: 10, height: 10)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct CompactDayChip: View {
+    let label: String
+    let status: DayStatus
+
+    var body: some View {
+        HStack(spacing: 7) {
+            statusDot
+            Text(label)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.primary)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
+    }
+
+    private var statusDot: some View {
+        Group {
+            switch status {
+            case .none:
+                Circle().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.2)
+            case .partial:
+                Circle().fill(Color.secondary.opacity(0.50))
+            case .full:
+                Circle().fill(Color.primary.opacity(0.78))
+            }
+        }
+        .frame(width: 8, height: 8)
         .accessibilityHidden(true)
     }
 }
