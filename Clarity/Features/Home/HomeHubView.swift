@@ -21,7 +21,6 @@ struct HomeHubView: View {
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
     @EnvironmentObject private var flow: AppFlowRouter
-    @State private var introExpanded: Bool = false
 
     init() {
         _reflectCompletions = Query(
@@ -56,12 +55,10 @@ struct HomeHubView: View {
 
                 if flow.homeTab == .practice {
                     PracticePanel(
-                        introExpanded: $introExpanded,
                         todayKey: todayKey,
                         didReflectToday: didReflectToday,
                         didViewToday: didViewToday,
-                        didPracticeToday: didPracticeToday,
-                        dayItems: lastDays(7)
+                        didPracticeToday: didPracticeToday
                     )
                 } else {
                     ProgressPanel(dayItems: lastDays(7))
@@ -128,125 +125,30 @@ struct HomeHubView: View {
 // MARK: - Practice tab
 
 private struct PracticePanel: View {
-    @Binding var introExpanded: Bool
-
     let todayKey: String
     let didReflectToday: Bool
     let didViewToday: Bool
     let didPracticeToday: Bool
-    let dayItems: [DayItem]
 
     var body: some View {
-        VStack(spacing: 16) {
-            introductionCard
+        VStack(spacing: 0) {
             practiceCard
-            recentCard
-            InsightsCard()
         }
-    }
-
-    private var introductionCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Clarity")
-                .font(.headline)
-
-            Text("A Buddhist daily practice app.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            DisclosureGroup(isExpanded: $introExpanded) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("How it works")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Begin each day by pressing start practice.")
-                        .font(.footnote)
-
-                    Text("One practice has three parts:")
-                        .font(.footnote.weight(.semibold))
-
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Reflect - Answer one question honestly by audio or text.")
-                        Text("View - A short teaching to contemplate.")
-                        Text("Practice - A method to cultivate inner space.")
-                    }
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    Text("Complete all three to form one unit of practice. These slowly advance over time. Return each day to build continuity.")
-                        .font(.footnote.weight(.semibold))
-
-                    Divider()
-
-                    Text("Reflect (anytime)")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Reflect is a private thinking instrument. It combines structured reflection with a Buddhist-informed AI assistant designed to help clarify experience rather than analyse or judge it.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Text("You can speak or write freely. The system helps organise thoughts, reveal patterns, and support clear seeing.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Text("On-device mode is fully private. Optional Cloud Tap processing uses redacted, anonymous text for deeper model responses.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    Text("Capsule")
-                        .font(.subheadline.weight(.semibold))
-
-                    Text("Capsule is your adaptive learning layer. If enabled, it gradually tailors questions and teachings to your patterns over time. Capsule stores structure, not secrets.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    Text("This app is not therapy and does not replace a teacher. It is a structured instrument for contemplative training.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 6)
-            } label: {
-                Text(introExpanded ? "Hide details" : "Learn more")
-                    .font(.subheadline.weight(.semibold))
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemBackground))
-                .overlay(alignment: .topTrailing) {
-                    Image("clarityMark")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 950, height: 950)
-                        .opacity(0.16)
-                        .offset(x: 140, y: -260)
-                        .allowsHitTesting(false)
-                }
-                .clipped()
-        )
     }
 
     private var practiceCard: some View {
         let nextTitle: String = {
-            if !didReflectToday { return "Start today’s practice" }
-            if !didViewToday { return "Continue today’s practice" }
-            if !didPracticeToday { return "Continue today’s practice" }
-            return "Today complete"
+            if !didReflectToday { return "Start daily practice" }
+            if !didViewToday { return "Continue daily practice" }
+            if !didPracticeToday { return "Continue daily practice" }
+            return "Daily practice complete"
         }()
 
         let nextSubtitle: String = {
             if !didReflectToday { return "Reflect, View, and Practice." }
             if !didViewToday { return "Next: View." }
             if !didPracticeToday { return "Next: Practice." }
-            return "Reflect, View, and Practice are complete."
+            return "All three parts are complete."
         }()
 
         let startStep: DailyFlowStep? = {
@@ -285,30 +187,6 @@ private struct PracticePanel: View {
             }
         }
     }
-
-    private var recentCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Recent")
-                .font(.headline)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(dayItems) { item in
-                        NavigationLink {
-                            DayDetailView(dayKey: item.dayKey, label: item.label)
-                        } label: {
-                            DayChip(label: item.label, status: item.status)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.vertical, 2)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
-    }
 }
 
 // MARK: - Bigger home practice card
@@ -326,17 +204,18 @@ private struct HomePracticeCard: View {
             heroImage
                 .frame(height: HomePracticeCardStyle.imageHeight)
 
-            HStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 14) {
                 Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
+                    .font(.title2.weight(.semibold))
 
-                VStack(alignment: .leading, spacing: 3) {
+                VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(.headline)
+                        .font(.title3.weight(.bold))
+                        .lineLimit(2)
 
                     Text(subtitle)
-                        .font(.footnote)
-                        .opacity(0.9)
+                        .font(.subheadline)
+                        .opacity(0.92)
                         .lineLimit(2)
                 }
 
@@ -346,14 +225,14 @@ private struct HomePracticeCard: View {
                     .font(.subheadline.weight(.semibold))
                     .opacity(0.9)
             }
-            .padding(.vertical, 16)
-            .padding(.horizontal, 16)
+            .padding(.vertical, 18)
+            .padding(.horizontal, 18)
         }
         .foregroundStyle(.white)
         .background(fill)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(Color.white.opacity(0.08), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.22), radius: 10, y: 5)
@@ -393,11 +272,11 @@ private struct HomePracticeCard: View {
 }
 
 private enum HomePracticeCardStyle {
-    static let imageAssetName = "kailash"            // your asset name
-    static let imageHeight: CGFloat = 248           // try 100–180 to change the photo area height
-    static let imageScale: CGFloat = 1.0            // e.g. 0.9 smaller, 1.1 larger inside the area
-    static let imageVerticalOffset: CGFloat = 0     // e.g. -10 moves photo up, +10 down
-    static let imageContentMode: ContentMode = .fill // .fill (crop) or .fit (show more)
+    static let imageAssetName = "kailash"
+    static let imageHeight: CGFloat = 248
+    static let imageScale: CGFloat = 1.0
+    static let imageVerticalOffset: CGFloat = 0
+    static let imageContentMode: ContentMode = .fill
 }
 
 // MARK: - Progress tab wrapper
@@ -406,17 +285,22 @@ private struct ProgressPanel: View {
     let dayItems: [DayItem]
 
     var body: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             ProgressScreen()
+            InsightsCard()
             compactRecentCard
         }
     }
 
     private var compactRecentCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Recent")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
+
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(dayItems) { item in
+                HStack(spacing: 6) {
+                    ForEach(Array(dayItems.prefix(5))) { item in
                         NavigationLink {
                             DayDetailView(dayKey: item.dayKey, label: item.label)
                         } label: {
@@ -425,13 +309,13 @@ private struct ProgressPanel: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(.vertical, 2)
+                .padding(.vertical, 1)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color(.secondarySystemBackground)))
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
     }
 }
 
@@ -624,29 +508,29 @@ private struct CompactDayChip: View {
     let status: DayStatus
 
     var body: some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 6) {
             statusDot
             Text(label)
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(.primary)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color(.systemBackground)))
+        .padding(.vertical, 7)
+        .padding(.horizontal, 9)
+        .background(RoundedRectangle(cornerRadius: 9).fill(Color(.systemBackground)))
     }
 
     private var statusDot: some View {
         Group {
             switch status {
             case .none:
-                Circle().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.2)
+                Circle().strokeBorder(Color.secondary.opacity(0.35), lineWidth: 1.1)
             case .partial:
                 Circle().fill(Color.secondary.opacity(0.50))
             case .full:
                 Circle().fill(Color.primary.opacity(0.78))
             }
         }
-        .frame(width: 8, height: 8)
+        .frame(width: 7, height: 7)
         .accessibilityHidden(true)
     }
 }

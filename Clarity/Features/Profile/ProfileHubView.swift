@@ -95,7 +95,11 @@ struct ProfileHubView: View {
             } header: {
                 Text("You")
             }
-
+            NavigationLink {
+                AboutView()
+            } label: {
+                Label("About", systemImage: "info.circle")
+            }
             Section {
                 NavigationLink {
                     SettingsView()
