@@ -112,6 +112,14 @@ struct ProfileHubView: View {
                 Text("App")
             }
         }
+        .scrollContentBackground(.hidden)
+        .background {
+            ZStack {
+                Color(uiColor: .systemGroupedBackground)
+                ProfileBackgroundWaterView()
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -142,4 +150,41 @@ struct ProfileHubView: View {
             ProgressScreen()
         }
     }
+}
+
+// MARK: - Profile background water
+
+private struct ProfileBackgroundWaterView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var scale: CGFloat = ProfileBackgroundWaterStyle.startScale
+
+    var body: some View {
+        GeometryReader { geo in
+            Image(ProfileBackgroundWaterStyle.assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geo.size.width, height: geo.size.height)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                .scaleEffect(scale, anchor: .center)
+                .opacity(ProfileBackgroundWaterStyle.baseOpacity)
+                .clipped()
+                .allowsHitTesting(false)
+                .onAppear {
+                    scale = ProfileBackgroundWaterStyle.startScale
+                    guard reduceMotion == false else { return }
+                    withAnimation(.easeOut(duration: ProfileBackgroundWaterStyle.zoomDuration)) {
+                        scale = ProfileBackgroundWaterStyle.endScale
+                    }
+                }
+        }
+    }
+}
+
+private enum ProfileBackgroundWaterStyle {
+    static let assetName = "water"         // background asset name
+    static let baseOpacity: Double = 0.10  // opacity
+    static let startScale: CGFloat = 1.00  // start size
+    static let endScale: CGFloat = 1.20    // end size
+    static let zoomDuration: Double = 50   // one-shot slow zoom
 }

@@ -31,7 +31,7 @@ struct GuidanceHubView: View {
                     Text("Guidance")
                         .font(.headline)
 
-                    Text("Teachings and one-to-one practice support")
+                    Text("one-to-one practice support")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

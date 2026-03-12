@@ -137,7 +137,13 @@ struct ExploreView: View {
             }
             .padding(16)
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background {
+            ZStack {
+                Color(.systemGroupedBackground)
+                ExploreBackgroundRocksView()
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle("Explore")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -486,4 +492,41 @@ private struct ExplorePlaceholderView: View {
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
     }
+}
+
+// MARK: - Explore background rocks
+
+private struct ExploreBackgroundRocksView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var scale: CGFloat = ExploreBackgroundRocksStyle.startScale
+
+    var body: some View {
+        GeometryReader { geo in
+            Image(ExploreBackgroundRocksStyle.assetName)
+                .resizable()
+                .scaledToFill()
+                .frame(width: geo.size.width, height: geo.size.height)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                .scaleEffect(scale, anchor: .center)
+                .opacity(ExploreBackgroundRocksStyle.baseOpacity)
+                .clipped()
+                .allowsHitTesting(false)
+                .onAppear {
+                    scale = ExploreBackgroundRocksStyle.startScale
+                    guard reduceMotion == false else { return }
+                    withAnimation(.easeOut(duration: ExploreBackgroundRocksStyle.zoomDuration)) {
+                        scale = ExploreBackgroundRocksStyle.endScale
+                    }
+                }
+        }
+    }
+}
+
+private enum ExploreBackgroundRocksStyle {
+    static let assetName = "rocks"         // asset name
+    static let baseOpacity: Double = 0.10  // opacity
+    static let startScale: CGFloat = 1.00  // start scale
+    static let endScale: CGFloat = 1.22    // end scale
+    static let zoomDuration: Double = 60   // slow one-shot zoom
 }
