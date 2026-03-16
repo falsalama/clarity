@@ -19,6 +19,7 @@ final class AppFlowRouter: ObservableObject {
     @Published var selectedTab: Tab = .home
     @Published var pendingOpenProgress: Bool = false
     @Published var animateNextBead: Bool = false
+    @Published var homeHubEntrySeed: Int = 0
 
     func go(_ tab: Tab) {
         selectedTab = tab

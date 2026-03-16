@@ -1,116 +1,111 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct WisdomView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(\.scenePhase) private var scenePhase
+    @State private var selectedPrompt: WisdomPrompt?
+    @State private var loadedPrompts: [WisdomPrompt] = []
 
     @Query(
         sort: [SortDescriptor(\WisdomResponseEntity.completedAt, order: .reverse)]
     )
     private var responses: [WisdomResponseEntity]
 
-    @Query(
-        filter: #Predicate<WisdomProgramStateEntity> { $0.id == "singleton" }
-    )
-    private var programStates: [WisdomProgramStateEntity]
-
-    @State private var route: WisdomRoute?
+    // TEMP fallback until Supabase fetch is wired
+    private let fallbackPrompts: [WisdomPrompt] = [
+        .init(
+            id: "wisdom_q_001",
+            category: "Identity",
+            question: "If a self cannot be found, what exactly is being defended?",
+            prompt: "Be precise. Do not answer with a slogan."
+        ),
+        .init(
+            id: "wisdom_q_002",
+            category: "Emptiness",
+            question: "Can something appear clearly and still lack intrinsic existence?",
+            prompt: "Separate appearance, function, and inherent reality."
+        ),
+        .init(
+            id: "wisdom_q_003",
+            category: "Language",
+            question: "When you name an experience, what is added that was not there before?",
+            prompt: "Distinguish direct experience from conceptual overlay."
+        )
+    ]
 
     private let wisdomFill = Color(red: 0.48, green: 0.18, blue: 0.22)
 
-    private var activeSets: [WisdomDailySet] {
-        WisdomSeedData.activeDailySets
+    private var displayedPrompts: [WisdomPrompt] {
+        let published = loadedPrompts
+            .filter { $0.isPublished }
+            .sorted {
+                if $0.programmeSlug == $1.programmeSlug {
+                    return $0.stepIndex < $1.stepIndex
+                }
+                return $0.programmeSlug < $1.programmeSlug
+            }
+
+        return published.isEmpty ? fallbackPrompts : published
     }
 
     private var todayKey: String {
-        Date().dayKey()
+        let cal = Calendar.current
+        let d = cal.startOfDay(for: Date())
+        let y = cal.component(.year, from: d)
+        let m = cal.component(.month, from: d)
+        let day = cal.component(.day, from: d)
+        return String(format: "%04d-%02d-%02d", y, m, day)
     }
 
-    private var programState: WisdomProgramStateEntity? {
-        programStates.first
-    }
-
-    private var currentSet: WisdomDailySet? {
-        guard !activeSets.isEmpty else { return nil }
-        let rawIndex = programState?.currentSetIndex ?? 0
-        let safeIndex = min(max(0, rawIndex), activeSets.count - 1)
-        return activeSets[safeIndex]
-    }
-
-    private var todayResponse: WisdomResponseEntity? {
-        responses.first(where: { $0.dayKey == todayKey })
-    }
-
-    private var isDoneToday: Bool {
-        todayResponse != nil
+    private func response(for prompt: WisdomPrompt) -> WisdomResponseEntity? {
+        responses.first(where: { $0.dayKey == todayKey && $0.questionID == prompt.id })
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introCard
-
-                if let set = currentSet {
-                    todayHeader(for: set)
-
-                    if let response = todayResponse {
-                        doneTodayCard(for: response)
-                    } else {
-                        laneCards(for: set)
-                    }
-                } else {
-                    unavailableCard
-                }
+                todayHeader
+                questionCards
             }
             .padding(16)
         }
-        .background(Color(.systemGroupedBackground).ignoresSafeArea())
+        .background {
+            ZStack {
+                Color(uiColor: .systemGroupedBackground)
+                WisdomBackgroundWaterView()
+            }
+            .ignoresSafeArea()
+        }
         .navigationTitle("Wisdom")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(item: $route) { route in
-            WisdomCaptureView(
-                dailySet: route.dailySet,
-                lane: route.lane
-            )
-        }
-        .onAppear {
-            ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
-        }
-        .onChange(of: scenePhase) { _, newValue in
-            guard newValue == .active else { return }
-            ensureProgramStateExists()
-            applyDailyAdvanceIfNeeded()
+        .navigationDestination(item: $selectedPrompt) { prompt in
+            WisdomPromptCaptureView(prompt: prompt)
         }
     }
 
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image(systemName: "sparkles.rectangle.stack.fill")
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 52, height: 52)
-                    .background(wisdomFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                Image("dorje2")
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
+                    .frame(width: 44, height: 44)
+                    .foregroundStyle(wisdomFill)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Wisdom")
+                    Text("Logic and insight training")
                         .font(.title3.weight(.semibold))
-
-                    Text("One of three enquiries each day")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
                 }
 
                 Spacer()
             }
 
-            Text("Choose one enquiry each day, answer in your own words, then compare your view with Buddhist, philosophical, logical, and modern perspectives.")
+            Text("Choose one question each day and answer in your own words.")
                 .foregroundStyle(.secondary)
 
-            Text("This is not Reflect. It is a deeper philosophical practice for opening fixation through reasoning, perspective, and contemplative analysis.")
+            Text("This is philosophical and contemplative training for loosening fixation through reasoning, perspective, and analytical inquiry.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
@@ -119,132 +114,46 @@ struct WisdomView: View {
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
-    private func todayHeader(for set: WisdomDailySet) -> some View {
+    private var todayHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Today’s enquiries")
+            Text("Today’s questions")
                 .font(.headline)
 
-            Text(set.title)
-                .font(.subheadline)
+            Text("Choose 1 of the following questions.")
+                .font(.footnote.weight(.semibold))
                 .foregroundStyle(.secondary)
-
-            if !isDoneToday {
-                Text("Choose one.")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
-    private func laneCards(for set: WisdomDailySet) -> some View {
+    private var questionCards: some View {
         VStack(spacing: 12) {
-            Button {
-                route = WisdomRoute(dailySet: set, lane: .opening)
-            } label: {
-                WisdomLaneCard(
-                    lane: .opening,
-                    question: set.question(for: .opening),
-                    accent: wisdomFill
-                )
+            ForEach(displayedPrompts) { prompt in
+                Button {
+                    selectedPrompt = prompt
+                } label: {
+                    WisdomQuestionCard(
+                        prompt: prompt,
+                        response: response(for: prompt),
+                        accent: wisdomFill
+                    )
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-
-            Button {
-                route = WisdomRoute(dailySet: set, lane: .analytical)
-            } label: {
-                WisdomLaneCard(
-                    lane: .analytical,
-                    question: set.question(for: .analytical),
-                    accent: wisdomFill
-                )
-            }
-            .buttonStyle(.plain)
-
-            Button {
-                route = WisdomRoute(dailySet: set, lane: .debate)
-            } label: {
-                WisdomLaneCard(
-                    lane: .debate,
-                    question: set.question(for: .debate),
-                    accent: wisdomFill
-                )
-            }
-            .buttonStyle(.plain)
         }
-    }
-
-    private func doneTodayCard(for response: WisdomResponseEntity) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Done for today")
-                    .font(.headline)
-
-                Spacer()
-
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.secondary)
-            }
-
-            Text(response.lane.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Text(response.questionText)
-                .font(.subheadline)
-
-            Text("A new set of enquiries will appear tomorrow.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private var unavailableCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Wisdom")
-                .font(.headline)
-
-            Text("No enquiry sets are available yet.")
-                .foregroundStyle(.secondary)
-        }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
-    private func ensureProgramStateExists() {
-        guard programState == nil else { return }
-        modelContext.insert(WisdomProgramStateEntity())
-        try? modelContext.save()
-    }
-
-    private func applyDailyAdvanceIfNeeded() {
-        guard let state = programState else { return }
-        guard !activeSets.isEmpty else { return }
-        guard let pendingDay = state.pendingAdvanceDayKey, pendingDay < todayKey else { return }
-
-        state.currentSetIndex = min(state.currentSetIndex + 1, activeSets.count - 1)
-        state.pendingAdvanceDayKey = nil
-        state.updatedAt = Date()
-
-        try? modelContext.save()
     }
 }
 
-private struct WisdomLaneCard: View {
-    let lane: WisdomLane
-    let question: WisdomQuestion
+private struct WisdomQuestionCard: View {
+    let prompt: WisdomPrompt
+    let response: WisdomResponseEntity?
     let accent: Color
+
+    @State private var showCompare = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(lane.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(accent)
-
+                categoryChip
                 Spacer()
 
                 Image(systemName: "chevron.right")
@@ -252,25 +161,105 @@ private struct WisdomLaneCard: View {
                     .foregroundStyle(accent.opacity(0.75))
             }
 
-            Text(question.questionText)
+            Text(prompt.question)
                 .font(.headline)
                 .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(lane.subtitle)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if let response {
+                Divider()
+
+                Text("Your answer")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(response.answerText)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button {
+                    showCompare = true
+                } label: {
+                    Text("Compare views")
+                        .font(.footnote.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .padding(.top, 4)
+            }
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .contentShape(Rectangle())
+        .navigationDestination(isPresented: $showCompare) {
+            if let response {
+                WisdomCompareView(response: response)
+            }
+        }
+    }
+
+    private var categoryChip: some View {
+        HStack(spacing: 8) {
+            Image("dorje2")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+                .foregroundStyle(accent)
+
+            Text(prompt.category)
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(accent)
+        }
     }
 }
 
-private struct WisdomRoute: Identifiable, Hashable {
-    let id = UUID()
-    let dailySet: WisdomDailySet
-    let lane: WisdomLane
+struct WisdomPrompt: Identifiable, Hashable, Codable {
+    let id: String
+    let programmeSlug: String
+    let stepIndex: Int
+    let title: String
+    let question: String
+    let buddhistView: String
+    let philosophicalView: String
+    let scientificView: String
+    let isPublished: Bool
+    let version: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case programmeSlug = "programme_slug"
+        case stepIndex = "step_index"
+        case title
+        case question
+        case buddhistView = "buddhist_view"
+        case philosophicalView = "philosophical_view"
+        case scientificView = "scientific_view"
+        case isPublished = "is_published"
+        case version
+    }
+
+    init(
+        id: String,
+        category: String,
+        question: String,
+        prompt: String
+    ) {
+        self.id = id
+        self.programmeSlug = "core"
+        self.stepIndex = 0
+        self.title = category
+        self.question = question
+        self.buddhistView = ""
+        self.philosophicalView = ""
+        self.scientificView = ""
+        self.isPublished = true
+        self.version = 1
+    }
+
+    var category: String { title }
+    var prompt: String { "" }
 }

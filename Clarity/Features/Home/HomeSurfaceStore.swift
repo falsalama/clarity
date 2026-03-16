@@ -40,30 +40,50 @@ final class HomeSurfaceStore: ObservableObject {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
 
-            let oldImageURL = manifest?.imageURL
-            let oldDateKey = manifest?.dateKey
-
+            let previousManifest = manifest
             let newManifest = try JSONDecoder().decode(WelcomeManifest.self, from: data)
-            manifest = newManifest
-            try persistManifest(data)
-            setLastFetchNow()
+
+            let path = imagePath()
+            let oldImageURL = previousManifest?.imageURL
+            let oldDateKey = previousManifest?.dateKey
+            let hasCachedImage = fm.fileExists(atPath: path.path)
+
+            if forceImageReload {
+                try? fm.removeItem(at: path)
+                cachedImageFileURL = nil
+            }
+
+            var nextImageURL: URL? = nil
+            var downloadedImageData: Data? = nil
 
             if let urlString = newManifest.imageURL,
                let imageURL = URL(string: urlString) {
 
-                let hasCachedImage = cachedImageFileURL != nil && fm.fileExists(atPath: imagePath().path)
                 let imageChanged = (oldImageURL != urlString)
                 let dateChanged = (oldDateKey != newManifest.dateKey)
+                let needsFreshImage = forceImageReload || imageChanged || dateChanged || !hasCachedImage
 
-                if forceImageReload {
-                    let path = imagePath()
-                    try? fm.removeItem(at: path)
+                if needsFreshImage {
+                    // Prevent old image flash while the new one is downloading.
                     cachedImageFileURL = nil
+                    downloadedImageData = await downloadImageData(from: imageURL)
+                } else {
+                    nextImageURL = path
                 }
+            } else {
+                try? fm.removeItem(at: path)
+                cachedImageFileURL = nil
+            }
 
-                if forceImageReload || imageChanged || dateChanged || !hasCachedImage {
-                    await fetchAndCacheImage(from: imageURL)
-                }
+            manifest = newManifest
+            try persistManifest(data)
+            setLastFetchNow()
+
+            if let downloadedImageData {
+                try downloadedImageData.write(to: path, options: [.atomic])
+                cachedImageFileURL = path
+            } else {
+                cachedImageFileURL = nextImageURL
             }
         } catch {
             // best-effort silent failure
@@ -151,21 +171,38 @@ final class HomeSurfaceStore: ObservableObject {
     }
 
     private func loadCached() {
-        if let data = try? Data(contentsOf: manifestPath()),
-           let cached = try? JSONDecoder().decode(WelcomeManifest.self, from: data) {
-            manifest = cached
+        guard
+            let data = try? Data(contentsOf: manifestPath()),
+            let cached = try? JSONDecoder().decode(WelcomeManifest.self, from: data),
+            cached.dateKey == todayDateKey()
+        else {
+            manifest = nil
+            cachedImageFileURL = nil
+            return
         }
 
+        manifest = cached
+
         let img = imagePath()
-        if fm.fileExists(atPath: img.path) {
-            cachedImageFileURL = img
-        }
+        cachedImageFileURL = fm.fileExists(atPath: img.path) ? img : nil
     }
 
     private func persistManifest(_ data: Data) throws {
         try data.write(to: manifestPath(), options: [.atomic])
     }
+    private func downloadImageData(from url: URL) async -> Data? {
+        do {
+            var req = URLRequest(url: url)
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            return data
+        } catch {
+            return nil
+        }
+    }
     private func fetchAndCacheImage(from url: URL) async {
         do {
             var req = URLRequest(url: url)

@@ -9,6 +9,7 @@ import UIKit
 /// - Welcome is NOT inside NavigationStack (prevents white/nav chrome)
 struct HomeView: View {
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
+    @EnvironmentObject private var flow: AppFlowRouter
 
     @AppStorage("welcome_surface_last_seen_daykey")
     private var lastSeenWelcomeDayKey: String = ""
@@ -59,16 +60,8 @@ struct HomeView: View {
         withAnimation(.easeInOut(duration: 0.18)) {
             showWelcome = false
         }
-    }
-}
 
-// MARK: - Day snapshot types (file-scope, accessible to subviews)
-
-fileprivate enum DayStatus { case none, partial, full }
-
-fileprivate struct DayItem: Identifiable {
-    let id: String          // dayKey
-    let dayKey: String
-    let label: String       // Today / Yesterday / "Tue 26"
-    let status: DayStatus
-}
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.50) {
+            flow.homeHubEntrySeed += 1
+        }
+    }}

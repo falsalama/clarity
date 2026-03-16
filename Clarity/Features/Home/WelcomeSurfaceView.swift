@@ -5,7 +5,7 @@ import UIKit
 /// Presented full-screen by HomeView wrapper.
 struct WelcomeSurfaceView: View {
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-    
+
     var body: some View {
         ZStack {
             backgroundImage
@@ -33,46 +33,54 @@ struct WelcomeSurfaceView: View {
                 let contentWidth = max(0, width - (pad * 2))
                 let textWidth = min(560, contentWidth)
 
-                VStack {
-                    Spacer()
-                    
-                    VStack(spacing: 10) {
-
-                        if !isShowingStaleWelcome,
-                           let message = homeSurface.manifest?.message,
-                           !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-
-                            Text(wrapped(message))
-                                .font(.system(size: responsiveFontSize(for: width),
-                                              weight: .regular,
-                                              design: .serif))
-                                .italic()
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(width: textWidth, alignment: .center)
-                        }
-
-                        if !isShowingStaleWelcome,
-                           let a = homeSurface.manifest?.attribution,
-                           !a.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-
-                            Text(wrappedAttribution(a))
-                                .font(.footnote)
-                                .foregroundStyle(.white.opacity(0.90))
-                                .multilineTextAlignment(.center)
-                                .lineLimit(nil)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .frame(width: textWidth, alignment: .center)
-                        }
+                ZStack(alignment: .topTrailing) {
+                    if dailyUIImage != nil {
+                        WelcomeLogoSlot(
+                            imagePath: homeSurface.cachedImageFileURL?.path
+                        )
+                        .padding(.top, topSafe + WelcomeLogoStyle.topOffset)          // MARK: tweak
+                        .padding(.trailing, pad + WelcomeLogoStyle.trailingOffset)   // MARK: tweak
                     }
-                    .padding(.horizontal, pad)
-                    // Key: keep content above the tab bar
-                    .padding(.bottom, 32)
+
+                    VStack {
+                        Spacer()
+
+                        VStack(spacing: 10) {
+                            if !isShowingStaleWelcome,
+                               let message = homeSurface.manifest?.message,
+                               !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+
+                                Text(wrapped(message))
+                                    .font(.system(size: responsiveFontSize(for: width),
+                                                  weight: .regular,
+                                                  design: .serif))
+                                    .italic()
+                                    .foregroundStyle(.white)
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(width: textWidth, alignment: .center)
+                            }
+
+                            if !isShowingStaleWelcome,
+                               let a = homeSurface.manifest?.attribution,
+                               !a.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+
+                                Text(wrappedAttribution(a))
+                                    .font(.footnote)
+                                    .foregroundStyle(.white.opacity(0.90))
+                                    .multilineTextAlignment(.center)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(width: textWidth, alignment: .center)
+                            }
+                        }
+                        .padding(.horizontal, pad)
+                        .padding(.bottom, 32)
+                    }
+                    .padding(.top, topSafe + 8)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                // Key: keep content below the status bar
-                .padding(.top, topSafe + 8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -131,13 +139,13 @@ struct WelcomeSurfaceView: View {
             }
         }
     }
-  
+
     private var dailyUIImage: UIImage? {
         guard !isShowingStaleWelcome else { return nil }
         guard let url = homeSurface.cachedImageFileURL else { return nil }
         return UIImage(contentsOfFile: url.path)
     }
-    
+
     // MARK: - Layout helpers
 
     private func responsiveFontSize(for width: CGFloat) -> CGFloat {
@@ -231,4 +239,71 @@ struct WelcomeSurfaceView: View {
             }
         }
     }
+}
+
+private struct WelcomeLogoSlot: View {
+    let imagePath: String?
+
+    @State private var opacity: Double = 0
+
+    var body: some View {
+        WelcomeLogoOverlay()
+            .opacity(opacity)
+            .onAppear {
+                opacity = 0
+                Task { @MainActor in
+                    try? await Task.sleep(
+                        nanoseconds: UInt64(WelcomeLogoStyle.fadeInDelay * 1_000_000_000) // MARK: tweak
+                    )
+                    withAnimation(.easeOut(duration: WelcomeLogoStyle.fadeInDuration)) {    // MARK: tweak
+                        opacity = WelcomeLogoStyle.maxOpacity                               // MARK: tweak
+                    }
+                }
+            }
+            .onChange(of: imagePath) { _, _ in
+                opacity = 0
+                Task { @MainActor in
+                    try? await Task.sleep(
+                        nanoseconds: UInt64(WelcomeLogoStyle.fadeInDelay * 1_000_000_000) // MARK: tweak
+                    )
+                    withAnimation(.easeOut(duration: WelcomeLogoStyle.fadeInDuration)) {    // MARK: tweak
+                        opacity = WelcomeLogoStyle.maxOpacity                               // MARK: tweak
+                    }
+                }
+            }
+    }
+}
+
+private struct WelcomeLogoOverlay: View {
+    var body: some View {
+        Image(WelcomeLogoStyle.assetName)
+            .resizable()
+            .scaledToFit()
+            .frame(
+                width: WelcomeLogoStyle.width,     // MARK: tweak
+                height: WelcomeLogoStyle.height    // MARK: tweak
+            )
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+}
+
+private enum WelcomeLogoStyle {
+    // MARK: - Asset
+    static let assetName = "logo"
+
+    // MARK: - Position
+    static let topOffset: CGFloat = -20            // MARK: tweak up
+    static let trailingOffset: CGFloat = -108       // MARK: tweak right
+
+    // MARK: - Size
+    static let width: CGFloat = 250               // MARK: tweak
+    static let height: CGFloat = 250              // MARK: tweak
+
+    // MARK: - Opacity
+    static let maxOpacity: Double = 1.0         // MARK: tweak
+
+    // MARK: - Timing
+    static let fadeInDelay: Double = 1.8         // MARK: tweak
+    static let fadeInDuration: Double = 1.1      // MARK: tweak
 }

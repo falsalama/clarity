@@ -51,6 +51,8 @@ struct ClarityApp: App {
                 FocusProgramStateEntity.self,
                 PracticeProgramStateEntity.self,
                 ReflectProgramStateEntity.self,
+                WisdomQuestionEntity.self,
+                WisdomDailySetEntity.self,
                 configurations: config
             )
 

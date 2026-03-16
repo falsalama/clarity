@@ -59,6 +59,7 @@ struct AppShellView: View {
         .onAppear {
             guard !didBind else { return }
             didBind = true
+            try? WisdomSeed.seedIfNeeded(in: modelContext)
 
             captureCoordinator.bind(
                 modelContext: modelContext,

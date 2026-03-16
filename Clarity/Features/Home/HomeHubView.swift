@@ -49,26 +49,43 @@ struct HomeHubView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 14) {
-                headerSegment
+        ZStack {
+            Color(.systemBackground)
+                .ignoresSafeArea()
 
-                if flow.homeTab == .practice {
+            if flow.homeTab == .practice {
+                HomeHubBackground()
+            }
+
+            if flow.homeTab == .practice {
+                VStack(spacing: 14) {
+                    headerSegment
+
                     PracticePanel(
                         todayKey: todayKey,
                         didReflectToday: didReflectToday,
                         didViewToday: didViewToday,
-                        didPracticeToday: didPracticeToday
+                        didPracticeToday: didPracticeToday,
+                        beginAnimationSeed: flow.homeHubEntrySeed
                     )
-                } else {
-                    ProgressPanel(dayItems: lastDays(7))
-                }
 
-                Spacer(minLength: 12)
+                    Spacer(minLength: 12)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 22)
+            } else {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        headerSegment
+                        ProgressPanel(dayItems: lastDays(7))
+                        Spacer(minLength: 12)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 22)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 22)
         }
     }
 
@@ -122,6 +139,289 @@ struct HomeHubView: View {
     }
 }
 
+// MARK: - Background
+
+private struct HomeHubBackground: View {
+    @State private var animate = false
+    @State private var revealPoint: CGPoint? = nil
+    @State private var revealAmount: CGFloat = 0
+
+    private let revealSize: CGFloat = 360
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack {
+                backgroundImage(named: "homehubbg", in: proxy)
+
+                if let revealPoint {
+                    backgroundImage(named: "homehubbgcolour", in: proxy)
+                        .opacity(revealAmount)
+                        .mask {
+                            ZStack {
+                                Color.clear
+
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            stops: [
+                                                .init(color: .white.opacity(1.0), location: 0.00),
+                                                .init(color: .white.opacity(0.96), location: 0.18),
+                                                .init(color: .white.opacity(0.78), location: 0.36),
+                                                .init(color: .white.opacity(0.40), location: 0.62),
+                                                .init(color: .white.opacity(0.12), location: 0.82),
+                                                .init(color: .clear, location: 1.00)
+                                            ],
+                                            center: .center,
+                                            startRadius: 0,
+                                            endRadius: revealSize * (0.48 + (revealAmount * 0.12))
+                                        )
+                                    )
+                                    .frame(
+                                        width: revealSize * (0.96 + revealAmount * 0.08),
+                                        height: revealSize * (0.96 + revealAmount * 0.08)
+                                    )
+                                    .position(revealPoint)
+                                    .blur(radius: 26)
+                            }
+                            .compositingGroup()
+                        }
+                        .overlay {
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [
+                                            Color.white.opacity(0.10),
+                                            Color.cyan.opacity(0.05),
+                                            Color.clear
+                                        ],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: revealSize * 0.34
+                                    )
+                                )
+                                .frame(width: revealSize * 0.72, height: revealSize * 0.72)
+                                .position(revealPoint)
+                                .opacity(revealAmount * 0.55)
+                                .blur(radius: 20)
+                        }
+                }
+            }
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged { value in
+                        revealPoint = value.location
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            revealAmount = 1
+                        }
+                    }
+                    .onEnded { _ in
+                        withAnimation(.easeOut(duration: 0.85)) {
+                            revealAmount = 0
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.90) {
+                            if revealAmount == 0 {
+                                revealPoint = nil
+                            }
+                        }
+                    }
+            )
+        }
+        .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func backgroundImage(named name: String, in proxy: GeometryProxy) -> some View {
+        if UIImage(named: name) != nil {
+            Image(name)
+                .resizable()
+                .scaledToFill()
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .scaleEffect(animate ? 1.04 : 1.00)
+                .offset(
+                    x: animate ? -10 : 10,
+                    y: animate ? 82 : 98
+                )
+                .overlay(
+                    name == "homehubbg"
+                    ? LinearGradient(
+                        colors: [
+                            Color(.systemBackground).opacity(0.18),
+                            Color(.systemBackground).opacity(0.04),
+                            Color(.systemBackground).opacity(0.20)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    : LinearGradient(
+                        colors: [
+                            Color.clear,
+                            Color.clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .opacity(name == "homehubbg" ? 0.30 : 1.0)
+                .ignoresSafeArea()
+                .onAppear { animate = true }
+                .animation(
+                    .easeInOut(duration: 16).repeatForever(autoreverses: true),
+                    value: animate
+                )
+        }
+    }
+}
+// MARK: - Liquid touch orb
+private struct LiquidTouchOrb: View {
+    let point: CGPoint
+
+    private let size: CGFloat = 144
+
+    // must match PracticePanel begin hit area
+    private let areaWidth: CGFloat = 300
+    private let areaHeight: CGFloat = 150
+
+    @State private var currentPoint: CGPoint = .zero
+    @State private var lastPoint: CGPoint = .zero
+    @State private var hasInitialised = false
+
+    private var nx: CGFloat {
+        ((currentPoint.x / areaWidth) - 0.5) * 2.0
+    }
+
+    private var ny: CGFloat {
+        ((currentPoint.y / areaHeight) - 0.5) * 2.0
+    }
+
+    private var highlightX: CGFloat { nx * 30 }
+    private var highlightY: CGFloat { ny * 22 }
+
+    private var shadowX: CGFloat { -nx * 20 }
+    private var shadowY: CGFloat { -ny * 16 }
+
+    private var stretchX: CGFloat { 1.0 + abs(nx) * 0.08 }
+    private var stretchY: CGFloat { 1.0 + abs(ny) * 0.08 }
+
+    private var trailDX: CGFloat { (lastPoint.x - currentPoint.x) * 0.18 }
+    private var trailDY: CGFloat { (lastPoint.y - currentPoint.y) * 0.18 }
+
+    var body: some View {
+        ZStack {
+            // soft trailing ghost
+            Circle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.16)
+                .frame(width: size * 0.96, height: size * 0.96)
+                .blur(radius: 10)
+                .scaleEffect(x: stretchX * 1.01, y: stretchY * 1.01)
+                .offset(x: trailDX, y: trailDY)
+
+            // main disc
+            Circle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.34)
+                .overlay(
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(0.38),
+                                    Color.white.opacity(0.14),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 2,
+                                endRadius: size * 0.56
+                            )
+                        )
+                        .frame(width: size * 0.84, height: size * 0.84)
+                        .offset(x: -10 + highlightX, y: -12 + highlightY)
+                        .blur(radius: 2.4)
+                )
+                .overlay(
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.black.opacity(0.14),
+                                    Color.black.opacity(0.06),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: 1,
+                                endRadius: size * 0.52
+                            )
+                        )
+                        .frame(width: size * 0.88, height: size * 0.88)
+                        .offset(x: 10 + shadowX, y: 12 + shadowY)
+                        .blur(radius: 3.6)
+                )
+                .overlay(
+                    Ellipse()
+                        .fill(Color.white.opacity(0.22))
+                        .frame(width: size * 0.30, height: size * 0.12)
+                        .blur(radius: 1.4)
+                        .offset(x: -18 + (highlightX * 0.55), y: -30 + (highlightY * 0.45))
+                )
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.68),
+                                    Color.white.opacity(0.18),
+                                    Color.white.opacity(0.34)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1.1
+                        )
+                        .blur(radius: 0.2)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.white.opacity(0.14), lineWidth: 12)
+                        .blur(radius: 10)
+                        .padding(2)
+                )
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(0.06), lineWidth: 1.2)
+                        .blur(radius: 1.2)
+                        .offset(y: 1.0)
+                )
+                .scaleEffect(x: stretchX, y: stretchY)
+                .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
+        }
+        .frame(width: size, height: size)
+        .position(currentPoint == .zero ? point : currentPoint)
+        .onAppear {
+            currentPoint = point
+            lastPoint = point
+            hasInitialised = true
+        }
+        .onChange(of: point) { oldValue, newValue in
+            guard hasInitialised else {
+                currentPoint = newValue
+                lastPoint = newValue
+                hasInitialised = true
+                return
+            }
+
+            lastPoint = currentPoint
+
+            withAnimation(.easeOut(duration: 0.16)) {
+                currentPoint = newValue
+            }
+
+            withAnimation(.easeOut(duration: 0.34)) {
+                lastPoint = newValue
+            }
+        }
+    }
+}
 // MARK: - Practice tab
 
 private struct PracticePanel: View {
@@ -129,154 +429,238 @@ private struct PracticePanel: View {
     let didReflectToday: Bool
     let didViewToday: Bool
     let didPracticeToday: Bool
+    let beginAnimationSeed: Int
 
-    var body: some View {
-        VStack(spacing: 0) {
-            practiceCard
-        }
+    @State private var beginTouchPoint: CGPoint? = nil
+
+    private var beginIntroHasPlayed: Bool {
+        beginAnimationSeed > 0
     }
 
-    private var practiceCard: some View {
-        let nextTitle: String = {
-            if !didReflectToday { return "Start daily practice" }
-            if !didViewToday { return "Continue daily practice" }
-            if !didPracticeToday { return "Continue daily practice" }
-            return "Daily practice complete"
-        }()
+    private var buttonTitle: String {
+        if !didReflectToday { return "Begin" }
+        if !didViewToday { return "Continue" }
+        if !didPracticeToday { return "Continue" }
+        return "Complete"
+    }
 
-        let nextSubtitle: String = {
-            if !didReflectToday { return "Reflect, View, and Practice." }
-            if !didViewToday { return "Next: View." }
-            if !didPracticeToday { return "Next: Practice." }
-            return "All three parts are complete."
-        }()
+    private var startStep: DailyFlowStep? {
+        if !didReflectToday { return .reflect }
+        if !didViewToday { return .focus }
+        if !didPracticeToday { return .practice }
+        return nil
+    }
 
-        let startStep: DailyFlowStep? = {
-            if !didReflectToday { return .reflect }
-            if !didViewToday { return .focus }
-            if !didPracticeToday { return .practice }
-            return nil
-        }()
+    // Begin - fixed, independent position
+    private let beginCenterY: CGFloat = 288
+    private let beginHitWidth: CGFloat = 300
+    private let beginHitHeight: CGFloat = 150
 
-        return Group {
+    // Dorje - fixed, independent position
+    private let dorjeSize: CGFloat = 85
+    private let dorjeHitSize: CGFloat = 116
+    private let dorjeTrailingInset: CGFloat = 74
+    private let dorjeBottomInset: CGFloat = 174
+    private let dorjeOpacity: Double = 0.50
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                beginBlock(
+                    at: CGPoint(
+                        x: geo.size.width * 0.5,
+                        y: beginCenterY
+                    )
+                )
+
+                dorjeBlock(
+                    at: CGPoint(
+                        x: geo.size.width - dorjeTrailingInset,
+                        y: geo.size.height - dorjeBottomInset
+                    )
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .frame(maxWidth: .infinity, minHeight: 420)
+    }
+
+    @ViewBuilder
+    private func beginBlock(at point: CGPoint) -> some View {
+        ZStack {
             if let startStep {
                 NavigationLink {
                     DailyFlowContainerView(startAt: startStep)
                 } label: {
-                    HomePracticeCard(
-                        title: nextTitle,
-                        subtitle: nextSubtitle,
-                        systemImage: startStep == .reflect
-                            ? "sun.max.fill"
-                            : (startStep == .focus ? "book.closed.fill" : "leaf.fill"),
-                        fill: Color(red: 0.55, green: 0.12, blue: 0.16),
-                        imageAssetName: HomePracticeCardStyle.imageAssetName,
-                        showsChevron: true
-                    )
+                    ZStack {
+                        Color.clear
+                        BeginPracticeButtonView(
+                            text: buttonTitle,
+                            isEnabled: true,
+                            animationSeed: beginAnimationSeed,
+                            introHasPlayed: beginIntroHasPlayed
+                        )
+                    }
+                    .frame(width: beginHitWidth, height: beginHitHeight)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             } else {
-                HomePracticeCard(
-                    title: nextTitle,
-                    subtitle: nextSubtitle,
-                    systemImage: "checkmark.circle.fill",
-                    fill: Color(red: 0.40, green: 0.40, blue: 0.40),
-                    imageAssetName: HomePracticeCardStyle.imageAssetName,
-                    showsChevron: false
-                )
-            }
-        }
-    }
-}
-
-// MARK: - Bigger home practice card
-
-private struct HomePracticeCard: View {
-    let title: String
-    let subtitle: String
-    let systemImage: String
-    let fill: Color
-    let imageAssetName: String
-    let showsChevron: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            heroImage
-                .frame(height: HomePracticeCardStyle.imageHeight)
-
-            HStack(alignment: .center, spacing: 14) {
-                Image(systemName: systemImage)
-                    .font(.title2.weight(.semibold))
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(title)
-                        .font(.title3.weight(.bold))
-                        .lineLimit(2)
-
-                    Text(subtitle)
-                        .font(.subheadline)
-                        .opacity(0.92)
-                        .lineLimit(2)
+                ZStack {
+                    Color.clear
+                    BeginPracticeButtonView(
+                        text: buttonTitle,
+                        isEnabled: false,
+                        animationSeed: beginAnimationSeed,
+                        introHasPlayed: beginIntroHasPlayed
+                    )
                 }
-
-                Spacer()
-
-                Image(systemName: showsChevron ? "chevron.right" : "checkmark.circle.fill")
-                    .font(.subheadline.weight(.semibold))
-                    .opacity(0.9)
+                .frame(width: beginHitWidth, height: beginHitHeight)
+                .contentShape(Rectangle())
             }
-            .padding(.vertical, 18)
-            .padding(.horizontal, 18)
+
+            if let beginTouchPoint {
+                LiquidTouchOrb(point: beginTouchPoint)
+                    .allowsHitTesting(false)
+            }
         }
-        .foregroundStyle(.white)
-        .background(fill)
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        .frame(width: beginHitWidth, height: beginHitHeight)
+        .coordinateSpace(name: "beginArea")
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 0, coordinateSpace: .named("beginArea"))
+                .onChanged { value in
+                    beginTouchPoint = value.location
+                }
+                .onEnded { _ in
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        beginTouchPoint = nil
+                    }
+                }
         )
-        .shadow(color: Color.black.opacity(0.22), radius: 10, y: 5)
-        .accessibilityElement(children: .combine)
+        .position(point)
     }
 
     @ViewBuilder
-    private var heroImage: some View {
-        if UIImage(named: imageAssetName) != nil {
-            Image(imageAssetName)
-                .resizable()
-                .aspectRatio(contentMode: HomePracticeCardStyle.imageContentMode)
-                .scaleEffect(HomePracticeCardStyle.imageScale, anchor: .center)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .offset(y: HomePracticeCardStyle.imageVerticalOffset)
-        } else {
+    private func dorjeBlock(at point: CGPoint) -> some View {
+        NavigationLink {
+            WisdomView()
+        } label: {
             ZStack {
-                LinearGradient(
-                    colors: [
-                        fill.opacity(0.95),
-                        fill.opacity(0.72)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                Color.clear
+                    .frame(width: dorjeHitSize, height: dorjeHitSize)
 
-                Image("clarityMark")
+                Image("dorje2")
                     .resizable()
+                    .renderingMode(.template)
                     .scaledToFit()
-                    .frame(width: 220, height: 220)
-                    .opacity(0.12)
-                    .offset(x: 56, y: -14)
+                    .frame(width: dorjeSize, height: dorjeSize)
+                    .foregroundStyle(.primary.opacity(dorjeOpacity))
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .position(point)
     }
 }
 
-private enum HomePracticeCardStyle {
-    static let imageAssetName = "kailash"
-    static let imageHeight: CGFloat = 248
-    static let imageScale: CGFloat = 1.0
-    static let imageVerticalOffset: CGFloat = 0
-    static let imageContentMode: ContentMode = .fill
+// MARK: - Begin button
+
+private struct BeginPracticeButtonView: View {
+    let text: String
+    let isEnabled: Bool
+    let animationSeed: Int
+    let introHasPlayed: Bool
+
+    @State private var fadeIn = false
+    @State private var revealProgress: CGFloat = 0
+    @State private var animationTask: Task<Void, Never>?
+
+    private let writeStartDelay: Double = 0.18
+    private let writeDuration: Double = 1.85
+    private let beginInk: Double = 0.96
+    private let beginFontSize: CGFloat = 52
+    private let featherWidth: CGFloat = 52
+    private let penDotSize: CGFloat = 9
+
+    private var revealWidth: CGFloat {
+        let uiFont = UIFont(name: "SnellRoundhand", size: beginFontSize)
+            ?? UIFont.systemFont(ofSize: beginFontSize)
+        return ceil((text as NSString).size(withAttributes: [.font: uiFont]).width) + 2
+    }
+
+    var body: some View {
+        ZStack {
+            Text(text)
+                .font(.custom("SnellRoundhand", size: beginFontSize))
+                .foregroundStyle(Color.black.opacity(isEnabled ? beginInk : 0.50))
+                .frame(width: revealWidth, alignment: .leading)
+                .opacity(fadeIn ? 1 : 0)
+                .mask(alignment: .leading) {
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0.0),
+                            .init(color: .black, location: 0.78),
+                            .init(color: .clear, location: 1.0)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: max(1, (revealWidth * revealProgress) + featherWidth))
+                }
+                .overlay(alignment: .leading) {
+                    Circle()
+                        .fill(Color.black.opacity((isEnabled ? beginInk : 0.50) * 0.30))
+                        .frame(width: penDotSize, height: penDotSize)
+                        .blur(radius: 0.5)
+                        .offset(
+                            x: max(0, revealWidth * revealProgress - (penDotSize * 0.5)),
+                            y: beginFontSize * 0.18
+                        )
+                        .opacity((revealProgress > 0.02 && revealProgress < 0.99) ? 1 : 0)
+                }
+        }
+        .frame(width: revealWidth + 24, height: 90)
+        .allowsHitTesting(false)
+        .onAppear {
+            animationTask?.cancel()
+
+            if introHasPlayed {
+                fadeIn = true
+                revealProgress = 1
+            } else {
+                fadeIn = false
+                revealProgress = 0
+            }
+        }
+        .onChange(of: animationSeed) { _, _ in
+            startAnimation()
+        }
+        .onDisappear {
+            animationTask?.cancel()
+        }
+    }
+
+    private func startAnimation() {
+        animationTask?.cancel()
+
+        fadeIn = false
+        revealProgress = 0
+
+        withAnimation(.easeIn(duration: 0.16)) {
+            fadeIn = true
+        }
+
+        animationTask = Task { @MainActor in
+            let delay = UInt64(writeStartDelay * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.linear(duration: writeDuration)) {
+                revealProgress = 1
+            }
+        }
+    }
 }
 
 // MARK: - Progress tab wrapper
@@ -315,10 +699,12 @@ private struct ProgressPanel: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.secondarySystemBackground))
+        )
     }
 }
-
 // MARK: - Insights
 
 private struct InsightsCard: View {
