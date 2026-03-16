@@ -149,7 +149,8 @@ Nothing is lost.
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text("View")
-                        .font(.headline)
+                        .font(.system(size: 30, weight: .regular, design: .serif))
+                        .italic()
 
                     Text("One small teaching each day.")
                         .font(.subheadline)

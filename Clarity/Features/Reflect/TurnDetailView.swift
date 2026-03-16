@@ -603,9 +603,9 @@ struct TurnDetailView: View {
 
     private var actionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Tools")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Text(" - Use these options for Buddhist reflection.")
+                .font(.subheadline)
+                .foregroundStyle(.primary.opacity(0.78))
 
             toolButton(title: toolTitle(.reflect), tool: .reflect, enabled: isToolsEnabled)
             toolButton(title: toolTitle(.perspective), tool: .perspective, enabled: isToolsEnabled)

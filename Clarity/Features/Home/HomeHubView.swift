@@ -278,122 +278,100 @@ private struct LiquidTouchOrb: View {
 
     private let size: CGFloat = 144
 
-    // must match PracticePanel begin hit area
-    private let areaWidth: CGFloat = 300
-    private let areaHeight: CGFloat = 150
-
     @State private var currentPoint: CGPoint = .zero
     @State private var lastPoint: CGPoint = .zero
     @State private var hasInitialised = false
 
-    private var nx: CGFloat {
-        ((currentPoint.x / areaWidth) - 0.5) * 2.0
-    }
-
-    private var ny: CGFloat {
-        ((currentPoint.y / areaHeight) - 0.5) * 2.0
-    }
-
-    private var highlightX: CGFloat { nx * 30 }
-    private var highlightY: CGFloat { ny * 22 }
-
-    private var shadowX: CGFloat { -nx * 20 }
-    private var shadowY: CGFloat { -ny * 16 }
-
-    private var stretchX: CGFloat { 1.0 + abs(nx) * 0.08 }
-    private var stretchY: CGFloat { 1.0 + abs(ny) * 0.08 }
-
-    private var trailDX: CGFloat { (lastPoint.x - currentPoint.x) * 0.18 }
-    private var trailDY: CGFloat { (lastPoint.y - currentPoint.y) * 0.18 }
+    private var trailDX: CGFloat { (lastPoint.x - currentPoint.x) * 0.22 }
+    private var trailDY: CGFloat { (lastPoint.y - currentPoint.y) * 0.22 }
 
     var body: some View {
         ZStack {
-            // soft trailing ghost
+            // soft watery trail
             Circle()
                 .fill(.ultraThinMaterial)
-                .opacity(0.16)
-                .frame(width: size * 0.96, height: size * 0.96)
-                .blur(radius: 10)
-                .scaleEffect(x: stretchX * 1.01, y: stretchY * 1.01)
+                .opacity(0.10)
+                .frame(width: size * 0.98, height: size * 0.98)
+                .blur(radius: 14)
+                .scaleEffect(1.02)
                 .offset(x: trailDX, y: trailDY)
 
-            // main disc
+            // outer glow haze
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.10),
+                            Color.white.opacity(0.05),
+                            Color.clear
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: size * 0.62
+                    )
+                )
+                .frame(width: size * 1.02, height: size * 1.02)
+                .blur(radius: 10)
+
+            // main orb
             Circle()
                 .fill(.ultraThinMaterial)
-                .opacity(0.34)
+                .opacity(0.26)
                 .overlay(
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color.white.opacity(0.38),
-                                    Color.white.opacity(0.14),
+                                    Color.white.opacity(0.34),
+                                    Color.white.opacity(0.16),
                                     Color.clear
                                 ],
-                                center: .center,
+                                center: .topLeading,
                                 startRadius: 2,
-                                endRadius: size * 0.56
-                            )
-                        )
-                        .frame(width: size * 0.84, height: size * 0.84)
-                        .offset(x: -10 + highlightX, y: -12 + highlightY)
-                        .blur(radius: 2.4)
-                )
-                .overlay(
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.black.opacity(0.14),
-                                    Color.black.opacity(0.06),
-                                    Color.clear
-                                ],
-                                center: .center,
-                                startRadius: 1,
                                 endRadius: size * 0.52
                             )
                         )
-                        .frame(width: size * 0.88, height: size * 0.88)
-                        .offset(x: 10 + shadowX, y: 12 + shadowY)
-                        .blur(radius: 3.6)
+                        .blur(radius: 2.2)
+                )
+                .overlay(
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(0.18),
+                                    Color.clear
+                                ],
+                                center: .bottomTrailing,
+                                startRadius: 0,
+                                endRadius: size * 0.42
+                            )
+                        )
+                        .blur(radius: 6)
                 )
                 .overlay(
                     Ellipse()
-                        .fill(Color.white.opacity(0.22))
-                        .frame(width: size * 0.30, height: size * 0.12)
+                        .fill(Color.white.opacity(0.28))
+                        .frame(width: size * 0.28, height: size * 0.11)
                         .blur(radius: 1.4)
-                        .offset(x: -18 + (highlightX * 0.55), y: -30 + (highlightY * 0.45))
+                        .offset(x: -18, y: -28)
                 )
                 .overlay(
                     Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.68),
-                                    Color.white.opacity(0.18),
-                                    Color.white.opacity(0.34)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.1
-                        )
-                        .blur(radius: 0.2)
+                        .stroke(Color.white.opacity(0.34), lineWidth: 1.0)
                 )
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.14), lineWidth: 12)
+                        .stroke(Color.white.opacity(0.12), lineWidth: 10)
                         .blur(radius: 10)
                         .padding(2)
                 )
                 .overlay(
                     Circle()
-                        .stroke(Color.black.opacity(0.06), lineWidth: 1.2)
-                        .blur(radius: 1.2)
-                        .offset(y: 1.0)
+                        .stroke(Color.black.opacity(0.05), lineWidth: 1.0)
+                        .blur(radius: 1.0)
+                        .offset(y: 1)
                 )
-                .scaleEffect(x: stretchX, y: stretchY)
-                .shadow(color: .black.opacity(0.06), radius: 16, y: 8)
+                .shadow(color: .black.opacity(0.05), radius: 14, y: 6)
         }
         .frame(width: size, height: size)
         .position(currentPoint == .zero ? point : currentPoint)
@@ -402,7 +380,7 @@ private struct LiquidTouchOrb: View {
             lastPoint = point
             hasInitialised = true
         }
-        .onChange(of: point) { oldValue, newValue in
+        .onChange(of: point) { _, newValue in
             guard hasInitialised else {
                 currentPoint = newValue
                 lastPoint = newValue
@@ -412,11 +390,11 @@ private struct LiquidTouchOrb: View {
 
             lastPoint = currentPoint
 
-            withAnimation(.easeOut(duration: 0.16)) {
+            withAnimation(.easeOut(duration: 0.28)) {
                 currentPoint = newValue
             }
 
-            withAnimation(.easeOut(duration: 0.34)) {
+            withAnimation(.easeOut(duration: 0.52)) {
                 lastPoint = newValue
             }
         }
@@ -498,7 +476,8 @@ private struct PracticePanel: View {
                             text: buttonTitle,
                             isEnabled: true,
                             animationSeed: beginAnimationSeed,
-                            introHasPlayed: beginIntroHasPlayed
+                            introHasPlayed: beginIntroHasPlayed,
+                            touchPoint: beginTouchPoint
                         )
                     }
                     .frame(width: beginHitWidth, height: beginHitHeight)
@@ -510,9 +489,10 @@ private struct PracticePanel: View {
                     Color.clear
                     BeginPracticeButtonView(
                         text: buttonTitle,
-                        isEnabled: false,
+                        isEnabled: true,
                         animationSeed: beginAnimationSeed,
-                        introHasPlayed: beginIntroHasPlayed
+                        introHasPlayed: beginIntroHasPlayed,
+                        touchPoint: beginTouchPoint
                     )
                 }
                 .frame(width: beginHitWidth, height: beginHitHeight)
@@ -571,6 +551,7 @@ private struct BeginPracticeButtonView: View {
     let isEnabled: Bool
     let animationSeed: Int
     let introHasPlayed: Bool
+    let touchPoint: CGPoint?
 
     @State private var fadeIn = false
     @State private var revealProgress: CGFloat = 0
@@ -578,21 +559,40 @@ private struct BeginPracticeButtonView: View {
 
     private let writeStartDelay: Double = 0.18
     private let writeDuration: Double = 1.85
-    private let beginInk: Double = 0.96
-    private let beginFontSize: CGFloat = 52
+    private let beginInk: Double = 0.88
+    private let beginFontSize: CGFloat = 42
     private let featherWidth: CGFloat = 52
     private let penDotSize: CGFloat = 9
 
+    private let areaWidth: CGFloat = 300
+    private let areaHeight: CGFloat = 150
+
     private var revealWidth: CGFloat {
-        let uiFont = UIFont(name: "SnellRoundhand", size: beginFontSize)
-            ?? UIFont.systemFont(ofSize: beginFontSize)
-        return ceil((text as NSString).size(withAttributes: [.font: uiFont]).width) + 2
+        let base = UIFont.systemFont(ofSize: beginFontSize)
+        let serif = base.fontDescriptor.withDesign(.serif) ?? base.fontDescriptor
+        let italic = serif.withSymbolicTraits(.traitItalic) ?? serif
+        let uiFont = UIFont(descriptor: italic, size: beginFontSize)
+
+        return ceil((text as NSString).size(withAttributes: [.font: uiFont]).width) + 20
+    }
+
+    private var parallaxX: CGFloat {
+        guard let touchPoint else { return 0 }
+        let nx = ((touchPoint.x / areaWidth) - 0.5) * 2.0
+        return nx * 6
+    }
+
+    private var parallaxY: CGFloat {
+        guard let touchPoint else { return 0 }
+        let ny = ((touchPoint.y / areaHeight) - 0.5) * 2.0
+        return ny * 3
     }
 
     var body: some View {
         ZStack {
             Text(text)
-                .font(.custom("SnellRoundhand", size: beginFontSize))
+                .font(.system(size: beginFontSize, weight: .regular, design: .serif))
+                .italic()
                 .foregroundStyle(Color.black.opacity(isEnabled ? beginInk : 0.50))
                 .frame(width: revealWidth, alignment: .leading)
                 .opacity(fadeIn ? 1 : 0)
@@ -619,8 +619,11 @@ private struct BeginPracticeButtonView: View {
                         )
                         .opacity((revealProgress > 0.02 && revealProgress < 0.99) ? 1 : 0)
                 }
+                .offset(x: parallaxX, y: parallaxY)
+                .animation(.easeOut(duration: 0.22), value: touchPoint?.x)
+                .animation(.easeOut(duration: 0.22), value: touchPoint?.y)
         }
-        .frame(width: revealWidth + 24, height: 90)
+        .frame(width: revealWidth + 56, height: 90)
         .allowsHitTesting(false)
         .onAppear {
             animationTask?.cancel()
@@ -662,7 +665,6 @@ private struct BeginPracticeButtonView: View {
         }
     }
 }
-
 // MARK: - Progress tab wrapper
 
 private struct ProgressPanel: View {

@@ -143,7 +143,9 @@ struct CaptureView: View {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text("Reflect")
-                        .font(.headline)
+                        .font(.system(size: 30, weight: .regular, design: .serif))
+                        .italic()
+
                     Text("express yourself honestly.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
@@ -474,12 +476,9 @@ struct CaptureView: View {
 
     private var reflectExplainerCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Reflect")
-                .font(.title3.weight(.semibold))
-
-            Text("Use this to speak or type what is on your mind. Use the buttons below for structured reflection through a Buddhist lens.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            Text("Speak or type what’s on your mind.")
+                .font(.subheadline)
+                .foregroundStyle(.primary.opacity(0.78))
                 .fixedSize(horizontal: false, vertical: true)
 
             Divider().padding(.top, 6)

@@ -293,15 +293,15 @@ private enum WelcomeLogoStyle {
     static let assetName = "logo"
 
     // MARK: - Position
-    static let topOffset: CGFloat = -20            // MARK: tweak up
-    static let trailingOffset: CGFloat = -108       // MARK: tweak right
+    static let topOffset: CGFloat = -14            // MARK: tweak up
+    static let trailingOffset: CGFloat = -100       // MARK: tweak right
 
     // MARK: - Size
-    static let width: CGFloat = 250               // MARK: tweak
-    static let height: CGFloat = 250              // MARK: tweak
+    static let width: CGFloat = 220               // MARK: tweak
+    static let height: CGFloat = 220              // MARK: tweak
 
     // MARK: - Opacity
-    static let maxOpacity: Double = 1.0         // MARK: tweak
+    static let maxOpacity: Double = 0.70         // MARK: tweak
 
     // MARK: - Timing
     static let fadeInDelay: Double = 1.8         // MARK: tweak

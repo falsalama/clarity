@@ -150,7 +150,8 @@ No analysis. Just a clean label.
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text("Practice")
-                        .font(.headline)
+                        .font(.system(size: 30, weight: .regular, design: .serif))
+                        .italic()
 
                     Text("One small practice each day.")
                         .font(.subheadline)
