@@ -149,15 +149,12 @@ Nothing is lost.
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text("View")
-                        .font(.system(size: 30, weight: .regular, design: .serif))
-                        .italic()
+                        .font(.headline)
 
                     Text("One small teaching each day.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

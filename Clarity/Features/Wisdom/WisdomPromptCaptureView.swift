@@ -12,6 +12,8 @@ struct WisdomPromptCaptureView: View {
     @State private var voiceTranscriptDraft: String = ""
     @State private var selectedInput: WisdomInputMode? = nil
     @State private var savedResponse: WisdomResponseEntity?
+    @State private var existingResponse: WisdomResponseEntity?
+    @State private var showCompare = false
 
     private let wisdomFill = Color(red: 0.48, green: 0.18, blue: 0.22)
 
@@ -52,12 +54,17 @@ struct WisdomPromptCaptureView: View {
         }
         .navigationTitle(prompt.category)
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadExistingResponseIfNeeded()
+        }
         .onChange(of: coordinator.lastCompletedTurnID) { _, newValue in
             guard let id = newValue else { return }
             absorbCompletedTurn(id)
         }
-        .navigationDestination(item: $savedResponse) { response in
-            WisdomCompareView(response: response)
+        .navigationDestination(isPresented: $showCompare) {
+            if let savedResponse {
+                WisdomCompareView(response: savedResponse, prompt: prompt)
+            }
         }
     }
 
@@ -75,9 +82,11 @@ struct WisdomPromptCaptureView: View {
                 .font(.title3.weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(prompt.prompt)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            if !prompt.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(prompt.prompt)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
@@ -158,7 +167,42 @@ struct WisdomPromptCaptureView: View {
                 .background(Color.clear)
         }
     }
-    
+
+    private func loadExistingResponseIfNeeded() {
+        let dayKey = todayKey
+        let questionID = prompt.id
+
+        let descriptor = FetchDescriptor<WisdomResponseEntity>(
+            predicate: #Predicate<WisdomResponseEntity> {
+                $0.dayKey == dayKey && $0.questionID == questionID
+            }
+        )
+
+        guard let existing = try? modelContext.fetch(descriptor).first else { return }
+
+        existingResponse = existing
+        savedResponse = existing
+
+        if let typed = existing.typedText,
+           !typed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            selectedInput = .text
+            typedText = typed
+            return
+        }
+
+        if let transcript = existing.redactedTranscript,
+           !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            selectedInput = .voice
+            voiceTranscriptDraft = transcript
+            return
+        }
+
+        if !existing.answerText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            selectedInput = .text
+            typedText = existing.answerText
+        }
+    }
+
     private func absorbCompletedTurn(_ id: UUID) {
         let descriptor = FetchDescriptor<TurnEntity>(
             predicate: #Predicate<TurnEntity> { $0.id == id }
@@ -178,9 +222,27 @@ struct WisdomPromptCaptureView: View {
         coordinator.clearLiveTranscript()
         coordinator.lastCompletedTurnID = nil
     }
-    
+
     private func saveResponseAndGoToCompare() {
         let mode = selectedInput ?? .text
+
+        if let existingResponse {
+            existingResponse.captureModeRaw = mode.rawValue
+            existingResponse.answerText = currentAnswerText
+            existingResponse.typedText = mode == .text ? typedText : nil
+            existingResponse.rawTranscript = mode == .voice ? voiceTranscriptDraft : nil
+            existingResponse.redactedTranscript = mode == .voice ? voiceTranscriptDraft : nil
+            existingResponse.completedAt = .now
+
+            do {
+                try modelContext.save()
+                savedResponse = existingResponse
+                showCompare = true
+            } catch {
+                print("WISDOM UPDATE SAVE FAILED: \(error)")
+            }
+            return
+        }
 
         let response = WisdomResponseEntity(
             dayKey: todayKey,
@@ -199,9 +261,15 @@ struct WisdomPromptCaptureView: View {
         )
 
         modelContext.insert(response)
-        try? modelContext.save()
 
-        savedResponse = response
+        do {
+            try modelContext.save()
+            existingResponse = response
+            savedResponse = response
+            showCompare = true
+        } catch {
+            print("WISDOM INSERT SAVE FAILED: \(error)")
+        }
     }
 }
 

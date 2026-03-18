@@ -143,15 +143,12 @@ struct CaptureView: View {
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text("Reflect")
-                        .font(.system(size: 30, weight: .regular, design: .serif))
-                        .italic()
+                        .font(.headline)
 
                     Text("express yourself honestly.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

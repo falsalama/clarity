@@ -106,14 +106,12 @@ struct FocusSoundsHubView: View {
         List {
             Section {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Meditative sounds")
-                        .font(.title3.weight(.semibold))
 
                     Text("An evolving collection of carefully composed sounds for practice, settling, and rest. This is a quiet support space - not a content library.")
                         .font(.body)
                         .foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 6)
+                .padding(.vertical, 0)
             }
 
             Section("Sounds") {

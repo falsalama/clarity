@@ -1,15 +1,16 @@
-// Clarity/Features/Progress/Mala27View.swift
-
 import SwiftUI
 
 /// 27-bead mala ring with centre portrait.
 /// - Filled beads start at 12 o'clock.
 /// - Empty: ghost outline.
 /// - Complete: warm charcoal “wood” bead.
+/// - Partial: gold fill for in-progress daily state.
 /// - Includes a minimal guru bead + collar + tassel.
-/// - Exposes `layersCompleted` for external UI (layer counters live in ProgressView).
 struct Mala27View: View {
     let openCount: Int
+    let didWisdomToday: Bool
+    let didCompassionToday: Bool
+    let overlayPartialOnLastOpenBead: Bool
     let layersCompleted: Int
     let portraitRecipe: PortraitRecipe
     let pulseCentre: Bool
@@ -30,11 +31,12 @@ struct Mala27View: View {
             let ghostStroke = Color.primary.opacity(0.10)
             let fill = Color(red: 0.14, green: 0.13, blue: 0.12)
 
-            // 12 o'clock start
+            let fullCount = min(max(openCount, 0), beadCount)
+            let hasPartial = didWisdomToday || didCompassionToday
+
             let angleOffset = -Double.pi / 2.0
 
             ZStack {
-                // Guru bead + tassel at 12 o'clock (not counted)
                 GuruBeadView(
                     centre: CGPoint(x: size * 0.5, y: size * 0.5 - ringRadius),
                     bead: bead,
@@ -44,38 +46,71 @@ struct Mala27View: View {
 
                 ForEach(0..<beadCount, id: \.self) { i in
                     let angle = (Double(i) / Double(beadCount)) * 2.0 * Double.pi + angleOffset
-                    let isOpen = i < min(max(openCount, 0), beadCount)
+                    let isOpen = i < fullCount
+                    let partialIndex = overlayPartialOnLastOpenBead
+                        ? max(0, min(fullCount - 1, beadCount - 1))
+                        : min(fullCount, beadCount - 1)
+
+                    let isPartialSlot = hasPartial && i == partialIndex
+
+                    if !isPartialSlot {
+                        ZStack {
+                            Circle()
+                                .stroke(ghostStroke, lineWidth: 2.2)
+
+                            if isOpen {
+                                Circle()
+                                    .fill(fill)
+                                    .shadow(
+                                        color: .black.opacity(0.22),
+                                        radius: 2.4,
+                                        x: 0,
+                                        y: 1.7
+                                    )
+
+                                Circle()
+                                    .fill(Color.white.opacity(0.10))
+                                    .blur(radius: 0.6)
+                                    .offset(x: -0.6, y: -0.9)
+                                    .mask(Circle())
+                            }
+                        }
+                        .frame(width: bead, height: bead)
+                        .position(
+                            x: size * 0.5 + cos(angle) * ringRadius,
+                            y: size * 0.5 + sin(angle) * ringRadius
+                        )
+                        .animation(.easeOut(duration: 1.2), value: openCount)
+                    }
+                }
+
+                if hasPartial {
+                    let partialIndex = overlayPartialOnLastOpenBead
+                        ? max(0, min(fullCount - 1, beadCount - 1))
+                        : min(fullCount, beadCount - 1)
+
+                    let partialAngle = (Double(partialIndex) / Double(beadCount)) * 2.0 * Double.pi + angleOffset
 
                     ZStack {
                         Circle()
                             .stroke(ghostStroke, lineWidth: 2.2)
 
-                        Circle()
-                            .fill(fill)
-                            .opacity(isOpen ? 1 : 0)
-                            .scaleEffect(isOpen ? 1 : 0.7)
-                            .shadow(
-                                color: .black.opacity(isOpen ? 0.22 : 0.0),
-                                radius: isOpen ? 2.4 : 0,
-                                x: 0,
-                                y: isOpen ? 1.7 : 0
-                            )
-
-                        Circle()
-                            .fill(Color.white.opacity(isOpen ? 0.10 : 0.0))
-                            .blur(radius: 0.6)
-                            .offset(x: -0.6, y: -0.9)
-                            .mask(Circle())
+                        PartialBeadFillView(
+                            didWisdomToday: didWisdomToday,
+                            didCompassionToday: didCompassionToday,
+                            rotationDegrees: partialAngle * 180.0 / .pi,
+                            showsBackgroundBase: !overlayPartialOnLastOpenBead
+                        )
                     }
                     .frame(width: bead, height: bead)
                     .position(
-                        x: size * 0.5 + cos(angle) * ringRadius,
-                        y: size * 0.5 + sin(angle) * ringRadius
+                        x: size * 0.5 + cos(partialAngle) * ringRadius,
+                        y: size * 0.5 + sin(partialAngle) * ringRadius
                     )
-                    .animation(.easeOut(duration: 1.2), value: openCount)
+                    .zIndex(100)
+                    .animation(.easeOut(duration: 0.6), value: "\(didWisdomToday)-\(didCompassionToday)")
                 }
 
-                // Centre portrait + optional pulse halo
                 ZStack {
                     if pulseCentre {
                         Circle()
@@ -104,6 +139,75 @@ struct Mala27View: View {
     }
 }
 
+private struct PartialBeadFillView: View {
+    let didWisdomToday: Bool
+    let didCompassionToday: Bool
+    let rotationDegrees: Double
+    let showsBackgroundBase: Bool
+
+    private let gold = Color(red: 0.86, green: 0.72, blue: 0.22)
+    private let claret = Color(red: 0.48, green: 0.18, blue: 0.22)
+    private let wood = Color(red: 0.14, green: 0.13, blue: 0.12)
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = min(proxy.size.width, proxy.size.height)
+            let activeStroke: Color = didCompassionToday ? claret : (didWisdomToday ? gold : wood)
+            let third = size / 3.0
+
+            ZStack {
+                if showsBackgroundBase {
+                    Circle()
+                        .fill(Color(.systemBackground))
+
+                    Circle()
+                        .fill(activeStroke.opacity(0.04))
+                } else {
+                    Circle()
+                        .fill(wood)
+                        .shadow(
+                            color: .black.opacity(0.22),
+                            radius: 2.4,
+                            x: 0,
+                            y: 1.7
+                        )
+
+                    Circle()
+                        .fill(Color.white.opacity(0.10))
+                        .blur(radius: 0.6)
+                        .offset(x: -0.6, y: -0.9)
+                        .mask(Circle())
+                }
+
+                HStack(spacing: 0) {
+                    Rectangle()
+                        .fill(didWisdomToday ? gold : .clear)
+                        .frame(width: third)
+
+                    Rectangle()
+                        .fill(didCompassionToday ? claret : .clear)
+                        .frame(width: third)
+
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(width: third)
+                }
+                .frame(width: size, height: size)
+                .clipShape(Circle())
+                .rotationEffect(.degrees(rotationDegrees))
+
+                Circle()
+                    .stroke(activeStroke.opacity(0.55), lineWidth: 1.2)
+            }
+            .shadow(
+                color: activeStroke.opacity(0.18),
+                radius: 1.8,
+                x: 0,
+                y: 1.1
+            )
+        }
+    }
+}
 private struct GuruBeadView: View {
     let centre: CGPoint
     let bead: CGFloat
@@ -117,29 +221,19 @@ private struct GuruBeadView: View {
         let guruH = bead * 1.75
         let guruW = bead * 0.95
 
-        // Spacing controls
         let cordDX = bead * 0.18
-        let rise = bead * 1.05        // how far the strands go upward
+        let rise = bead * 1.05
         let stop = bead * 0.34
 
-        // Core anchors
         let guruCentre = CGPoint(x: centre.x, y: centre.y)
-
-        // Collar bead above the guru bead
         let collarY = guruCentre.y - guruH * 0.62
-
-        // Knot sits just ABOVE the collar bead (close to the mala)
         let knotCentre = CGPoint(x: centre.x, y: collarY - bead * 0.40)
-
-        // Cord ends (stopper beads) above the knot
         let endY = knotCentre.y - rise
 
-        // Knot sizing
         let loopW = bead * 0.78
         let loopH = bead * 0.52
 
         ZStack {
-            // Cords start at knot and go UP
             Path { p in
                 let startL = CGPoint(x: knotCentre.x - cordDX, y: knotCentre.y)
                 let endL   = CGPoint(x: startL.x, y: endY)
@@ -164,7 +258,6 @@ private struct GuruBeadView: View {
             .stroke(cord, style: StrokeStyle(lineWidth: 4.6, lineCap: .round))
             .shadow(color: cordShadow, radius: 1.2, x: 0, y: 0.8)
 
-            // Stopper beads at cord ends
             Circle()
                 .fill(fill.opacity(0.85))
                 .overlay(Circle().stroke(ghostStroke, lineWidth: 1.2))
@@ -177,7 +270,6 @@ private struct GuruBeadView: View {
                 .frame(width: stop, height: stop)
                 .position(x: knotCentre.x + cordDX, y: endY)
 
-            // Knot loop (NOW near the mala / collar)
             ZStack {
                 RoundedRectangle(cornerRadius: loopH * 0.45, style: .continuous)
                     .stroke(cord, lineWidth: 4.2)
@@ -199,7 +291,6 @@ private struct GuruBeadView: View {
             .shadow(color: cordShadow, radius: 1.0, x: 0, y: 0.8)
             .position(knotCentre)
 
-            // Guru bead body
             RoundedRectangle(cornerRadius: guruH * 0.26, style: .continuous)
                 .fill(fill.opacity(0.98))
                 .frame(width: guruW, height: guruH)
@@ -212,7 +303,6 @@ private struct GuruBeadView: View {
                 )
                 .position(guruCentre)
 
-            // Collar bead (between guru bead and knot)
             Circle()
                 .fill(fill.opacity(0.60))
                 .overlay(Circle().stroke(ghostStroke, lineWidth: 1.4))
@@ -223,17 +313,15 @@ private struct GuruBeadView: View {
 }
 
 /// Tibetan “male abacus” style layer counter (horizontal).
-/// - Shows up to 20 layers as two rows of 10.
-/// - Row 1 fills 0...10, then Row 2 fills 0...10.
 struct QuarterMalaCountersView: View {
     let rounds: Int
-    
+
     var body: some View {
         let v = max(0, min(rounds, 27))
         let top = min(v, 9)
         let middle = min(max(v - 9, 0), 9)
         let bottom = min(max(v - 18, 0), 9)
-        
+
         VStack(spacing: 10) {
             row(filled: top)
             row(filled: middle)
@@ -243,19 +331,17 @@ struct QuarterMalaCountersView: View {
         .accessibilityLabel("Quarter mala counters")
         .accessibilityValue("\(v) rounds")
     }
-    
+
     private func row(filled: Int) -> some View {
         let ghost = Color.primary.opacity(0.12)
         let cord = Color.primary.opacity(0.16)
         let fill = Color(red: 0.14, green: 0.13, blue: 0.12)
 
         return ZStack {
-            // cord
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(cord)
                 .frame(height: 5)
 
-            // end stopper beads
             HStack {
                 Circle()
                     .fill(fill.opacity(0.92))
@@ -271,7 +357,6 @@ struct QuarterMalaCountersView: View {
             }
             .padding(.horizontal, 2)
 
-            // beads
             HStack(spacing: 8) {
                 ForEach(0..<9, id: \.self) { i in
                     let on = i < filled
@@ -293,7 +378,6 @@ struct QuarterMalaCountersView: View {
             }
             .padding(.horizontal, 18)
 
-            // little knots just inside the stopper beads
             HStack {
                 knotView
                 Spacer()

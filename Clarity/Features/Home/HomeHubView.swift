@@ -237,11 +237,8 @@ private struct HomeHubBackground: View {
                 .resizable()
                 .scaledToFill()
                 .frame(width: proxy.size.width, height: proxy.size.height)
-                .scaleEffect(animate ? 1.04 : 1.00)
-                .offset(
-                    x: animate ? -10 : 10,
-                    y: animate ? 82 : 98
-                )
+                .scaleEffect(1.04)
+                .offset(x: 0, y: 82)
                 .overlay(
                     name == "homehubbg"
                     ? LinearGradient(
@@ -264,11 +261,6 @@ private struct HomeHubBackground: View {
                 )
                 .opacity(name == "homehubbg" ? 0.30 : 1.0)
                 .ignoresSafeArea()
-                .onAppear { animate = true }
-                .animation(
-                    .easeInOut(duration: 16).repeatForever(autoreverses: true),
-                    value: animate
-                )
         }
     }
 }
@@ -411,6 +403,8 @@ private struct PracticePanel: View {
 
     @State private var beginTouchPoint: CGPoint? = nil
 
+    private let compassionFill = Color(red: 0.62, green: 0.28, blue: 0.34)
+
     private var beginIntroHasPlayed: Bool {
         beginAnimationSeed > 0
     }
@@ -435,11 +429,18 @@ private struct PracticePanel: View {
     private let beginHitHeight: CGFloat = 150
 
     // Dorje - fixed, independent position
-    private let dorjeSize: CGFloat = 85
-    private let dorjeHitSize: CGFloat = 116
-    private let dorjeTrailingInset: CGFloat = 74
+    private let dorjeSize: CGFloat = 115
+    private let dorjeHitSize: CGFloat = 115
+    private let dorjeTrailingInset: CGFloat = 75
     private let dorjeBottomInset: CGFloat = 174
-    private let dorjeOpacity: Double = 0.50
+    private let dorjeOpacity: Double = 0.9
+
+    // Lotus - fixed, independent position
+    private let lotusSize: CGFloat = 118
+    private let lotusHitSize: CGFloat = 118
+    private let lotusLeadingInset: CGFloat = 94
+    private let lotusBottomInset: CGFloat = 25
+    private let lotusOpacity: Double = 0.9
 
     var body: some View {
         GeometryReader { geo in
@@ -448,6 +449,13 @@ private struct PracticePanel: View {
                     at: CGPoint(
                         x: geo.size.width * 0.5,
                         y: beginCenterY
+                    )
+                )
+
+                lotusBlock(
+                    at: CGPoint(
+                        x: lotusLeadingInset,
+                        y: geo.size.height - lotusBottomInset
                     )
                 )
 
@@ -522,6 +530,27 @@ private struct PracticePanel: View {
     }
 
     @ViewBuilder
+    private func lotusBlock(at point: CGPoint) -> some View {
+        NavigationLink {
+            CompassionView()
+        } label: {
+            ZStack {
+                Color.clear
+                    .frame(width: lotusHitSize, height: lotusHitSize)
+
+                Image("lotus")
+                    .resizable()
+                    .renderingMode(.original)
+                    .scaledToFit()
+                    .frame(width: lotusSize, height: lotusSize)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(LotusPressStyle())
+        .position(point)
+    }
+
+    @ViewBuilder
     private func dorjeBlock(at point: CGPoint) -> some View {
         NavigationLink {
             WisdomView()
@@ -532,10 +561,10 @@ private struct PracticePanel: View {
 
                 Image("dorje2")
                     .resizable()
-                    .renderingMode(.template)
+                    .renderingMode(.original)
                     .scaledToFit()
                     .frame(width: dorjeSize, height: dorjeSize)
-                    .foregroundStyle(.primary.opacity(dorjeOpacity))
+                    .opacity(dorjeOpacity)
             }
             .contentShape(Rectangle())
         }
@@ -543,7 +572,6 @@ private struct PracticePanel: View {
         .position(point)
     }
 }
-
 // MARK: - Begin button
 
 private struct BeginPracticeButtonView: View {
@@ -707,6 +735,22 @@ private struct ProgressPanel: View {
         )
     }
 }
+
+private struct LotusPressStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .brightness(configuration.isPressed ? 0.10 : 0.0)
+            .overlay {
+                Circle()
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.16 : 0.0))
+                    .blur(radius: configuration.isPressed ? 12 : 0)
+                    .scaleEffect(configuration.isPressed ? 1.08 : 1.0)
+            }
+            .scaleEffect(configuration.isPressed ? 1.03 : 1.0)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}
+
 // MARK: - Insights
 
 private struct InsightsCard: View {

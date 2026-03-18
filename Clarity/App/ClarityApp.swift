@@ -53,6 +53,7 @@ struct ClarityApp: App {
                 ReflectProgramStateEntity.self,
                 WisdomQuestionEntity.self,
                 WisdomDailySetEntity.self,
+                WisdomResponseEntity.self,
                 configurations: config
             )
 

@@ -177,7 +177,7 @@ struct CapsuleView: View {
     private let dharmaTraditionOptions: [String] = [
         "",
         "FPMT",
-        "Rimé (non-sectarian)",
+        "Rimé",
         "Rigpa",
         "Drikung Kagyu",
         "Karma Kagyu",
@@ -356,17 +356,18 @@ struct CapsuleView: View {
             preferencesSection
             advancedSection
         }
-        .navigationTitle("Capsule")
-#if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
-#endif
-        .navigationTitle("Reflect")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Text("express yourself honestly.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Capsule")
+                        .font(.headline)
+
+                    Text("profile, preferences & practice context")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -748,12 +749,45 @@ private struct PreferencePickerRow: View {
                 Text(option.isEmpty ? "—" : option).tag(option)
             }
         }
+        .onAppear {
+            repairSelectionIfNeeded()
+        }
         .onChange(of: selection) { _, newValue in
-            onChange(newValue)
+            let repaired = repairedSelection(for: newValue)
+
+            if repaired != newValue {
+                selection = repaired
+            } else {
+                onChange(newValue)
+            }
         }
     }
-}
 
+    private func repairSelectionIfNeeded() {
+        let repaired = repairedSelection(for: selection)
+        if repaired != selection {
+            selection = repaired
+            onChange(repaired)
+        }
+    }
+
+    private func repairedSelection(for value: String) -> String {
+        if options.contains(value) { return value }
+
+        let foldedValue = folded(value)
+
+        if let match = options.first(where: { folded($0) == foldedValue }) {
+            return match
+        }
+
+        return ""
+    }
+
+    private func folded(_ s: String) -> String {
+        s.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
 private struct MultiSelectList: View {
     let title: String
     let options: [String]

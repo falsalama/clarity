@@ -43,5 +43,10 @@
 	</array>
 	<key>WELCOME_MANIFEST_ENDPOINT</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/welcome-manifest</string>
+	<key>WISDOM_STEPS_ENDPOINT</key>
+	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/wisdom-steps
+</string>
+	<key>COMPASSION_STEPS_ENDPOINT</key>
+	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/compassion-steps</string>
 </dict>
 </plist>

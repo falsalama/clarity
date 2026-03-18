@@ -5,13 +5,24 @@ import UIKit
 struct WisdomView: View {
     @State private var selectedPrompt: WisdomPrompt?
     @State private var loadedPrompts: [WisdomPrompt] = []
+    @State private var loadError: String?
+    @State private var isLoadingPrompts = true
+    @State private var completedPromptForNavigation: WisdomPrompt?
+    
+    @AppStorage("wisdom_current_day_index")
+    private var currentWisdomDayIndex: Int = 1
+
+    @AppStorage("wisdom_last_completed_day_index")
+    private var lastCompletedWisdomDayIndex: Int = 0
+
+    @AppStorage("wisdom_last_done_day_key")
+    private var lastDoneDayKey: String = ""
 
     @Query(
         sort: [SortDescriptor(\WisdomResponseEntity.completedAt, order: .reverse)]
     )
     private var responses: [WisdomResponseEntity]
 
-    // TEMP fallback until Supabase fetch is wired
     private let fallbackPrompts: [WisdomPrompt] = [
         .init(
             id: "wisdom_q_001",
@@ -35,10 +46,24 @@ struct WisdomView: View {
 
     private let wisdomFill = Color(red: 0.48, green: 0.18, blue: 0.22)
 
+    private var todayKey: String {
+        Date().dayKey()
+    }
+
+    private var isDoneToday: Bool {
+        lastDoneDayKey == todayKey
+    }
+
     private var displayedPrompts: [WisdomPrompt] {
         let published = loadedPrompts
             .filter { $0.isPublished }
             .sorted {
+                if let lhsDay = $0.dayIndex, let rhsDay = $1.dayIndex, lhsDay != rhsDay {
+                    return lhsDay < rhsDay
+                }
+                if let lhsSlot = $0.slotIndex, let rhsSlot = $1.slotIndex, lhsSlot != rhsSlot {
+                    return lhsSlot < rhsSlot
+                }
                 if $0.programmeSlug == $1.programmeSlug {
                     return $0.stepIndex < $1.stepIndex
                 }
@@ -48,25 +73,52 @@ struct WisdomView: View {
         return published.isEmpty ? fallbackPrompts : published
     }
 
-    private var todayKey: String {
-        let cal = Calendar.current
-        let d = cal.startOfDay(for: Date())
-        let y = cal.component(.year, from: d)
-        let m = cal.component(.month, from: d)
-        let day = cal.component(.day, from: d)
-        return String(format: "%04d-%02d-%02d", y, m, day)
+    private func response(for prompt: WisdomPrompt) -> WisdomResponseEntity? {
+        responses.first(where: { $0.questionID == prompt.id && $0.dayKey == todayKey })
     }
 
-    private func response(for prompt: WisdomPrompt) -> WisdomResponseEntity? {
-        responses.first(where: { $0.dayKey == todayKey && $0.questionID == prompt.id })
+    private var latestTodayResponse: WisdomResponseEntity? {
+        responses.first(where: { $0.dayKey == todayKey })
+    }
+
+    private var latestTodayPrompt: WisdomPrompt? {
+        guard let response = latestTodayResponse else { return nil }
+        return displayedPrompts.first(where: { $0.id == response.questionID })
+    }
+
+    private var isUsingFallbackPrompts: Bool {
+        displayedPrompts == fallbackPrompts
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 introCard
-                todayHeader
-                questionCards
+
+                if let loadError, !isLoadingPrompts {
+                    Text(loadError)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if isDoneToday {
+                    doneTodayCard
+                } else {
+                    todayHeader
+                    questionCards
+                }
+
+                HStack {
+                    Spacer()
+                    Image("dorje2")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 118, height: 118)
+                        .opacity(0.9)
+                    Spacer()
+                }
+                .padding(.top, 8)
+                .padding(.bottom, 8)
             }
             .padding(16)
         }
@@ -77,37 +129,137 @@ struct WisdomView: View {
             }
             .ignoresSafeArea()
         }
-        .navigationTitle("Wisdom")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text("Wisdom")
+                        .font(.headline)
+
+                    Text("logic and analytical training")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+        }
         .navigationDestination(item: $selectedPrompt) { prompt in
             WisdomPromptCaptureView(prompt: prompt)
         }
+        .navigationDestination(item: $completedPromptForNavigation) { prompt in
+            if let response = latestTodayResponse {
+                WisdomCompareView(response: response, prompt: prompt)
+            }
+        }
+        .task(id: currentWisdomDayIndex) {
+            syncDayIndexIfNeeded()
+            await loadWisdomPrompts()
+        }
+    }
+
+    private func syncDayIndexIfNeeded() {
+        guard !lastDoneDayKey.isEmpty else { return }
+        guard lastDoneDayKey != todayKey else { return }
+
+        if currentWisdomDayIndex <= lastCompletedWisdomDayIndex {
+            currentWisdomDayIndex = lastCompletedWisdomDayIndex + 1
+        }
+    }
+
+    @MainActor
+    private func loadWisdomPrompts() async {
+        isLoadingPrompts = true
+
+        do {
+            let prompts = try await fetchWisdomPrompts()
+
+            if prompts.isEmpty {
+                loadedPrompts = []
+                loadError = "No wisdom entries found. Using fallback questions."
+            } else {
+                loadedPrompts = prompts
+                loadError = nil
+                print("WISDOM loaded \(prompts.count) prompts from edge function")
+            }
+        } catch {
+            loadedPrompts = []
+            loadError = "Could not load wisdom from database. Using fallback questions."
+            print("WISDOM LOAD FAILED: \(error)")
+        }
+
+        isLoadingPrompts = false
+    }
+
+    private func fetchWisdomPrompts() async throws -> [WisdomPrompt] {
+        guard let endpointURL = wisdomStepsEndpointURL else {
+            throw URLError(.badURL)
+        }
+
+        guard var components = URLComponents(url: endpointURL, resolvingAgainstBaseURL: false) else {
+            throw URLError(.badURL)
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "dayIndex", value: String(max(1, currentWisdomDayIndex)))
+        ]
+
+        guard let url = components.url else {
+            throw URLError(.badURL)
+        }
+
+        var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
+        req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+
+        guard let http = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        guard http.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "<no body>"
+            print("WISDOM HTTP \(http.statusCode): \(body)")
+            throw URLError(.badServerResponse)
+        }
+
+        let decoded = try JSONDecoder().decode(WisdomStepsResponse.self, from: data)
+        print("WISDOM dayIndex =", decoded.dayIndex, "items =", decoded.items.count)
+        return decoded.items
+    }
+
+    private var wisdomStepsEndpointURL: URL? {
+        let keys = [
+            "WISDOM_STEPS_ENDPOINT",
+            "WisdomStepsEndpoint"
+        ]
+
+        for key in keys {
+            if let raw = Bundle.main.object(forInfoDictionaryKey: key) as? String {
+                let cleaned = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !cleaned.isEmpty, let url = URL(string: cleaned) {
+                    return url
+                }
+            }
+        }
+
+        return nil
     }
 
     private var introCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 12) {
-                Image("dorje2")
-                    .resizable()
-                    .renderingMode(.template)
-                    .scaledToFit()
-                    .frame(width: 44, height: 44)
-                    .foregroundStyle(wisdomFill)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Logic and insight training")
-                        .font(.title3.weight(.semibold))
-                }
-
-                Spacer()
-            }
-
             Text("Choose one question each day and answer in your own words.")
                 .foregroundStyle(.secondary)
 
             Text("This is philosophical and contemplative training for loosening fixation through reasoning, perspective, and analytical inquiry.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
+
+            if !isLoadingPrompts && isUsingFallbackPrompts {
+                Text("Using fallback questions.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
@@ -125,19 +277,70 @@ struct WisdomView: View {
         }
     }
 
+    private var doneTodayCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Today’s wisdom is complete.")
+                .font(.headline)
+
+            if let response = latestTodayResponse {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Chosen question")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(response.questionText)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Your answer")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(response.answerText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(5)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
+            Button {
+                guard let prompt = latestTodayPrompt else { return }
+                completedPromptForNavigation = prompt
+            } label: {
+                Text("Open completed view")
+                    .font(.callout.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(wisdomFill)
+            .disabled(latestTodayPrompt == nil || latestTodayResponse == nil)
+        }
+        .padding(16)
+        .background(Color(.secondarySystemGroupedBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
     private var questionCards: some View {
         VStack(spacing: 12) {
-            ForEach(displayedPrompts) { prompt in
-                Button {
-                    selectedPrompt = prompt
-                } label: {
-                    WisdomQuestionCard(
-                        prompt: prompt,
-                        response: response(for: prompt),
-                        accent: wisdomFill
-                    )
+            if isLoadingPrompts {
+                ProgressView()
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 20)
+            } else {
+                ForEach(displayedPrompts) { prompt in
+                    Button {
+                        selectedPrompt = prompt
+                    } label: {
+                        WisdomQuestionCard(
+                            prompt: prompt,
+                            response: response(for: prompt),
+                            accent: wisdomFill
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -196,7 +399,7 @@ private struct WisdomQuestionCard: View {
         .contentShape(Rectangle())
         .navigationDestination(isPresented: $showCompare) {
             if let response {
-                WisdomCompareView(response: response)
+                WisdomCompareView(response: response, prompt: prompt)
             }
         }
     }
@@ -205,10 +408,8 @@ private struct WisdomQuestionCard: View {
         HStack(spacing: 8) {
             Image("dorje2")
                 .resizable()
-                .renderingMode(.template)
                 .scaledToFit()
-                .frame(width: 16, height: 16)
-                .foregroundStyle(accent)
+                .frame(width: 46, height: 46)
 
             Text(prompt.category)
                 .font(.footnote.weight(.semibold))
@@ -228,6 +429,9 @@ struct WisdomPrompt: Identifiable, Hashable, Codable {
     let scientificView: String
     let isPublished: Bool
     let version: Int
+    let dayIndex: Int?
+    let slotIndex: Int?
+    let lane: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -240,6 +444,9 @@ struct WisdomPrompt: Identifiable, Hashable, Codable {
         case scientificView = "scientific_view"
         case isPublished = "is_published"
         case version
+        case dayIndex = "day_index"
+        case slotIndex = "slot_index"
+        case lane
     }
 
     init(
@@ -258,6 +465,9 @@ struct WisdomPrompt: Identifiable, Hashable, Codable {
         self.scientificView = ""
         self.isPublished = true
         self.version = 1
+        self.dayIndex = nil
+        self.slotIndex = nil
+        self.lane = nil
     }
 
     var category: String { title }

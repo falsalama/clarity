@@ -24,7 +24,12 @@ final class AppFlowRouter: ObservableObject {
     func go(_ tab: Tab) {
         selectedTab = tab
     }
-
+    func openPracticeHome() {
+        pendingOpenProgress = false
+        selectedTab = .home
+        homeTab = .practice
+    }
+    
     func openProgressWithBeadAnimation() {
         selectedTab = .home
         homeTab = .progress
