@@ -80,6 +80,10 @@ struct AppShellView: View {
 
             homeSurface.startDailyAutoRefresh()
             Task { await homeSurface.refreshNow() }
+            
+            Task {
+                await NotificationManager.shared.refreshDailyScheduleIfEnabled()
+            }
         }
         .onChange(of: scenePhase) { _, newPhase in
             captureCoordinator.handleScenePhaseChange(newPhase)
@@ -96,6 +100,10 @@ struct AppShellView: View {
 
                 homeSurface.startDailyAutoRefresh()
                 Task { await homeSurface.refreshNow() }
+
+                Task {
+                    await NotificationManager.shared.refreshDailyScheduleIfEnabled()
+                }
 
             } else {
                 siriTask?.cancel()

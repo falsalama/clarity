@@ -177,9 +177,7 @@ struct SettingsView: View {
                                 // Daily repeating reminder.
                                 await NotificationManager.shared.scheduleDaily(
                                     hour: 10,
-                                    minute: 0,
-                                    title: "Clarity",
-                                    body: "One small step today - Reflect, View, or Practice."
+                                    minute: 0
                                 )
                             } else {
                                 await NotificationManager.shared.cancelDaily()

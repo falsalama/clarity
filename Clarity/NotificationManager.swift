@@ -1,5 +1,3 @@
-// NotificationManager.swift
-
 import Foundation
 import UserNotifications
 #if canImport(UIKit)
@@ -13,15 +11,24 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     private override init() {
         super.init()
-        center.delegate = self // show banners while app is open (foreground)
+        center.delegate = self
     }
 
     private let center = UNUserNotificationCenter.current()
 
     private enum IDs {
         static let testOnce = "clarity_nudge_test_once"
-        static let daily = "clarity_nudge_daily"
+        static let dailyPrefix = "clarity_nudge_daily_"
     }
+
+    private enum Keys {
+        static let enabled = "daily_nudge_enabled"
+        static let hour = "daily_nudge_hour"
+        static let minute = "daily_nudge_minute"
+        static let seed = "daily_nudge_seed"
+    }
+
+    private let schedulingHorizonDays = 90
 
     private let dailyNudgeMessages: [(title: String, body: String)] = [
         (
@@ -49,9 +56,9 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
             body: "A short sit is enough. Clarity grows through repetition, not force."
         )
     ]
+
     // MARK: - Permission
 
-    /// Returns true if notifications are authorised (or provisionally authorised).
     func requestPermissionIfNeeded() async -> Bool {
         let settings = await center.notificationSettings()
 
@@ -73,7 +80,6 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
     // MARK: - Scheduling
 
-    /// One-time test notification after N seconds (useful to confirm delivery immediately).
     func scheduleTestIn(seconds: TimeInterval, title: String, body: String) async {
         guard await requestPermissionIfNeeded() else { return }
 
@@ -84,61 +90,123 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         content.body = body
         content.sound = .default
 
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(5, seconds), repeats: false)
-        let request = UNNotificationRequest(identifier: IDs.testOnce, content: content, trigger: trigger)
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: max(5, seconds),
+            repeats: false
+        )
 
-        do { try await center.add(request) } catch { /* best-effort */ }
+        let request = UNNotificationRequest(
+            identifier: IDs.testOnce,
+            content: content,
+            trigger: trigger
+        )
+
+        do {
+            try await center.add(request)
+        } catch {
+            // best-effort
+        }
     }
 
-    /// Repeating daily notification at the specified local time (hour/minute).
-    /// Replaces any existing Clarity daily request.
-    func scheduleDaily(hour: Int, minute: Int, title: String? = nil, body: String? = nil) async {
+    /// Schedules a rolling set of one-off daily notifications so the message can vary.
+    func scheduleDaily(hour: Int, minute: Int) async {
         guard await requestPermissionIfNeeded() else { return }
+
+        let clampedHour = max(0, min(23, hour))
+        let clampedMinute = max(0, min(59, minute))
+
+        UserDefaults.standard.set(clampedHour, forKey: Keys.hour)
+        UserDefaults.standard.set(clampedMinute, forKey: Keys.minute)
+
+        let seed = sequenceSeed()
 
         await cancelDaily()
 
-        let messages = dailyNudgeMessages
-        let chosen = messages.randomElement() ?? (
-            title: "Clarity",
-            body: "Return to practice."
-        )
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfToday = calendar.startOfDay(for: now)
 
-        let content = UNMutableNotificationContent()
-        content.title = title ?? chosen.title
-        content.body = body ?? chosen.body
-        content.sound = .default
+        for offset in 0..<schedulingHorizonDays {
+            guard let day = calendar.date(byAdding: .day, value: offset, to: startOfToday) else {
+                continue
+            }
 
-        var comps = DateComponents()
-        comps.hour = max(0, min(23, hour))
-        comps.minute = max(0, min(59, minute))
+            var comps = calendar.dateComponents([.year, .month, .day], from: day)
+            comps.hour = clampedHour
+            comps.minute = clampedMinute
 
-        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
-        let request = UNNotificationRequest(identifier: IDs.daily, content: content, trigger: trigger)
+            guard let fireDate = calendar.date(from: comps) else { continue }
+            guard fireDate > now.addingTimeInterval(5) else { continue }
 
-        do { try await center.add(request) } catch { /* best-effort */ }
+            let messageIndex = (seed + offset) % dailyNudgeMessages.count
+            let chosen = dailyNudgeMessages[messageIndex]
+
+            let content = UNMutableNotificationContent()
+            content.title = chosen.title
+            content.body = chosen.body
+            content.sound = .default
+
+            let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+            let identifier = IDs.dailyPrefix + requestDateKey(for: fireDate)
+
+            let request = UNNotificationRequest(
+                identifier: identifier,
+                content: content,
+                trigger: trigger
+            )
+
+            do {
+                try await center.add(request)
+            } catch {
+                // best-effort
+            }
+        }
+    }
+
+    /// Rebuilds the rolling schedule if reminders are enabled.
+    func refreshDailyScheduleIfEnabled(defaultHour: Int = 10, defaultMinute: Int = 0) async {
+        guard UserDefaults.standard.bool(forKey: Keys.enabled) else { return }
+
+        let hour: Int
+        let minute: Int
+
+        if UserDefaults.standard.object(forKey: Keys.hour) != nil {
+            hour = UserDefaults.standard.integer(forKey: Keys.hour)
+        } else {
+            hour = defaultHour
+        }
+
+        if UserDefaults.standard.object(forKey: Keys.minute) != nil {
+            minute = UserDefaults.standard.integer(forKey: Keys.minute)
+        } else {
+            minute = defaultMinute
+        }
+
+        await scheduleDaily(hour: hour, minute: minute)
     }
 
     func cancelDaily() async {
-        center.removePendingNotificationRequests(withIdentifiers: [IDs.daily])
+        let ids = await pendingDailyIdentifiers()
+        guard !ids.isEmpty else { return }
+        center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
     func cancelAllClarityNudges() async {
-        center.removePendingNotificationRequests(withIdentifiers: [IDs.testOnce, IDs.daily])
+        await cancelDaily()
+        center.removePendingNotificationRequests(withIdentifiers: [IDs.testOnce])
     }
 
     // MARK: - Foreground presentation
 
-    /// If the app is open, still show the banner/sound (otherwise it can look like “nothing happened”).
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
-        return [.banner, .sound, .badge]
+        [.banner, .sound, .badge]
     }
 
     // MARK: - Settings
 
-    /// Opens the system Notifications settings for this app if possible, otherwise the app settings page.
     func openSystemSettings() {
 #if canImport(UIKit)
         let app = UIApplication.shared
@@ -153,5 +221,35 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         }
 #endif
     }
-}
 
+    // MARK: - Helpers
+
+    private func sequenceSeed() -> Int {
+        if let stored = UserDefaults.standard.object(forKey: Keys.seed) as? Int {
+            return stored
+        }
+
+        let newSeed = Int.random(in: 0..<max(1, dailyNudgeMessages.count))
+        UserDefaults.standard.set(newSeed, forKey: Keys.seed)
+        return newSeed
+    }
+
+    private func requestDateKey(for date: Date) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar.current
+        f.timeZone = .current
+        f.dateFormat = "yyyyMMdd"
+        return f.string(from: date)
+    }
+
+    private func pendingDailyIdentifiers() async -> [String] {
+        await withCheckedContinuation { continuation in
+            center.getPendingNotificationRequests { requests in
+                let ids = requests
+                    .map(\.identifier)
+                    .filter { $0.hasPrefix(IDs.dailyPrefix) }
+                continuation.resume(returning: ids)
+            }
+        }
+    }
+}

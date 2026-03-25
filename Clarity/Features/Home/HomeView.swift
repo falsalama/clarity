@@ -2,22 +2,12 @@ import SwiftUI
 import SwiftData
 import UIKit
 
-/// Home wrapper:
-/// - Welcome shows on each fresh app open (once per session)
-/// - Welcome shows again on each new day (once per day)
-/// - Welcome dismisses by tapping anywhere
-/// - Welcome is NOT inside NavigationStack (prevents white/nav chrome)
 struct HomeView: View {
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
     @EnvironmentObject private var flow: AppFlowRouter
 
-    @AppStorage("welcome_surface_last_seen_daykey")
-    private var lastSeenWelcomeDayKey: String = ""
-
     @State private var showWelcome: Bool = false
     @State private var didShowThisSession: Bool = false
-
-    private var todayKey: String { Date().dayKey() }
 
     var body: some View {
         Group {
@@ -27,20 +17,11 @@ struct HomeView: View {
                     .onTapGesture { dismissWelcome() }
                     .toolbar(.hidden, for: .tabBar)
             } else {
-                // Hub content is inside a NavigationStack provided by AppShellView.
                 HomeHubView()
             }
         }
         .onAppear {
             presentWelcomeIfNeededForSession()
-        }
-        .onChange(of: homeSurface.manifest?.dateKey) { _, newKey in
-            let key = newKey ?? todayKey
-            if lastSeenWelcomeDayKey != key {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    showWelcome = true
-                }
-            }
         }
     }
 
@@ -54,8 +35,7 @@ struct HomeView: View {
     }
 
     private func dismissWelcome() {
-        let key = homeSurface.manifest?.dateKey ?? todayKey
-        lastSeenWelcomeDayKey = key
+        homeSurface.markCurrentWelcomeSeen()
 
         withAnimation(.easeInOut(duration: 0.18)) {
             showWelcome = false
@@ -64,4 +44,5 @@ struct HomeView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.50) {
             flow.homeHubEntrySeed += 1
         }
-    }}
+    }
+}

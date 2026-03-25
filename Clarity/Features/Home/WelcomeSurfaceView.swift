@@ -46,8 +46,7 @@ struct WelcomeSurfaceView: View {
                         Spacer()
 
                         VStack(spacing: 10) {
-                            if !isShowingStaleWelcome,
-                               let message = homeSurface.manifest?.message,
+                            if let message = homeSurface.manifest?.message,
                                !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 
                                 Text(wrapped(message))
@@ -62,8 +61,7 @@ struct WelcomeSurfaceView: View {
                                     .frame(width: textWidth, alignment: .center)
                             }
 
-                            if !isShowingStaleWelcome,
-                               let a = homeSurface.manifest?.attribution,
+                            if let a = homeSurface.manifest?.attribution,
                                !a.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 
                                 Text(wrappedAttribution(a))
@@ -106,19 +104,6 @@ struct WelcomeSurfaceView: View {
         }
     }
 
-    private var todayDateKey: String {
-        let fmt = DateFormatter()
-        fmt.calendar = Calendar.current
-        fmt.timeZone = .current
-        fmt.dateFormat = "yyyy-MM-dd"
-        return fmt.string(from: Date())
-    }
-
-    private var isShowingStaleWelcome: Bool {
-        guard let manifest = homeSurface.manifest else { return false }
-        return manifest.dateKey != todayDateKey
-    }
-
     // MARK: - Background
 
     private var backgroundImage: some View {
@@ -134,14 +119,12 @@ struct WelcomeSurfaceView: View {
                 } else {
                     Color(.secondarySystemBackground)
                         .frame(width: geo.size.width, height: geo.size.height)
-                        .overlay(ProgressView().progressViewStyle(.circular))
                 }
             }
         }
     }
 
     private var dailyUIImage: UIImage? {
-        guard !isShowingStaleWelcome else { return nil }
         guard let url = homeSurface.cachedImageFileURL else { return nil }
         return UIImage(contentsOfFile: url.path)
     }

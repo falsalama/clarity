@@ -1,5 +1,3 @@
-// HomeSurfaceStore.swift
-
 import Foundation
 import Combine
 #if canImport(UIKit)
@@ -14,108 +12,92 @@ final class HomeSurfaceStore: ObservableObject {
     private(set) var endpointURL: URL? = nil
 
     private let fm = FileManager.default
-    private var midnightTimer: Timer?
     private var observers: [NSObjectProtocol] = []
 
     private let lastFetchKey = "home_surface_last_fetch_at"
+    private let currentSequenceKey = "home_surface_current_sequence_index"
+    private let lastSeenDayKey = "home_surface_last_seen_day_key"
+    private let lastAdvancedDayKey = "home_surface_last_advanced_day_key"
+    private let currentImageURLKey = "home_surface_current_image_url"
+    private let prefetchedImageURLKey = "home_surface_prefetched_image_url"
 
     init() {
         endpointURL = Self.readEndpointURLFromPlist()
         loadCached()
-        // Do not start timers/observers automatically here.
-        // AppShellView controls start/stop to avoid duplicate observers.
     }
 
     // MARK: - Public
 
-    /// Always fetch the manifest (small). Only download image if URL changed or missing locally.
     func refreshNow(forceImageReload: Bool = false) async {
-        guard let endpointURL else { return }
+        advanceSequenceIfNeededForNewDay()
+
+        guard let requestURL = endpointURLForCurrentSequence() else { return }
 
         do {
-            var req = URLRequest(url: endpointURL)
-            req.cachePolicy = .reloadIgnoringLocalCacheData
-            req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+            var req = URLRequest(url: requestURL)
+            req.cachePolicy = .useProtocolCachePolicy
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
 
-            let previousManifest = manifest
             let newManifest = try JSONDecoder().decode(WelcomeManifest.self, from: data)
 
-            let path = imagePath()
-            let oldImageURL = previousManifest?.imageURL
-            let oldDateKey = previousManifest?.dateKey
-            let hasCachedImage = fm.fileExists(atPath: path.path)
+            // Persist the server-normalized current sequence so local state stays aligned
+            UserDefaults.standard.set(newManifest.sequenceIndex, forKey: currentSequenceKey)
 
             if forceImageReload {
-                try? fm.removeItem(at: path)
-                cachedImageFileURL = nil
+                clearCurrentImage()
+                clearPrefetchedImage()
             }
 
-            var nextImageURL: URL? = nil
-            var downloadedImageData: Data? = nil
-
-            if let urlString = newManifest.imageURL,
-               let imageURL = URL(string: urlString) {
-
-                let imageChanged = (oldImageURL != urlString)
-                let dateChanged = (oldDateKey != newManifest.dateKey)
-                let needsFreshImage = forceImageReload || imageChanged || dateChanged || !hasCachedImage
-
-                if needsFreshImage {
-                    // Prevent old image flash while the new one is downloading.
-                    cachedImageFileURL = nil
-                    downloadedImageData = await downloadImageData(from: imageURL)
-                } else {
-                    nextImageURL = path
-                }
-            } else {
-                try? fm.removeItem(at: path)
-                cachedImageFileURL = nil
-            }
-
+            let resolvedImageURL = await resolveCurrentImage(for: newManifest)
             manifest = newManifest
-            try persistManifest(data)
+            cachedImageFileURL = resolvedImageURL
+
+            try persistManifest(newManifest)
             setLastFetchNow()
 
-            if let downloadedImageData {
-                try downloadedImageData.write(to: path, options: [.atomic])
-                cachedImageFileURL = path
-            } else {
-                cachedImageFileURL = nextImageURL
-            }
+            await prefetchNextImageIfNeeded(for: newManifest)
         } catch {
             // best-effort silent failure
         }
     }
 
     func refreshIfStale(maxAgeSeconds: TimeInterval) async {
-        if manifest == nil { await refreshNow(); return }
-        guard let last = lastFetchAt() else { await refreshNow(); return }
+        if manifest == nil {
+            await refreshNow()
+            return
+        }
+
+        guard let last = lastFetchAt() else {
+            await refreshNow()
+            return
+        }
+
         if Date().timeIntervalSince(last) > maxAgeSeconds {
             await refreshNow()
         }
     }
 
     func refreshIfNeededForToday() async {
-        guard needsRefreshForToday() else { return }
-        await refreshNow()
+        await refreshIfStale(maxAgeSeconds: 6 * 60 * 60)
     }
+
     func forceRefresh() async {
         await refreshNow(forceImageReload: true)
     }
-    // MARK: - Auto refresh
+
+    func markCurrentWelcomeSeen() {
+        UserDefaults.standard.set(localDayKey(), forKey: lastSeenDayKey)
+    }
+
+    // MARK: - Lifecycle hooks
 
     func startDailyAutoRefresh() {
         installObserversIfNeeded()
-        scheduleNextMidnightTimer()
     }
 
     func stopDailyAutoRefresh() {
-        midnightTimer?.invalidate()
-        midnightTimer = nil
-
         for token in observers {
             NotificationCenter.default.removeObserver(token)
         }
@@ -148,33 +130,37 @@ final class HomeSurfaceStore: ObservableObject {
         return nil
     }
 
-    // MARK: - Cache paths
+    // MARK: - Paths
 
     private func baseDir() -> URL {
         let appSupport = fm.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let newDir = appSupport.appendingPathComponent("HomeSurface", isDirectory: true)
-        let oldDir = appSupport.appendingPathComponent("WelcomeSurface", isDirectory: true)
+        let dir = appSupport.appendingPathComponent("HomeSurface", isDirectory: true)
 
-        if fm.fileExists(atPath: newDir.path) == false {
-            if fm.fileExists(atPath: oldDir.path) { return oldDir }
-            try? fm.createDirectory(at: newDir, withIntermediateDirectories: true)
+        if fm.fileExists(atPath: dir.path) == false {
+            try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
         }
-        return newDir
+
+        return dir
     }
 
     private func manifestPath() -> URL {
         baseDir().appendingPathComponent("manifest.json")
     }
 
-    private func imagePath() -> URL {
-        baseDir().appendingPathComponent("image.bin")
+    private func currentImagePath() -> URL {
+        baseDir().appendingPathComponent("image-current.bin")
     }
+
+    private func prefetchedImagePath() -> URL {
+        baseDir().appendingPathComponent("image-prefetch.bin")
+    }
+
+    // MARK: - Load / persist
 
     private func loadCached() {
         guard
             let data = try? Data(contentsOf: manifestPath()),
-            let cached = try? JSONDecoder().decode(WelcomeManifest.self, from: data),
-            cached.dateKey == todayDateKey()
+            let cached = try? JSONDecoder().decode(WelcomeManifest.self, from: data)
         else {
             manifest = nil
             cachedImageFileURL = nil
@@ -183,18 +169,162 @@ final class HomeSurfaceStore: ObservableObject {
 
         manifest = cached
 
-        let img = imagePath()
-        cachedImageFileURL = fm.fileExists(atPath: img.path) ? img : nil
+        let currentPath = currentImagePath()
+        cachedImageFileURL = fm.fileExists(atPath: currentPath.path) ? currentPath : nil
     }
 
-    private func persistManifest(_ data: Data) throws {
+    private func persistManifest(_ manifest: WelcomeManifest) throws {
+        let data = try JSONEncoder().encode(manifest)
         try data.write(to: manifestPath(), options: [.atomic])
     }
+
+    // MARK: - Endpoint
+
+    private func endpointURLForCurrentSequence() -> URL? {
+        guard let endpointURL else { return nil }
+
+        var comps = URLComponents(url: endpointURL, resolvingAgainstBaseURL: false)
+        var items = comps?.queryItems ?? []
+        items.removeAll { $0.name == "index" }
+        items.append(URLQueryItem(name: "index", value: String(currentSequenceIndexToRequest())))
+        comps?.queryItems = items
+
+        return comps?.url
+    }
+
+private func currentSequenceIndexToRequest() -> Int {
+    max(0, UserDefaults.standard.integer(forKey: currentSequenceKey))
+}
+
+private func advanceSequenceIfNeededForNewDay() {
+    let defaults = UserDefaults.standard
+    let today = localDayKey()
+
+    let lastSeen = defaults.string(forKey: lastSeenDayKey) ?? ""
+    let lastAdvanced = defaults.string(forKey: lastAdvancedDayKey) ?? ""
+
+    // First ever run: stay on current sequence.
+    guard !lastSeen.isEmpty else { return }
+
+    // Already saw welcome today: do not advance.
+    guard lastSeen != today else { return }
+
+    // Already advanced once for this day: do not advance again.
+    guard lastAdvanced != today else { return }
+
+    let next = currentSequenceIndexToRequest() + 1
+    defaults.set(next, forKey: currentSequenceKey)
+    defaults.set(today, forKey: lastAdvancedDayKey)
+}
+
+private func localDayKey() -> String {
+    let f = DateFormatter()
+    f.calendar = Calendar.current
+    f.timeZone = .current
+    f.dateFormat = "yyyy-MM-dd"
+    return f.string(from: Date())
+}
+
+
+    // MARK: - Image resolution
+
+    private func resolveCurrentImage(for manifest: WelcomeManifest) async -> URL? {
+        guard let urlString = manifest.imageURL, let remoteURL = URL(string: urlString) else {
+            clearCurrentImage()
+            return nil
+        }
+
+        let currentPath = currentImagePath()
+        let currentCachedURL = UserDefaults.standard.string(forKey: currentImageURLKey)
+        let prefetchedURL = UserDefaults.standard.string(forKey: prefetchedImageURLKey)
+
+        if currentCachedURL == urlString, fm.fileExists(atPath: currentPath.path) {
+            return currentPath
+        }
+
+        if prefetchedURL == urlString, fm.fileExists(atPath: prefetchedImagePath().path) {
+            promotePrefetchedImageIfPossible(for: urlString)
+            return fm.fileExists(atPath: currentPath.path) ? currentPath : nil
+        }
+
+        guard let data = await downloadImageData(from: remoteURL) else {
+            return nil
+        }
+
+        do {
+            try data.write(to: currentPath, options: [.atomic])
+            UserDefaults.standard.set(urlString, forKey: currentImageURLKey)
+            return currentPath
+        } catch {
+            return nil
+        }
+    }
+
+    private func prefetchNextImageIfNeeded(for manifest: WelcomeManifest) async {
+        guard let nextURLString = manifest.nextImageURL, let remoteURL = URL(string: nextURLString) else {
+            clearPrefetchedImage()
+            return
+        }
+
+        let currentURL = UserDefaults.standard.string(forKey: currentImageURLKey)
+        let prefetchedURL = UserDefaults.standard.string(forKey: prefetchedImageURLKey)
+        let prefetchPath = prefetchedImagePath()
+
+        if nextURLString == currentURL {
+            clearPrefetchedImage()
+            return
+        }
+
+        if prefetchedURL == nextURLString, fm.fileExists(atPath: prefetchPath.path) {
+            return
+        }
+
+        guard let data = await downloadImageData(from: remoteURL) else {
+            return
+        }
+
+        do {
+            try data.write(to: prefetchPath, options: [.atomic])
+            UserDefaults.standard.set(nextURLString, forKey: prefetchedImageURLKey)
+        } catch {
+            // silent
+        }
+    }
+
+    private func promotePrefetchedImageIfPossible(for urlString: String) {
+        let prefetchPath = prefetchedImagePath()
+        let currentPath = currentImagePath()
+        let prefetchedURL = UserDefaults.standard.string(forKey: prefetchedImageURLKey)
+
+        guard prefetchedURL == urlString, fm.fileExists(atPath: prefetchPath.path) else {
+            clearCurrentImage()
+            cachedImageFileURL = nil
+            return
+        }
+
+        try? fm.removeItem(at: currentPath)
+        try? fm.moveItem(at: prefetchPath, to: currentPath)
+
+        UserDefaults.standard.set(urlString, forKey: currentImageURLKey)
+        UserDefaults.standard.removeObject(forKey: prefetchedImageURLKey)
+        cachedImageFileURL = fm.fileExists(atPath: currentPath.path) ? currentPath : nil
+    }
+
+    private func clearCurrentImage() {
+        try? fm.removeItem(at: currentImagePath())
+        UserDefaults.standard.removeObject(forKey: currentImageURLKey)
+        cachedImageFileURL = nil
+    }
+
+    private func clearPrefetchedImage() {
+        try? fm.removeItem(at: prefetchedImagePath())
+        UserDefaults.standard.removeObject(forKey: prefetchedImageURLKey)
+    }
+
     private func downloadImageData(from url: URL) async -> Data? {
         do {
             var req = URLRequest(url: url)
-            req.cachePolicy = .reloadIgnoringLocalCacheData
-            req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+            req.cachePolicy = .useProtocolCachePolicy
 
             let (data, response) = try await URLSession.shared.data(for: req)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
@@ -203,61 +333,8 @@ final class HomeSurfaceStore: ObservableObject {
             return nil
         }
     }
-    private func fetchAndCacheImage(from url: URL) async {
-        do {
-            var req = URLRequest(url: url)
-            req.cachePolicy = .reloadIgnoringLocalCacheData
-            req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
 
-            let (data, response) = try await URLSession.shared.data(for: req)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
-
-            let path = imagePath()
-            try data.write(to: path, options: [.atomic])
-            cachedImageFileURL = path
-        } catch {
-            // silent
-        }
-    }
-
-    // MARK: - Today / midnight
-
-    private func needsRefreshForToday() -> Bool {
-        guard let cached = manifest else { return true }
-        return cached.dateKey != todayDateKey()
-    }
-
-    private func todayDateKey() -> String {
-        let fmt = DateFormatter()
-        fmt.calendar = Calendar.current
-        fmt.timeZone = .current
-        fmt.dateFormat = "yyyy-MM-dd"
-        return fmt.string(from: Date())
-    }
-
-    private func nextLocalMidnight() -> Date {
-        let cal = Calendar.current
-        let now = Date()
-        let comps = DateComponents(hour: 0, minute: 0, second: 5)
-        return cal.nextDate(after: now, matching: comps, matchingPolicy: .nextTime)
-            ?? now.addingTimeInterval(24 * 60 * 60)
-    }
-
-    private func scheduleNextMidnightTimer() {
-        midnightTimer?.invalidate()
-        midnightTimer = nil
-
-        let fireDate = nextLocalMidnight()
-        let interval = max(1.0, fireDate.timeIntervalSinceNow)
-
-        midnightTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: false) { [weak self] _ in
-            guard let self else { return }
-            Task { @MainActor in
-                await self.refreshIfNeededForToday()
-                self.scheduleNextMidnightTimer()
-            }
-        }
-    }
+    // MARK: - Observers
 
     private func installObserversIfNeeded() {
         guard observers.isEmpty else { return }
@@ -271,14 +348,11 @@ final class HomeSurfaceStore: ObservableObject {
         ) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
-                await self.refreshIfNeededForToday()
-                self.scheduleNextMidnightTimer()
+                await self.refreshIfStale(maxAgeSeconds: 6 * 60 * 60)
             }
         }
-        observers.append(dayChange)
 
-        // NOTE: foreground refresh is driven by AppShellView (scenePhase),
-        // so we do not add UIApplication observers here (avoids duplication).
+        observers.append(dayChange)
     }
 
     // MARK: - Last fetch
@@ -292,4 +366,3 @@ final class HomeSurfaceStore: ObservableObject {
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: lastFetchKey)
     }
 }
-
