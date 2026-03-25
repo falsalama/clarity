@@ -1,18 +1,14 @@
-// ClarityApp.swift
-
 import SwiftUI
 import SwiftData
 
 @main
 struct ClarityApp: App {
-
-    @Environment(\.scenePhase) private var scenePhase
-
     @StateObject private var cloudTap = CloudTapSettings()
     @StateObject private var providerSettings = ContemplationProviderSettings()
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
     @StateObject private var homeSurfaceStore = HomeSurfaceStore()
+    @StateObject private var supabaseAuth = SupabaseAuthStore()
 
     private let container: ModelContainer
 
@@ -57,7 +53,6 @@ struct ClarityApp: App {
                 configurations: config
             )
 
-            // IMPORTANT: make container available to CarPlay scene delegate.
             AppServices.modelContainer = self.container
 
             print("SwiftData store URL =", storeURL.path)
@@ -74,10 +69,12 @@ struct ClarityApp: App {
                 .environmentObject(capsuleStore)
                 .environmentObject(redactionDictionary)
                 .environmentObject(homeSurfaceStore)
+                .environmentObject(supabaseAuth)
+               
         }
         .modelContainer(container)
     }
-
+    
     private static func storeURL(filename: String) throws -> URL {
         let fm = FileManager.default
         let base = try fm.url(

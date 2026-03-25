@@ -14,6 +14,7 @@ struct AppShellView: View {
     @EnvironmentObject private var capsuleStore: CapsuleStore
     @EnvironmentObject private var redactionDictionary: RedactionDictionary
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
+    @EnvironmentObject private var supabaseAuth: SupabaseAuthStore
 
     // Owned here
     @StateObject private var captureCoordinator = TurnCaptureCoordinator()
@@ -22,6 +23,7 @@ struct AppShellView: View {
     @State private var didBind = false
     @State private var pendingSiriStart = false
     @State private var siriTask: Task<Void, Never>? = nil
+    @State private var didBootstrapSupabaseAuth = false
 
     init() {
         // Ensure the tab bar is opaque and styled from the very first frame.
@@ -59,6 +61,16 @@ struct AppShellView: View {
         .onAppear {
             guard !didBind else { return }
             didBind = true
+            
+            if !didBootstrapSupabaseAuth {
+                didBootstrapSupabaseAuth = true
+                Task {
+                    print("Supabase bootstrap from AppShellView starting")
+                    await supabaseAuth.bootstrapAnonymousSessionIfNeeded()
+                    print("Supabase bootstrap from AppShellView finished")
+                }
+            }
+            
             try? WisdomSeed.seedIfNeeded(in: modelContext)
 
             captureCoordinator.bind(

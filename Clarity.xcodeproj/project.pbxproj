@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		F534AC5A2F32C9010046860C /* WALBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F534AC592F32C9010046860C /* WALBuilder.swift */; };
+		F573096E2F7408D50017A732 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = F573096D2F7408D50017A732 /* Auth */; };
+		F57309712F740A940017A732 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = F57309702F740A940017A732 /* Supabase */; };
 		F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F5A6E0222F3939A00097A43D /* LlamaSwift */; };
 /* End PBXBuildFile section */
 
@@ -47,7 +49,9 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F573096E2F7408D50017A732 /* Auth in Frameworks */,
 				F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */,
+				F57309712F740A940017A732 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -61,6 +65,7 @@
 				F54A10692F1F9624003FF874 /* Products */,
 				F5682B2D2F23857000AE7D8E /* docs */,
 				F534AC592F32C9010046860C /* WALBuilder.swift */,
+				F573096F2F740A940017A732 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -70,6 +75,13 @@
 				F54A10682F1F9624003FF874 /* Clarity.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		F573096F2F740A940017A732 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -93,6 +105,8 @@
 			name = Clarity;
 			packageProductDependencies = (
 				F5A6E0222F3939A00097A43D /* LlamaSwift */,
+				F573096D2F7408D50017A732 /* Auth */,
+				F57309702F740A940017A732 /* Supabase */,
 			);
 			productName = Clarity;
 			productReference = F54A10682F1F9624003FF874 /* Clarity.app */;
@@ -124,6 +138,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */,
+				F573096C2F7408D50017A732 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = F54A10692F1F9624003FF874 /* Products */;
@@ -415,6 +430,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		F573096C2F7408D50017A732 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
 		F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/mattt/llama.swift";
@@ -426,6 +449,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		F573096D2F7408D50017A732 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F573096C2F7408D50017A732 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		F57309702F740A940017A732 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F573096C2F7408D50017A732 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
 		F5A6E0222F3939A00097A43D /* LlamaSwift */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */;

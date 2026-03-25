@@ -12,7 +12,6 @@ struct CalendarObservance: Decodable, Identifiable {
     let practice_angle: String?
     let tradition_scope: String
     let region_scope: String
-    // NEW: optional per-row image key (e.g. "events/penor_rinpoche.jpg" or "ah.jpg")
     let image_key: String?
 }
 
@@ -21,22 +20,35 @@ final class CalendarStore: ObservableObject {
     @Published var today: [CalendarObservance] = []
     @Published var upcoming: [CalendarObservance] = []
 
-    private let supabaseURL = "https://yaxpwhimwktqqxyzitao.supabase.co"
-    private let anonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlheHB3aGltd2t0cXF4eXppdGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDQ3NTIsImV4cCI6MjA4NTA4MDc1Mn0.-WyjZU2okWufyAmWxdC6TRarsopMBUlx6HR5ttlS77M"
+    private var supabaseURL: URL? {
+        CloudTapConfig.supabaseURL
+    }
+
+    private var anonKey: String? {
+        CloudTapConfig.supabaseAnonKey
+    }
 
     private var feedURL: URL? {
-        URL(string:
-            "https://yaxpwhimwktqqxyzitao.supabase.co/rest/v1/calendar_observances" +
+        guard let supabaseURL else { return nil }
+
+        let raw =
+            supabaseURL.absoluteString +
+            "/rest/v1/calendar_observances" +
             "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key" +
             "&enabled=eq.true" +
             "&date=gte.2026-01-01" +
             "&date=lte.2026-12-31" +
             "&order=date.asc"
-        )
+
+        return URL(string: raw)
     }
 
     func refresh() async {
-        guard let url = feedURL else { return }
+        guard let url = feedURL, let anonKey else {
+            today = []
+            upcoming = []
+            return
+        }
 
         var req = URLRequest(url: url)
         req.cachePolicy = .returnCacheDataElseLoad

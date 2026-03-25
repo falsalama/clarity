@@ -1,11 +1,9 @@
-// CloudTapService.swift
-
 import Foundation
 import OSLog
 
 enum CloudTapError: Error, Equatable {
     case unavailable
-    case http(Int, String)     // status code + response body (diagnostic)
+    case http(Int, String)
     case decoding
     case network(String)
 }
@@ -51,8 +49,6 @@ final class CloudTapService {
         try await postJSON(reqBody, to: "cloudtap-talkitthrough")
     }
 
-    // MARK: - Steps (DB-fed content)
-
     func reflectSteps(programme: String = "starter_5day") async throws -> CloudTapStepsResponse {
         try await getJSON(from: "reflect-steps", query: [URLQueryItem(name: "programme", value: programme)])
     }
@@ -76,27 +72,16 @@ final class CloudTapService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        req.setValue("Bearer \(cfg.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
-        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
+        guard let accessToken = AppServices.supabaseAccessToken, !accessToken.isEmpty else {
+            Self.logger.error("CloudTap POST missing user access token for \(endpoint, privacy: .public)")
+            throw CloudTapError.unavailable
+        }
 
-        // IMPORTANT: keep default key encoding (camelCase) because server expects appVersion, recordedAt, etc.
+        applySupabaseHeaders(to: &req, cfg: cfg, accessToken: accessToken)
+
         let encoder = JSONEncoder()
         req.httpBody = try encoder.encode(body)
 
-        // ============================================================
-        // MARK: - PRISM/TRACE DEBUG HOOK (TEMPORARY)
-        //
-        // Purpose:
-        // - Print a small summary of what we EXPORT to CloudTap:
-        //   preference key count + learnedCues count + key preview.
-        //
-        // Requirements:
-        // - Add file: Clarity/Core/CloudTap/CloudTapTraceHook.swift
-        //
-        // Remove later:
-        // - Delete this block (and the response block below)
-        // - Delete CloudTapTraceHook.swift
-        // ============================================================
         #if DEBUG
         CloudTapTraceHook.emit(endpoint: endpoint, requestBody: req.httpBody)
         #endif
@@ -110,16 +95,6 @@ final class CloudTapService {
                 throw CloudTapError.http(code, bodyText)
             }
 
-            // ============================================================
-            // MARK: - PRISM/TRACE DEBUG HOOK (TEMPORARY)
-            //
-            // Purpose:
-            // - Print a short snippet of what we RECEIVE from CloudTap.
-            //
-            // Remove later:
-            // - Delete this block (and the export block above)
-            // - Delete CloudTapTraceHook.swift
-            // ============================================================
             #if DEBUG
             CloudTapTraceHook.emitResponse(endpoint: endpoint, responseBody: data)
             #endif
@@ -153,8 +128,7 @@ final class CloudTapService {
         req.timeoutInterval = 30
 
         req.setValue("application/json", forHTTPHeaderField: "Accept")
-        req.setValue("Bearer \(cfg.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
-        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
+        applySupabaseHeaders(to: &req, cfg: cfg, accessToken: nil)
 
         do {
             let (data, resp) = try await session.data(for: req)
@@ -174,6 +148,22 @@ final class CloudTapService {
             throw e
         } catch {
             throw CloudTapError.network(String(describing: error))
+        }
+    }
+
+    private func applySupabaseHeaders(
+        to req: inout URLRequest,
+        cfg: CloudTapConfig.Config,
+        accessToken: String?
+    ) {
+        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
+
+        if let accessToken, !accessToken.isEmpty {
+            req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            Self.logger.debug("CloudTap using user access token")
+        } else {
+            req.setValue("Bearer \(cfg.supabaseAnonKey)", forHTTPHeaderField: "Authorization")
+            Self.logger.debug("CloudTap using anon key")
         }
     }
 

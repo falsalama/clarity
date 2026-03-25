@@ -10,7 +10,7 @@
 	<key>CloudTapBaseURL</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1</string>
 	<key>SupabaseAnonKey</key>
-	<string>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlheHB3aGltd2t0cXF4eXppdGFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MDQ3NTIsImV4cCI6MjA4NTA4MDc1Mn0.-WyjZU2okWufyAmWxdC6TRarsopMBUlx6HR5ttlS77M.</string>
+	<string>sb_publishable_zEvJDeQVlAOGutSLGt_yVA_E1ZFhA1E</string>
 	<key>SupabaseURL</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co</string>
 	<key>UIApplicationSceneManifest</key>
