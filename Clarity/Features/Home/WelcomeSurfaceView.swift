@@ -117,8 +117,16 @@ struct WelcomeSurfaceView: View {
                         .clipped()
                         .contentShape(Rectangle())
                 } else {
-                    Color(.secondarySystemBackground)
-                        .frame(width: geo.size.width, height: geo.size.height)
+                    ZStack {
+                        Color(.secondarySystemBackground)
+                            .frame(width: geo.size.width, height: geo.size.height)
+
+                        if homeSurface.isResolvingCurrentDaySurface {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .tint(.white.opacity(0.9))
+                        }
+                    }
                 }
             }
         }

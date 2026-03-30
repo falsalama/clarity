@@ -138,15 +138,21 @@ struct CompassionView: View {
         isLoading = true
 
         do {
-            let entry = try await fetchCompassionEntry()
+            let response = try await fetchCompassionEntry()
+            let normalizedDayIndex = max(1, response.dayIndex)
 
-            if let entry {
+            if normalizedDayIndex != currentCompassionDayIndex {
+                currentCompassionDayIndex = normalizedDayIndex
+            }
+
+            if let entry = response.item {
                 loadedEntry = entry
                 loadError = nil
-                print("COMPASSION loaded entry \(entry.id)")
+                print("COMPASSION dayIndex =", normalizedDayIndex, "item =", entry.id)
             } else {
                 loadedEntry = nil
                 loadError = "No compassion entry found. Using fallback content."
+                print("COMPASSION dayIndex =", normalizedDayIndex, "item = nil")
             }
         } catch {
             loadedEntry = nil
@@ -157,7 +163,7 @@ struct CompassionView: View {
         isLoading = false
     }
 
-    private func fetchCompassionEntry() async throws -> CompassionEntry? {
+    private func fetchCompassionEntry() async throws -> CompassionStepsResponse {
         guard let endpointURL = compassionStepsEndpointURL else {
             throw URLError(.badURL)
         }
@@ -177,6 +183,8 @@ struct CompassionView: View {
         var req = URLRequest(url: url)
         req.cachePolicy = .reloadIgnoringLocalCacheData
         req.setValue("no-cache", forHTTPHeaderField: "Cache-Control")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        applySupabaseHeaders(to: &req)
 
         let (data, response) = try await URLSession.shared.data(for: req)
 
@@ -190,8 +198,21 @@ struct CompassionView: View {
             throw URLError(.badServerResponse)
         }
 
-        let decoded = try JSONDecoder().decode(CompassionStepsResponse.self, from: data)
-        return decoded.item
+        return try JSONDecoder().decode(CompassionStepsResponse.self, from: data)
+    }
+
+    private func applySupabaseHeaders(to req: inout URLRequest) {
+        guard let anonKey = CloudTapConfig.supabaseAnonKey, !anonKey.isEmpty else { return }
+
+        req.setValue(anonKey, forHTTPHeaderField: "apikey")
+
+        if let accessToken = AppServices.supabaseAccessToken, !accessToken.isEmpty {
+            req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+            print("COMPASSION using user access token")
+        } else {
+            req.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+            print("COMPASSION using anon key")
+        }
     }
 
     private var compassionStepsEndpointURL: URL? {

@@ -8,6 +8,7 @@ import UIKit
 final class HomeSurfaceStore: ObservableObject {
     @Published private(set) var manifest: WelcomeManifest? = nil
     @Published private(set) var cachedImageFileURL: URL? = nil
+    @Published private(set) var isResolvingCurrentDaySurface = false
 
     private(set) var endpointURL: URL? = nil
 
@@ -24,25 +25,35 @@ final class HomeSurfaceStore: ObservableObject {
     init() {
         endpointURL = Self.readEndpointURLFromPlist()
         loadCached()
+        prepareCurrentDaySurfaceForImmediatePresentation()
     }
 
     // MARK: - Public
 
     func refreshNow(forceImageReload: Bool = false) async {
-        advanceSequenceIfNeededForNewDay()
+        prepareCurrentDaySurfaceForImmediatePresentation()
 
-        guard let requestURL = endpointURLForCurrentSequence() else { return }
+        if manifest == nil {
+            isResolvingCurrentDaySurface = true
+        }
+
+        guard let requestURL = endpointURLForCurrentSequence() else {
+            isResolvingCurrentDaySurface = false
+            return
+        }
 
         do {
             var req = URLRequest(url: requestURL)
             req.cachePolicy = .useProtocolCachePolicy
 
             let (data, response) = try await URLSession.shared.data(for: req)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                isResolvingCurrentDaySurface = false
+                return
+            }
 
             let newManifest = try JSONDecoder().decode(WelcomeManifest.self, from: data)
 
-            // Persist the server-normalized current sequence so local state stays aligned
             UserDefaults.standard.set(newManifest.sequenceIndex, forKey: currentSequenceKey)
 
             if forceImageReload {
@@ -58,8 +69,9 @@ final class HomeSurfaceStore: ObservableObject {
             setLastFetchNow()
 
             await prefetchNextImageIfNeeded(for: newManifest)
+            isResolvingCurrentDaySurface = false
         } catch {
-            // best-effort silent failure
+            isResolvingCurrentDaySurface = false
         }
     }
 
@@ -102,6 +114,84 @@ final class HomeSurfaceStore: ObservableObject {
             NotificationCenter.default.removeObserver(token)
         }
         observers.removeAll()
+    }
+
+    // MARK: - Launch / rollover preparation
+
+    private func prepareCurrentDaySurfaceForImmediatePresentation() {
+        let advancedToNewDay = advanceSequenceIfNeededForNewDay()
+        guard advancedToNewDay else {
+            isResolvingCurrentDaySurface = false
+            return
+        }
+
+        guard let cachedManifest = manifest else {
+            isResolvingCurrentDaySurface = true
+            return
+        }
+
+        guard let promotedManifest = promotedManifestFromPrefetchedNext(using: cachedManifest) else {
+            suppressStalePresentationUntilRefreshCompletes()
+            return
+        }
+
+        manifest = promotedManifest
+        UserDefaults.standard.set(promotedManifest.sequenceIndex, forKey: currentSequenceKey)
+
+        if let promotedImageURL = promotedManifest.imageURL {
+            promotePrefetchedImageIfPossible(for: promotedImageURL)
+        } else {
+            clearCurrentImage()
+        }
+
+        cachedImageFileURL = fm.fileExists(atPath: currentImagePath().path) ? currentImagePath() : nil
+
+        do {
+            try persistManifest(promotedManifest)
+        } catch {
+            // best-effort silent failure
+        }
+
+        isResolvingCurrentDaySurface = false
+    }
+
+    private func suppressStalePresentationUntilRefreshCompletes() {
+        manifest = nil
+        cachedImageFileURL = nil
+        isResolvingCurrentDaySurface = true
+    }
+
+    private func promotedManifestFromPrefetchedNext(using current: WelcomeManifest) -> WelcomeManifest? {
+        guard let nextSequenceIndex = current.nextSequenceIndex else { return nil }
+        guard let nextMessage = current.nextMessage,
+              !nextMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+
+        let nextImageURL = current.nextImageURL
+        let prefetchedURL = UserDefaults.standard.string(forKey: prefetchedImageURLKey)
+
+        if let nextImageURL {
+            guard prefetchedURL == nextImageURL,
+                  fm.fileExists(atPath: prefetchedImagePath().path) else {
+                return nil
+            }
+        }
+
+        return WelcomeManifest(
+            sequenceIndex: nextSequenceIndex,
+            message: nextMessage,
+            imageURL: nextImageURL,
+            attribution: current.nextAttribution,
+            nextSequenceIndex: nil,
+            nextMessage: nil,
+            nextImageURL: nil,
+            nextAttribution: nil,
+            dateKey: nil,
+            totalCount: current.totalCount,
+            focusSubtitle: current.focusSubtitle,
+            practiceSubtitle: current.practiceSubtitle
+        )
     }
 
     // MARK: - Plist
@@ -192,39 +282,35 @@ final class HomeSurfaceStore: ObservableObject {
         return comps?.url
     }
 
-private func currentSequenceIndexToRequest() -> Int {
-    max(0, UserDefaults.standard.integer(forKey: currentSequenceKey))
-}
+    private func currentSequenceIndexToRequest() -> Int {
+        max(0, UserDefaults.standard.integer(forKey: currentSequenceKey))
+    }
 
-private func advanceSequenceIfNeededForNewDay() {
-    let defaults = UserDefaults.standard
-    let today = localDayKey()
+    @discardableResult
+    private func advanceSequenceIfNeededForNewDay() -> Bool {
+        let defaults = UserDefaults.standard
+        let today = localDayKey()
 
-    let lastSeen = defaults.string(forKey: lastSeenDayKey) ?? ""
-    let lastAdvanced = defaults.string(forKey: lastAdvancedDayKey) ?? ""
+        let lastSeen = defaults.string(forKey: lastSeenDayKey) ?? ""
+        let lastAdvanced = defaults.string(forKey: lastAdvancedDayKey) ?? ""
 
-    // First ever run: stay on current sequence.
-    guard !lastSeen.isEmpty else { return }
+        guard !lastSeen.isEmpty else { return false }
+        guard lastSeen != today else { return false }
+        guard lastAdvanced != today else { return false }
 
-    // Already saw welcome today: do not advance.
-    guard lastSeen != today else { return }
+        let next = currentSequenceIndexToRequest() + 1
+        defaults.set(next, forKey: currentSequenceKey)
+        defaults.set(today, forKey: lastAdvancedDayKey)
+        return true
+    }
 
-    // Already advanced once for this day: do not advance again.
-    guard lastAdvanced != today else { return }
-
-    let next = currentSequenceIndexToRequest() + 1
-    defaults.set(next, forKey: currentSequenceKey)
-    defaults.set(today, forKey: lastAdvancedDayKey)
-}
-
-private func localDayKey() -> String {
-    let f = DateFormatter()
-    f.calendar = Calendar.current
-    f.timeZone = .current
-    f.dateFormat = "yyyy-MM-dd"
-    return f.string(from: Date())
-}
-
+    private func localDayKey() -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar.current
+        f.timeZone = .current
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
 
     // MARK: - Image resolution
 
