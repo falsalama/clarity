@@ -755,7 +755,6 @@ private struct LotusPressStyle: ButtonStyle {
 
 private struct InsightsCard: View {
     @EnvironmentObject private var capsuleStore: CapsuleStore
-    @State private var expanded: Bool = false
 
     private enum Lane {
         case insight
@@ -821,23 +820,19 @@ private struct InsightsCard: View {
     }
 
     private var visibleInsightItems: [CapsuleTendency] {
-        expanded ? Array(insightItems.prefix(3)) : Array(insightItems.prefix(1))
+        Array(insightItems.prefix(3))
     }
 
     private var visibleLeaningItems: [CapsuleTendency] {
-        expanded ? Array(leaningItems.prefix(3)) : Array(leaningItems.prefix(1))
+        Array(leaningItems.prefix(3))
     }
 
     private var visibleShiftItems: [CapsuleTendency] {
-        expanded ? Array(shiftItems.prefix(3)) : Array(shiftItems.prefix(1))
+        Array(shiftItems.prefix(3))
     }
 
     private var hasAnything: Bool {
         !insightItems.isEmpty || !leaningItems.isEmpty || !shiftItems.isEmpty
-    }
-
-    private var canExpand: Bool {
-        insightItems.count > 1 || leaningItems.count > 1 || shiftItems.count > 1
     }
 
     var body: some View {
@@ -845,19 +840,6 @@ private struct InsightsCard: View {
             HStack {
                 Text("Insights")
                     .font(.headline)
-
-                Spacer()
-
-                if canExpand {
-                    Button(expanded ? "Show less" : "Show more") {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            expanded.toggle()
-                        }
-                    }
-                    .font(.footnote.weight(.semibold))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                }
             }
 
             if !hasAnything {

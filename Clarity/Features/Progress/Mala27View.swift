@@ -315,17 +315,24 @@ private struct GuruBeadView: View {
 /// Tibetan “male abacus” style layer counter (horizontal).
 struct QuarterMalaCountersView: View {
     let rounds: Int
+    let visibleRows: Int
+
+    init(rounds: Int, visibleRows: Int = 3) {
+        self.rounds = rounds
+        self.visibleRows = visibleRows
+    }
 
     var body: some View {
         let v = max(0, min(rounds, 27))
         let top = min(v, 9)
         let middle = min(max(v - 9, 0), 9)
         let bottom = min(max(v - 18, 0), 9)
+        let rows = Array([top, middle, bottom].prefix(max(0, min(visibleRows, 3))))
 
         VStack(spacing: 10) {
-            row(filled: top)
-            row(filled: middle)
-            row(filled: bottom)
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, filled in
+                row(filled: filled)
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Quarter mala counters")

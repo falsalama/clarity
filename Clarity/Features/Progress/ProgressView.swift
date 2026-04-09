@@ -73,7 +73,7 @@ struct ProgressScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 8) {
             Mala27View(
                 openCount: ringOpenCount,
                 didWisdomToday: didWisdomToday,
@@ -87,19 +87,9 @@ struct ProgressScreen: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 28)
 
-            Text("\(ringOpenCount) of 27")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            VStack(spacing: 8) {
-                Text("Quarter Malas completed")
-                    .font(.headline)
-                    .foregroundStyle(.secondary)
-
-                QuarterMalaCountersView(rounds: layersCompleted)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
+            QuarterMalaCountersView(rounds: layersCompleted, visibleRows: 1)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 2)
 
             Spacer(minLength: 4)
         }
