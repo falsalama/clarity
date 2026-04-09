@@ -23,6 +23,18 @@ struct ExploreView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
+                    FocusSoundsHubView()
+                } label: {
+                    ExplorePillCTA(
+                        title: "Meditative Sounds",
+                        subtitle: "Meditative sounds",
+                        systemImage: "waveform",
+                        fill: focusBlue
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
                     AppleHealthExploreView()
                 } label: {
                     ExplorePillCTA(
@@ -35,19 +47,6 @@ struct ExploreView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
-                    WisdomView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Wisdom",
-                        subtitle: "Answer one of three questions each day",
-                        systemImage: "sparkles.rectangle.stack.fill",
-                        fill: .white,
-                        textColor: Color.black.opacity(0.92)
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
                     GuidanceHubView()
                 } label: {
                     ExplorePillCTA(
@@ -55,18 +54,6 @@ struct ExploreView: View {
                         subtitle: "Book a one-to-one session",
                         systemImage: "person.2.fill",
                         fill: guidanceGreen
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    FocusSoundsHubView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Focus",
-                        subtitle: "Meditative sounds",
-                        systemImage: "waveform",
-                        fill: focusBlue
                     )
                 }
                 .buttonStyle(.plain)
@@ -506,6 +493,7 @@ private struct ExploreBackgroundRocksView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var scale: CGFloat = ExploreBackgroundRocksStyle.startScale
+    @State private var hasStartedZoom = false
 
     var body: some View {
         GeometryReader { geo in
@@ -519,6 +507,8 @@ private struct ExploreBackgroundRocksView: View {
                 .clipped()
                 .allowsHitTesting(false)
                 .onAppear {
+                    guard hasStartedZoom == false else { return }
+                    hasStartedZoom = true
                     scale = ExploreBackgroundRocksStyle.startScale
                     guard reduceMotion == false else { return }
                     withAnimation(.easeOut(duration: ExploreBackgroundRocksStyle.zoomDuration)) {

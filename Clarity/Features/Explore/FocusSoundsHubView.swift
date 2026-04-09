@@ -104,28 +104,18 @@ struct FocusSoundsHubView: View {
     
     var body: some View {
         List {
-            Section {
-                VStack(alignment: .leading, spacing: 10) {
-
-                    Text("An evolving collection of carefully composed sounds for practice, settling, and rest. This is a quiet support space - not a content library.")
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 0)
-            }
-
             Section("Sounds") {
                 ForEach(sounds) { sound in
                     Button {
                         player.toggle(id: sound.id, fileName: sound.fileName)
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: 7) {
                             RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .fill(sound.tint.opacity(0.22))
-                                .frame(width: 42, height: 42)
+                                .frame(width: 30, height: 30)
                                 .overlay(
                                     Image(systemName: player.isPlaying(id: sound.id) ? "pause.fill" : "play.fill")
-                                        .font(.system(size: 15, weight: .semibold))
+                                        .font(.system(size: 12, weight: .semibold))
                                         .foregroundStyle(sound.tint)
                                 )
 
@@ -153,15 +143,59 @@ struct FocusSoundsHubView: View {
                                 }
                             }
                         }
-                        .padding(.vertical, 4)
+                        .padding(.vertical, 0)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 10))
                 }
             }
 
             Section("Later") {
-                Text("Sleep and longer listening can live here later without changing the overall structure.")
+                Button {
+                    player.toggle(id: "Nothing To Hold", fileName: "Nothing To Hold")
+                } label: {
+                    HStack(spacing: 7) {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(red: 0.42, green: 0.08, blue: 0.10).opacity(0.22))
+                            .frame(width: 30, height: 30)
+                            .overlay(
+                                Image(systemName: player.isPlaying(id: "Nothing To Hold") ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(Color(red: 0.42, green: 0.08, blue: 0.10))
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Nothing To Hold")
+                                .foregroundStyle(.primary)
+
+                            Text("Preview from the upcoming Longchen Dzo album.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        VStack(alignment: .trailing, spacing: 3) {
+                            Text("7m 56s")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+
+                            if player.currentID == "Nothing To Hold" {
+                                Image(systemName: player.isPlaying(id: "Nothing To Hold") ? "waveform" : "speaker.slash")
+                                    .font(.footnote.weight(.medium))
+                                    .foregroundStyle(Color(red: 0.42, green: 0.08, blue: 0.10))
+                            }
+                        }
+                    }
+                    .padding(.vertical, 0)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .listRowInsets(EdgeInsets(top: 2, leading: 10, bottom: 2, trailing: 10))
+
+                Text("Sleep, relaxation, and curated songs coming soon.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .padding(.vertical, 4)
@@ -169,18 +203,12 @@ struct FocusSoundsHubView: View {
         }
         .scrollContentBackground(.hidden)
         .background(backgroundGradient.ignoresSafeArea())
-        .navigationTitle("Focus")
+        .navigationTitle("Meditative Sounds")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text("Focus")
-                        .font(.headline)
-
-                    Text("Meditative sounds")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Meditative Sounds")
+                    .font(.headline)
             }
         }
     }
@@ -203,4 +231,3 @@ private struct FocusSoundItem: Identifiable, Hashable {
         self.tint = tint
     }
 }
-

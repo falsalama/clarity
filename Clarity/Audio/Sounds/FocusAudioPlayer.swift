@@ -41,8 +41,9 @@ final class FocusAudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate 
     }
 
     private func play(id: String, fileName: String) {
-        guard let url = Bundle.main.url(forResource: fileName, withExtension: "m4a") else {
-            print("FocusAudioPlayer: missing file \(fileName).m4a")
+        let extensions = ["m4a", "mp3"]
+        guard let url = extensions.compactMap({ Bundle.main.url(forResource: fileName, withExtension: $0) }).first else {
+            print("FocusAudioPlayer: missing file \(fileName).m4a/.mp3")
             stop()
             return
         }
@@ -61,7 +62,7 @@ final class FocusAudioPlayer: NSObject, ObservableObject, AVAudioPlayerDelegate 
             currentID = id
             isCurrentlyPlaying = true
         } catch {
-            print("FocusAudioPlayer: failed to play \(fileName).m4a - \(error)")
+            print("FocusAudioPlayer: failed to play \(fileName) - \(error)")
             stop()
         }
     }
