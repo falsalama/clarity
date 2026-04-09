@@ -148,7 +148,7 @@ struct WisdomView: View {
         }
         .navigationDestination(item: $completedPromptForNavigation) { prompt in
             if let response = latestTodayResponse {
-                WisdomCompareView(response: response, prompt: prompt)
+                WisdomCompareView(response: response, prompt: prompt, backGoesHome: true)
             }
         }
         .task(id: currentWisdomDayIndex) {
@@ -399,7 +399,7 @@ private struct WisdomQuestionCard: View {
         .contentShape(Rectangle())
         .navigationDestination(isPresented: $showCompare) {
             if let response {
-                WisdomCompareView(response: response, prompt: prompt)
+                WisdomCompareView(response: response, prompt: prompt, backGoesHome: false)
             }
         }
     }

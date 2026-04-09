@@ -2,7 +2,6 @@ import SwiftUI
 
 struct CompassionView: View {
     @EnvironmentObject private var flow: AppFlowRouter
-    @Environment(\.dismiss) private var dismiss
 
     @State private var loadedEntry: CompassionEntry?
     @State private var loadError: String?
@@ -319,6 +318,8 @@ struct CompassionView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(compassionFill)
+            .disabled(alreadyDoneToday)
+            .opacity(alreadyDoneToday ? 0.55 : 1)
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
@@ -340,13 +341,13 @@ struct CompassionView: View {
     }
 
     private func markDoneAndReturnHome() {
-        if !alreadyDoneToday {
-            lastDoneDayKey = todayKey
-            lastCompletedCompassionDayIndex = max(lastCompletedCompassionDayIndex, currentCompassionDayIndex)
-        }
+        guard !alreadyDoneToday else { return }
 
+        lastDoneDayKey = todayKey
+        lastCompletedCompassionDayIndex = max(lastCompletedCompassionDayIndex, currentCompassionDayIndex)
+
+        SparkleAudio.play()
         flow.openProgressWithBeadAnimation()
-        dismiss() // pop back to Home hub so Progress is visible
     }
 }
 

@@ -20,6 +20,8 @@ final class AppFlowRouter: ObservableObject {
     @Published var pendingOpenProgress: Bool = false
     @Published var animateNextBead: Bool = false
     @Published var homeHubEntrySeed: Int = 0
+    @Published var homeNavigationResetSeed: Int = 0
+    @Published var suppressNextHomeWelcome: Bool = false
 
     func go(_ tab: Tab) {
         selectedTab = tab
@@ -29,12 +31,22 @@ final class AppFlowRouter: ObservableObject {
         selectedTab = .home
         homeTab = .practice
     }
+
+    func openPracticeHomeAtRoot() {
+        pendingOpenProgress = false
+        selectedTab = .home
+        homeTab = .practice
+        suppressNextHomeWelcome = true
+        homeNavigationResetSeed += 1
+    }
     
     func openProgressWithBeadAnimation() {
         selectedTab = .home
         homeTab = .progress
         pendingOpenProgress = true
         animateNextBead = true
+        suppressNextHomeWelcome = true
+        homeNavigationResetSeed += 1
     }
 
     func consumeProgressTrigger() {
@@ -43,5 +55,11 @@ final class AppFlowRouter: ObservableObject {
 
     func consumeBeadAnimationFlag() {
         animateNextBead = false
+    }
+
+    func consumeHomeWelcomeSuppression() -> Bool {
+        let shouldSuppress = suppressNextHomeWelcome
+        suppressNextHomeWelcome = false
+        return shouldSuppress
     }
 }

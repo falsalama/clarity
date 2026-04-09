@@ -27,9 +27,28 @@ struct TextsView: View {
                     } label: {
                         TextCard(
                             title: "Heart Sutra",
+                            titleSecondary: "ཤེས་རབ་སྙིང་པོ།",
                             subtitle: "A pecha-style reading edition for practice and recitation.",
                             category: "Sutra",
                             tint: Color(red: 0.55, green: 0.10, blue: 0.14),
+                            isAvailable: true
+                        )
+                    }
+                    .buttonStyle(TextCardPressStyle())
+
+                    NavigationLink {
+                        PechaReaderView(
+                            title: DiamondCutterPecha.title,
+                            subtitle: DiamondCutterPecha.subtitle,
+                            pages: DiamondCutterPecha.pages
+                        )
+                    } label: {
+                        TextCard(
+                            title: "Diamond Sutra",
+                            titleSecondary: "རྡོ་རྗེ་གཅོད་པ།",
+                            subtitle: "Opening movement of a Clarity working edition.",
+                            category: "Sutra",
+                            tint: Color(red: 0.38, green: 0.18, blue: 0.08),
                             isAvailable: true
                         )
                     }
@@ -173,17 +192,43 @@ private struct TextsBackgroundView: View {
 
 private struct TextCard: View {
     let title: String
+    let titleSecondary: String?
     let subtitle: String
     let category: String
     let tint: Color
     let isAvailable: Bool
 
+    init(
+        title: String,
+        titleSecondary: String? = nil,
+        subtitle: String,
+        category: String,
+        tint: Color,
+        isAvailable: Bool
+    ) {
+        self.title = title
+        self.titleSecondary = titleSecondary
+        self.subtitle = subtitle
+        self.category = category
+        self.tint = tint
+        self.isAvailable = isAvailable
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                    .foregroundStyle(.primary)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    if let titleSecondary, !titleSecondary.isEmpty {
+                        Text(titleSecondary)
+                            .font(.headline.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
 
                 Text(subtitle)
                     .font(.subheadline)

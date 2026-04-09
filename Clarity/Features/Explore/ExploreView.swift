@@ -35,6 +35,18 @@ struct ExploreView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
+                    TextsView()
+                } label: {
+                    ExplorePillCTA(
+                        title: "Texts",
+                        subtitle: "Sutras, prayers, and recitations",
+                        systemImage: "book.closed",
+                        fill: Color(red: 0.38, green: 0.13, blue: 0.14)
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
                     AppleHealthExploreView()
                 } label: {
                     ExplorePillCTA(
@@ -54,18 +66,6 @@ struct ExploreView: View {
                         subtitle: "Book a one-to-one session",
                         systemImage: "person.2.fill",
                         fill: guidanceGreen
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    TextsView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Texts",
-                        subtitle: "Sutras, prayers, and recitations",
-                        systemImage: "book.closed",
-                        fill: Color(red: 0.38, green: 0.13, blue: 0.14)
                     )
                 }
                 .buttonStyle(.plain)

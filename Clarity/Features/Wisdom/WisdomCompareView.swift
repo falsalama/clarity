@@ -2,7 +2,6 @@ import SwiftUI
 
 struct WisdomCompareView: View {
     @EnvironmentObject private var flow: AppFlowRouter
-    @Environment(\.dismiss) private var dismiss
 
     @AppStorage("wisdom_current_day_index")
     private var currentWisdomDayIndex: Int = 1
@@ -15,6 +14,7 @@ struct WisdomCompareView: View {
 
     let response: WisdomResponseEntity
     let prompt: WisdomPrompt
+    let backGoesHome: Bool
 
     private let wisdomFill = Color(red: 0.48, green: 0.18, blue: 0.22)
 
@@ -45,6 +45,19 @@ struct WisdomCompareView: View {
         }
         .navigationTitle("Compare Views")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(backGoesHome)
+        .toolbar {
+            if backGoesHome {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        flow.openPracticeHomeAtRoot()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .accessibilityLabel("Back")
+                }
+            }
+        }
     }
 
     private var questionCard: some View {
@@ -125,6 +138,8 @@ struct WisdomCompareView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(wisdomFill)
+            .disabled(alreadyDoneToday)
+            .opacity(alreadyDoneToday ? 0.55 : 1)
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
@@ -145,17 +160,12 @@ struct WisdomCompareView: View {
     }
 
     private func markDoneAndGoToProgress() {
-        if !alreadyDoneToday {
-            lastDoneDayKey = todayKey
-            lastCompletedWisdomDayIndex = max(lastCompletedWisdomDayIndex, currentWisdomDayIndex)
-        }
+        guard !alreadyDoneToday else { return }
 
-        // Switch Home hub to Progress
+        lastDoneDayKey = todayKey
+        lastCompletedWisdomDayIndex = max(lastCompletedWisdomDayIndex, currentWisdomDayIndex)
+
+        SparkleAudio.play()
         flow.openProgressWithBeadAnimation()
-
-        // Pop back to Home hub so Progress is visible
-        dismiss() // Compare -> Capture
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { dismiss() } // Capture -> Wisdom list
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.10) { dismiss() } // Wisdom list -> Home hub
     }
 }

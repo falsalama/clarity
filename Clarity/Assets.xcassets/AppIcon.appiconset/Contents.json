@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "ChatGPT Image Mar 20, 2026 at 10_23_50 AM.png",
+      "filename" : "clarity appicomn.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,6 @@
           "value" : "dark"
         }
       ],
-      "filename" : "clarity app icon dark.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +24,6 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "clarity app icon.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -36,7 +34,6 @@
       "size" : "16x16"
     },
     {
-      "filename" : "light 32.png",
       "idiom" : "mac",
       "scale" : "2x",
       "size" : "16x16"
@@ -52,7 +49,6 @@
       "size" : "32x32"
     },
     {
-      "filename" : "light small.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "128x128"
@@ -63,7 +59,6 @@
       "size" : "128x128"
     },
     {
-      "filename" : "light 256.png",
       "idiom" : "mac",
       "scale" : "1x",
       "size" : "256x256"

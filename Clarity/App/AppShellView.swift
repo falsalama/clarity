@@ -34,6 +34,7 @@ struct AppShellView: View {
         TabView(selection: $flow.selectedTab) {
 
             NavigationStack { HomeView() }
+                .id(flow.homeNavigationResetSeed)
                 .tabItem { Label("Home", systemImage: "house") }
                 .tag(AppFlowRouter.Tab.home)
 

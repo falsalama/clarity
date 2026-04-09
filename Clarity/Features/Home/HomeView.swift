@@ -26,6 +26,12 @@ struct HomeView: View {
     }
 
     private func presentWelcomeIfNeededForSession() {
+        if flow.consumeHomeWelcomeSuppression() {
+            didShowThisSession = true
+            showWelcome = false
+            return
+        }
+
         guard !didShowThisSession else { return }
         didShowThisSession = true
 

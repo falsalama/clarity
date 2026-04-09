@@ -21,7 +21,6 @@ struct PracticeView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var homeSurface: HomeSurfaceStore
-    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var flow: AppFlowRouter
     // MARK: - Data
 
@@ -354,8 +353,8 @@ No analysis. Just a clean label.
 
         do { try modelContext.save() } catch { /* best-effort */ }
 
+        SparkleAudio.play()
         flow.openProgressWithBeadAnimation()
-        dismiss() // pop back so Progress is visible
     }
     // MARK: - Progression (advance on next day after Done)
 

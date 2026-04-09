@@ -63,7 +63,7 @@ struct WisdomPromptCaptureView: View {
         }
         .navigationDestination(isPresented: $showCompare) {
             if let savedResponse {
-                WisdomCompareView(response: savedResponse, prompt: prompt)
+                WisdomCompareView(response: savedResponse, prompt: prompt, backGoesHome: false)
             }
         }
     }
