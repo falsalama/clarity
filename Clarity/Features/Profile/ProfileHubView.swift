@@ -9,7 +9,6 @@ struct ProfileHubView: View {
     @Query private var practiceCompletions: [PracticeCompletionEntity]
     @Query private var userProfiles: [UserProfileEntity]
 
-    @StateObject private var calendarStore = CalendarStore()
     @State private var showProgressScreen: Bool = false
 
     init() {
@@ -55,27 +54,6 @@ struct ProfileHubView: View {
                     CapsuleLearningView()
                 } label: {
                     Label("Learning", systemImage: "sparkles")
-                }
-
-                NavigationLink {
-                    CalendarView()
-                } label: {
-                    HStack(spacing: 10) {
-                        Label("Calendar", systemImage: "calendar")
-                        Spacer()
-                        if let today = calendarStore.today.first {
-                            Text(today.title)
-                                .font(.footnote)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-
-                NavigationLink {
-                    PilgrimageView()
-                } label: {
-                    Label("Pilgrimage", systemImage: "map")
                 }
 
                 NavigationLink {
@@ -126,9 +104,6 @@ struct ProfileHubView: View {
         }
         .navigationTitle("Profile")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await calendarStore.refresh()
-        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {

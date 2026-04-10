@@ -48,6 +48,21 @@ struct AppShellView: View {
             .tabItem { Label("Reflect", systemImage: "mic") }
             .tag(AppFlowRouter.Tab.reflect)
 
+            NavigationStack { MeditationZoneView() }
+                .tabItem {
+                    VStack(spacing: 0) {
+                        Image("meditate")
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24, height: 24)
+
+                        Text("Meditation")
+                            .offset(y: 4)
+                    }
+                }
+                .tag(AppFlowRouter.Tab.meditation)
+
             NavigationStack { ExploreView() }
                 .tabItem { Label("Explore", systemImage: "square.grid.2x2") }
                 .tag(AppFlowRouter.Tab.explore)

@@ -6,6 +6,7 @@ final class AppFlowRouter: ObservableObject {
     enum Tab: Hashable {
         case home
         case reflect
+        case meditation
         case explore
         case profile
     }

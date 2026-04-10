@@ -4,6 +4,9 @@ struct CaptureButton: View {
     let phase: TurnCaptureCoordinator.Phase
     let isEnabled: Bool
     let level: Double
+    var size: CGFloat = 132
+    var micIconScale: CGFloat = 0.265
+    var stopIconScale: CGFloat = 0.30
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -52,17 +55,17 @@ struct CaptureButton: View {
                 // Icon swap (mic → stop)
                 if phase == .recording {
                     Image(systemName: "stop.circle")
-                        .font(.system(size: 40, weight: .regular))
+                        .font(.system(size: size * stopIconScale, weight: .regular))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(Color.red.opacity(0.95))
                 } else {
                     Image(systemName: "mic")
-                        .font(.system(size: 35, weight: .regular))
+                        .font(.system(size: size * micIconScale, weight: .regular))
                         .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.primary)
                 }
             }
-            .frame(width: 132, height: 132)
+            .frame(width: size, height: size)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -84,4 +87,3 @@ struct CaptureButton: View {
         .accessibilityAddTraits(.isButton)
     }
 }
-

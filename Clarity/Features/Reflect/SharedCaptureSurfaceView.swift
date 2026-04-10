@@ -30,8 +30,9 @@ struct SharedCaptureSurfaceView: View {
 
             micButton
 
-            statusPill
+            statusPillSlot
                 .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.phase)
+                .animation(.easeInOut(duration: Layout.statusAnimDuration), value: coordinator.uiError)
 
             if showTypeButton {
                 typeTextButton
@@ -98,6 +99,12 @@ struct SharedCaptureSurfaceView: View {
 
     // MARK: - Status
 
+    private var statusPillSlot: some View {
+        statusPill
+            .opacity(shouldShowStatusPill ? 1 : 0)
+            .accessibilityHidden(!shouldShowStatusPill)
+    }
+
     private var statusPill: some View {
         HStack(spacing: Layout.statusPillSpacing) {
             Text(LocalizedStringKey(statusTextKey))
@@ -117,9 +124,17 @@ struct SharedCaptureSurfaceView: View {
         .clipShape(Capsule())
     }
 
+    private var shouldShowStatusPill: Bool {
+        coordinator.phase != .idle || coordinator.uiError == .notReady
+    }
+
     private var statusTextKey: String {
         switch coordinator.phase {
-        case .idle: return "capture.ready"
+        case .idle:
+            if coordinator.uiError == .notReady {
+                return "error.capture.not_ready"
+            }
+            return "capture.ready"
         case .preparing: return "capture.preparing"
         case .recording: return "capture.listening"
         case .finalising, .transcribing, .redacting: return "capture.processing"

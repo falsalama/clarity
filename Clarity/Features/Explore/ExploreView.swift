@@ -2,73 +2,106 @@ import SwiftUI
 import HealthKit
 
 struct ExploreView: View {
-    private let meditationGold = Color(red: 0.84, green: 0.70, blue: 0.24)
-    private let guidanceGreen = Color(red: 0.18, green: 0.46, blue: 0.28)
-    private let focusBlue = Color(red: 0.16, green: 0.36, blue: 0.78)
-    private let healthRose = Color(red: 0.82, green: 0.23, blue: 0.36)
+    private let guidanceGreen = Color(red: 0.22, green: 0.54, blue: 0.34)
+    private let focusBlue = Color(red: 0.24, green: 0.46, blue: 0.90)
+    private let healthRose = Color(red: 0.90, green: 0.31, blue: 0.47)
+    private let textsBurgundy = Color(red: 0.55, green: 0.24, blue: 0.29)
+    private let calendarAmber = Color(red: 0.82, green: 0.58, blue: 0.22)
+    private let pilgrimageSlate = Color(red: 0.32, green: 0.42, blue: 0.52)
+    private let offeringInk = Color(red: 0.13, green: 0.13, blue: 0.14)
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 14),
+        GridItem(.flexible(), spacing: 14)
+    ]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                NavigationLink {
-                    MeditationZoneView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Meditation Zone",
-                        subtitle: "Timer, posture, shamatha, and recitation",
-                        systemImage: "figure.mind.and.body",
-                        fill: meditationGold
-                    )
-                }
-                .buttonStyle(.plain)
+                LazyVGrid(columns: gridColumns, spacing: 14) {
+                    NavigationLink {
+                        FocusSoundsHubView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Meditative Sounds",
+                            subtitle: "Songs, tones, and soundscapes",
+                            systemImage: "waveform",
+                            fill: focusBlue
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                NavigationLink {
-                    FocusSoundsHubView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Meditative Sounds",
-                        subtitle: "Meditative sounds",
-                        systemImage: "waveform",
-                        fill: focusBlue
-                    )
-                }
-                .buttonStyle(.plain)
+                    NavigationLink {
+                        TextsView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Texts",
+                            subtitle: "Sutras, prayers, and recitations",
+                            systemImage: "book.closed",
+                            fill: textsBurgundy
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                NavigationLink {
-                    TextsView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Texts",
-                        subtitle: "Sutras, prayers, and recitations",
-                        systemImage: "book.closed",
-                        fill: Color(red: 0.38, green: 0.13, blue: 0.14)
-                    )
-                }
-                .buttonStyle(.plain)
+                    NavigationLink {
+                        AppleHealthExploreView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Apple Health",
+                            subtitle: "Sleep, heart, steps, and mindful minutes",
+                            systemImage: "heart.text.square.fill",
+                            fill: healthRose
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                NavigationLink {
-                    AppleHealthExploreView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Apple Health",
-                        subtitle: "Sleep, heart, steps, and mindful minutes",
-                        systemImage: "heart.text.square.fill",
-                        fill: healthRose
-                    )
-                }
-                .buttonStyle(.plain)
+                    NavigationLink {
+                        GuidanceHubView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Guidance",
+                            subtitle: "Book a one-to-one session",
+                            systemImage: "person.2.fill",
+                            fill: guidanceGreen
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                NavigationLink {
-                    GuidanceHubView()
-                } label: {
-                    ExplorePillCTA(
-                        title: "Guidance",
-                        subtitle: "Book a one-to-one session",
-                        systemImage: "person.2.fill",
-                        fill: guidanceGreen
-                    )
+                    NavigationLink {
+                        CalendarView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Calendar",
+                            subtitle: "Lunar dates, observances, and sacred days",
+                            systemImage: "calendar",
+                            fill: calendarAmber
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        PilgrimageView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Pilgrimage",
+                            subtitle: "Places, routes, and future journeys",
+                            systemImage: "map",
+                            fill: pilgrimageSlate
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    NavigationLink {
+                        LightOfferingView()
+                    } label: {
+                        ExploreFeatureTile(
+                            title: "Light Offering",
+                            subtitle: "A simple butterlamp practice space",
+                            systemImage: "flame.fill",
+                            fill: offeringInk
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Coming Soon")
@@ -368,55 +401,98 @@ private struct AppleHealthBulletRow: View {
     }
 }
 
-private struct ExplorePillCTA: View {
+private struct ExploreFeatureTile: View {
     let title: String
     let subtitle: String
     let systemImage: String
     let fill: Color
-    var textColor: Color = .white
-
-    // Matches the outer ExploreView .padding(16)
-    private let horizontalBleed: CGFloat = 16
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: 10) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(Color.white.opacity(0.18))
+                    .frame(width: 44, height: 44)
 
-            VStack(alignment: .leading, spacing: 2) {
+                Image(systemName: systemImage)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.96))
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.headline)
+                    .font(.headline.weight(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(subtitle)
                     .font(.footnote)
-                    .opacity(0.9)
+                    .foregroundStyle(Color.white.opacity(0.86))
                     .lineLimit(2)
             }
 
             Spacer()
 
-            Image(systemName: "chevron.right")
-                .font(.subheadline.weight(.semibold))
-                .opacity(0.85)
+            HStack {
+                Spacer()
+
+                Image(systemName: "arrow.up.right")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Color.white.opacity(0.88))
+            }
         }
-        .padding(.vertical, 14)
-        .padding(.horizontal, 16)   // keeps text/icons where they are now
-        .foregroundStyle(textColor)
+        .padding(14)
+        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+        .foregroundStyle(Color.white)
         .background {
-            Rectangle()
-                .fill(fill)
-                .padding(.horizontal, -horizontalBleed) // extends stripe to screen edge
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            fill.opacity(0.98),
+                            fill.opacity(0.82)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.30),
+                                    Color.clear,
+                                    Color.black.opacity(0.06)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(alignment: .top) {
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.26),
+                                            Color.white.opacity(0.06),
+                                            Color.clear
+                                        ],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .frame(height: 54)
+                                .padding(.horizontal, 10)
+                                .padding(.top, 8)
+                                .blur(radius: 0.5)
+                        }
+                )
         }
         .overlay {
-            Rectangle()
-                .stroke(
-                    textColor == .white
-                        ? Color.white.opacity(0.08)
-                        : Color.black.opacity(0.08),
-                    lineWidth: 1
-                )
-                .padding(.horizontal, -horizontalBleed)
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
         }
+        .shadow(color: fill.opacity(0.18), radius: 20, x: 0, y: 12)
         .accessibilityElement(children: .combine)
     }
 }

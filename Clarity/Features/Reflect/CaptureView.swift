@@ -28,6 +28,7 @@ struct CaptureView: View {
     // Sheet toggle for typing text
     @State private var showPasteSheet: Bool = false
     @State private var goToDailyFocus = false
+    @State private var showDailyAnswerSheet = false
 
     // Steps (Reflect onboarding)
     @State private var steps: [CloudTapStep] = []
@@ -41,6 +42,8 @@ struct CaptureView: View {
     @Query private var completedTurns: [TurnEntity]
     @State private var bgPhase: Bool = false
     @State private var isReady: Bool = false
+    @State private var cloudRevealPoint: CGPoint? = nil
+    @State private var cloudRevealAmount: CGFloat = 0
 
     // Progress count (Reflect done-days)
     @Query private var reflectCompletions: [ReflectCompletionEntity]
@@ -87,6 +90,7 @@ struct CaptureView: View {
         static let badgeTrailingPadding: CGFloat = 4
 
         static let sectionCorner: CGFloat = 16
+        static let cloudRevealSize: CGFloat = 340
     }
 
     // MARK: - Derived state
@@ -127,17 +131,21 @@ struct CaptureView: View {
 
     private var captureRoot: some View {
         ZStack {
-            cloudsBackground
+            captureBackground
 
-            List {
-                captureSurfaceSection
-                capturesSection
+            if hideDailyQuestion {
+                List {
+                    captureSurfaceSection
+                    capturesSection
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .opacity(isReady ? 1 : 0)
+                .animation(.easeOut(duration: 0.55), value: isReady)
+                .padding(.top, -52)
+            } else {
+                dailyCaptureLayout
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .opacity(isReady ? 1 : 0)
-            .animation(.easeOut(duration: 0.55), value: isReady)
-            .padding(.top, hideDailyQuestion ? -52 : 0)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -145,10 +153,12 @@ struct CaptureView: View {
                     Text("Reflect")
                         .font(.headline)
 
-                    Text("express yourself honestly.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                    if hideDailyQuestion {
+                        Text("express yourself honestly.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             }
         }
@@ -216,30 +226,126 @@ struct CaptureView: View {
             // New calendar day: advance if yesterday was marked done.
             advanceIfPending()
         }
+        .sheet(isPresented: $showDailyAnswerSheet) {
+            DailyReflectAnswerSheet(step: currentStep, dayKey: todayKey) {
+                // Stay on the daily reflect screen after saving.
+            }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
-    private var cloudsBackground: some View {
-        Image("CloudsBG")
+    private var captureBackground: some View {
+        GeometryReader { proxy in
+            ZStack {
+                if let cloudRevealPoint {
+                    skyRevealFill(in: proxy)
+                        .opacity(cloudRevealAmount * 0.98)
+                        .mask {
+                            ZStack {
+                                Color.clear
+
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            stops: [
+                                                .init(color: .white.opacity(1.0), location: 0.00),
+                                                .init(color: .white.opacity(0.96), location: 0.18),
+                                                .init(color: .white.opacity(0.78), location: 0.36),
+                                                .init(color: .white.opacity(0.40), location: 0.62),
+                                                .init(color: .white.opacity(0.12), location: 0.82),
+                                                .init(color: .clear, location: 1.00)
+                                            ],
+                                            center: .center,
+                                            startRadius: 0,
+                                            endRadius: Layout.cloudRevealSize * (0.56 + (cloudRevealAmount * 0.14))
+                                        )
+                                    )
+                                    .frame(
+                                        width: Layout.cloudRevealSize * (1.04 + cloudRevealAmount * 0.10),
+                                        height: Layout.cloudRevealSize * (1.04 + cloudRevealAmount * 0.10)
+                                    )
+                                    .position(cloudRevealPoint)
+                                    .blur(radius: 30)
+                            }
+                            .compositingGroup()
+                        }
+                        .overlay {
+                            Circle()
+                                .fill(
+                                    RadialGradient(
+                                        colors: [
+                                            Color.white.opacity(0.12),
+                                            Color(red: 0.73, green: 0.84, blue: 0.97).opacity(0.14),
+                                            Color.clear
+                                        ],
+                                        center: .center,
+                                        startRadius: 0,
+                                        endRadius: Layout.cloudRevealSize * 0.34
+                                    )
+                                )
+                                .frame(width: Layout.cloudRevealSize * 0.72, height: Layout.cloudRevealSize * 0.72)
+                                .position(cloudRevealPoint)
+                                .opacity(cloudRevealAmount * 0.55)
+                                .blur(radius: 20)
+                        }
+                }
+
+                cloudsBackgroundImage(named: "CloudsBG", in: proxy, imageOpacity: 0.24)
+            }
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+    }
+
+    private func skyRevealFill(in proxy: GeometryProxy) -> some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(red: 0.78, green: 0.89, blue: 0.99),
+                    Color(red: 0.88, green: 0.94, blue: 0.99),
+                    Color(red: 0.97, green: 0.98, blue: 1.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [
+                    Color.white.opacity(0.36),
+                    Color(red: 0.72, green: 0.86, blue: 0.98).opacity(0.26),
+                    Color.clear
+                ],
+                center: .center,
+                startRadius: 0,
+                endRadius: max(proxy.size.width, proxy.size.height) * 0.52
+            )
+            .blendMode(.screen)
+        }
+        .frame(width: proxy.size.width, height: proxy.size.height)
+    }
+
+    private func cloudsBackgroundImage(named name: String, in proxy: GeometryProxy, imageOpacity: Double) -> some View {
+        return Image(name)
             .resizable()
             .scaledToFit()
-            .frame(maxWidth: .infinity)
-            .opacity(0.09)
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottom)
+            .opacity(imageOpacity)
             .mask(
                 LinearGradient(
                     stops: [
                         .init(color: .clear, location: 0.00),
-                        .init(color: .black, location: 0.28),
+                        .init(color: .black, location: 0.14),
                         .init(color: .black, location: 1.00)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            .frame(maxHeight: .infinity, alignment: .bottom)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .scaleEffect(bgPhase ? 1.30 : 1.18, anchor: .bottom)
-            .scaleEffect(x: -1, y: 1) // mirror horizontally
-            .offset(y: bgPhase ? 98 : 120)
-            .allowsHitTesting(false)
+            .scaleEffect(x: -1, y: 1)
+            .offset(y: bgPhase ? 58 : 78)
     }
 
     // MARK: - Steps: load + state
@@ -297,12 +403,14 @@ struct CaptureView: View {
         do { try modelContext.save() } catch { /* best-effort */ }
     }
 
-    private var latestTurnIDToday: UUID? {
+    private var dailyAnswerTurnIDToday: UUID? {
         let cal = Calendar.current
         let now = Date()
 
         return completedTurns.first(where: { turn in
-            cal.isDate(turn.recordedAt, inSameDayAs: now)
+            cal.isDate(turn.recordedAt, inSameDayAs: now) &&
+            turn.promptKindRaw == "daily_reflect" &&
+            turn.promptDayKey == todayKey
         })?.id
     }
 
@@ -321,7 +429,7 @@ struct CaptureView: View {
     
     private func markDoneToday() {
         let step = currentStep
-        let linkedTurnID = latestTurnIDToday
+        let linkedTurnID = dailyAnswerTurnIDToday
 
         applyDailyPromptSnapshot(to: linkedTurnID)
 
@@ -364,72 +472,187 @@ struct CaptureView: View {
 
     private var captureSurfaceSection: some View {
         VStack(spacing: 12) {
-
-            if hideDailyQuestion {
-                reflectExplainerCard
-            } else {
-                todayQuestionCard
-            }
-
+            reflectExplainerCard
             SharedCaptureSurfaceView(
-                showPromptChips: true,
+                showPromptChips: false,
                 showTypeButton: true,
                 onTypeTap: { showPasteSheet = true }
             )
         }
         .padding(.vertical, 0)
-        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 10, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 16, leading: 16, bottom: 10, trailing: 16))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
     }
-    private var todayQuestionCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
 
+    private var dailyCaptureLayout: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                dailyQuestionCard
+            }
+            .frame(maxWidth: 560)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 16)
+            .frame(minHeight: geo.size.height, alignment: .top)
+            .opacity(isReady ? 1 : 0)
+            .animation(.easeOut(duration: 0.55), value: isReady)
+            .contentShape(Rectangle())
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onChanged { value in
+                        cloudRevealPoint = value.location
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            cloudRevealAmount = 1
+                        }
+                    }
+                    .onEnded { _ in
+                        withAnimation(.easeOut(duration: 0.85)) {
+                            cloudRevealAmount = 0
+                        }
+
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                            if cloudRevealAmount == 0 {
+                                cloudRevealPoint = nil
+                            }
+                        }
+                    }
+            )
+        }
+    }
+
+    private var hasAnswerToday: Bool {
+        dailyAnswerTurnIDToday != nil
+    }
+
+    private var dailyVoiceActionTitle: String {
+        switch coordinator.phase {
+        case .idle:
+            return "Answer"
+        case .recording:
+            return "Stop"
+        case .preparing:
+            return "Preparing…"
+        case .finalising:
+            return "Finalising…"
+        case .transcribing:
+            return "Transcribing…"
+        case .redacting:
+            return "Saving…"
+        }
+    }
+
+    private var dailyVoiceActionEnabled: Bool {
+        coordinator.phase == .idle || coordinator.phase == .recording
+    }
+
+    private var dailyPhaseStatusText: String {
+        switch coordinator.phase {
+        case .preparing:
+            return "Preparing…"
+        case .recording:
+            return "Listening…"
+        case .finalising:
+            return "Finalising…"
+        case .transcribing:
+            return "Transcribing…"
+        case .redacting:
+            return "Saving…"
+        case .idle:
+            return ""
+        }
+    }
+
+    private var dailyQuestionCard: some View {
+        VStack(spacing: 18) {
             Text("Today’s question")
                 .font(.title3.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
 
             Group {
                 if stepsLoading {
                     Text("Loading…")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
 
                 } else if let err = stepsError {
                     Text(err)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
 
                 } else if let step = currentStep {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(step.body)
-                            .font(.body)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text("Press mic or type to answer. Speaking is recommended.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .opacity(questionReady ? 1 : 0)
-                    .animation(.easeOut(duration: 0.55), value: questionReady)
+                    Text(step.body)
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .opacity(questionReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.55), value: questionReady)
 
                 } else {
                     Text("No question yet.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
                 }
             }
             .transaction { $0.animation = nil }
+            Button {
+                switch coordinator.phase {
+                case .idle:
+                    showDailyAnswerSheet = true
+                case .recording:
+                    coordinator.stopCapture()
+                default:
+                    break
+                }
+            } label: {
+                Text(dailyVoiceActionTitle)
+                    .font(.system(size: 21, weight: .medium, design: .serif))
+                    .italic()
+                    .foregroundStyle(Color.black.opacity(0.78))
+                    .frame(width: 128, height: 128)
+                    .background(
+                        ZStack {
+                            Circle()
+                                .fill(Color.white)
 
-            Divider()
-                .padding(.top, 6)
+                            Circle()
+                                .stroke(Color.secondary.opacity(0.12), lineWidth: 11)
 
-            HStack {
-                Text(isDoneToday ? "Done for today, come back tomorrow." : "Mark as done for today.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                            Circle()
+                                .stroke(
+                                    AngularGradient(
+                                        gradient: Gradient(stops: [
+                                            .init(color: Color(red: 0.78, green: 0.64, blue: 0.20), location: 0.00),
+                                            .init(color: Color(red: 0.95, green: 0.83, blue: 0.34), location: 0.10),
+                                            .init(color: Color(red: 0.88, green: 0.90, blue: 0.96), location: 0.50),
+                                            .init(color: Color(red: 0.95, green: 0.83, blue: 0.34), location: 0.90),
+                                            .init(color: Color(red: 0.78, green: 0.64, blue: 0.20), location: 1.00)
+                                        ]),
+                                        center: .center
+                                    ),
+                                    style: StrokeStyle(lineWidth: 11, lineCap: .round)
+                                )
+                                .rotationEffect(.degrees(-90))
+                                .shadow(
+                                    color: Color(red: 0.90, green: 0.76, blue: 0.28).opacity(0.16),
+                                    radius: 8,
+                                    x: 0,
+                                    y: 3
+                                )
+                        }
+                    )
+            }
+            .buttonStyle(.plain)
+            .disabled(!dailyVoiceActionEnabled)
+            .frame(maxWidth: .infinity)
 
-                Spacer()
-
+            if hasAnswerToday {
                 Button {
                     markDoneToday()
 
@@ -441,33 +664,31 @@ struct CaptureView: View {
                 } label: {
                     Text("Done")
                         .font(.callout.weight(.semibold))
+                        .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
                 .disabled(
                     isDoneToday ||
+                    !hasAnswerToday ||
                     coordinator.phase != .idle ||
                     currentStep == nil
                 )
             }
 
-            #if DEBUG
-            if canRepairTodaySnapshot {
-                Button("Repair snapshot (debug)") {
-                    markDoneToday()
-                }
-                .font(.footnote.weight(.semibold))
+            if coordinator.phase != .idle {
+                Text(dailyPhaseStatusText)
+                .font(.footnote)
                 .foregroundStyle(.secondary)
-                .padding(.top, 6)
+                .frame(maxWidth: .infinity)
             }
-            #endif
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(.thinMaterial)
+        .frame(maxWidth: .infinity)
+        .padding(24)
+        .background(Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
-                .stroke(.black.opacity(0.06), lineWidth: 1)
+                .stroke(.white.opacity(0.24), lineWidth: 1)
         )
     }
 
@@ -477,12 +698,6 @@ struct CaptureView: View {
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.78))
                 .fixedSize(horizontal: false, vertical: true)
-
-            Divider().padding(.top, 6)
-
-            Text("Tip: Keep it short. One clear thought is enough.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
@@ -593,6 +808,239 @@ struct CaptureView: View {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
         #endif
+    }
+}
+
+private struct DailyReflectAnswerSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @EnvironmentObject private var dictionary: RedactionDictionary
+    @EnvironmentObject private var capsuleStore: CapsuleStore
+
+    @StateObject private var recorder = AudioRecorder()
+    @StateObject private var transcriber = SpeechTranscriber()
+    @State private var text: String = ""
+    @State private var errorMessage: String?
+    @State private var isSaving: Bool = false
+    @FocusState private var isEditorFocused: Bool
+
+    let step: CloudTapStep?
+    let dayKey: String
+    let onCreated: () -> Void
+
+    private var isMicActive: Bool {
+        recorder.isRecording || transcriber.isTranscribing
+    }
+
+    private var micPhase: TurnCaptureCoordinator.Phase {
+        if recorder.isRecording {
+            return .recording
+        }
+
+        if transcriber.isTranscribing {
+            return .transcribing
+        }
+
+        return .idle
+    }
+
+    private var micStatusText: String {
+        if recorder.isRecording {
+            return "Listening…"
+        }
+
+        if transcriber.isTranscribing {
+            return "Transcribing…"
+        }
+
+        return ""
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Answer")
+                .font(.headline)
+
+            ZStack(alignment: .topTrailing) {
+                TextEditor(text: $text)
+                    .focused($isEditorFocused)
+                    .scrollContentBackground(.hidden)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .padding(.trailing, 92)
+                    .textSelection(.enabled)
+                    .frame(minHeight: 220)
+                    .disabled(isMicActive)
+
+                VStack(spacing: 8) {
+                    CaptureButton(
+                        phase: micPhase,
+                        isEnabled: !(transcriber.isTranscribing && !recorder.isRecording),
+                        level: recorder.level,
+                        size: 72,
+                        micIconScale: 0.30,
+                        stopIconScale: 0.33
+                    ) {
+                        if recorder.isRecording {
+                            recorder.stop()
+                            transcriber.stop()
+                        } else if !transcriber.isTranscribing {
+                            startMicCapture()
+                        }
+                    }
+                    .background(
+                        Circle()
+                            .fill(Color.primary.opacity(0.04))
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(0.30), lineWidth: 1)
+                            )
+                    )
+
+                    if !micStatusText.isEmpty {
+                        Text(micStatusText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.top, 14)
+                .padding(.trailing, 8)
+            }
+            .padding(10)
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button(isSaving ? "Saving…" : "Save") {
+                save()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(isSaving || isMicActive || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(20)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isEditorFocused = true
+            }
+        }
+        .onDisappear {
+            if recorder.isRecording {
+                recorder.stop()
+            }
+            if transcriber.isTranscribing {
+                transcriber.cancel()
+            }
+        }
+        .onChange(of: transcriber.lastTranscript) { _, newValue in
+            guard let newValue, !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            text = newValue
+            isEditorFocused = true
+        }
+        .onChange(of: recorder.lastError) { _, newValue in
+            guard let newValue, !newValue.isEmpty else { return }
+            if transcriber.isTranscribing {
+                transcriber.cancel()
+            }
+            errorMessage = newValue
+        }
+        .onChange(of: transcriber.lastError) { _, newValue in
+            guard let newValue, !newValue.isEmpty else { return }
+            errorMessage = newValue
+        }
+    }
+
+    private func startMicCapture() {
+        errorMessage = nil
+        text = ""
+        isEditorFocused = false
+
+        Task { @MainActor in
+            let ok = await transcriber.startSession()
+            guard ok else {
+                errorMessage = transcriber.lastError ?? "Couldn’t start transcription."
+                return
+            }
+
+            transcriber.attach(to: recorder)
+            recorder.start()
+        }
+    }
+
+    private func save() {
+        errorMessage = nil
+        isSaving = true
+        defer { isSaving = false }
+
+        let input = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !input.isEmpty else {
+            errorMessage = "Text is empty."
+            return
+        }
+
+        let redacted = Redactor(tokens: dictionary.tokens).redact(input).redactedText
+
+        do {
+            let repo = TurnRepository(context: modelContext)
+            let id = try repo.createTextTurn(
+                redactedText: redacted,
+                recordedAt: Date(),
+                captureContext: .unknown
+            )
+
+            if let t = try? repo.fetch(id: id) {
+                t.promptKindRaw = "daily_reflect"
+                t.promptProgrammeSlug = "starter_5day"
+                t.promptStepIndex = step?.stepIndex
+                t.promptTitle = step?.title
+                t.promptBody = step?.body
+                t.promptDayKey = dayKey
+
+                if t.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   let auto = autoTitle(from: redacted), !auto.isEmpty {
+                    t.title = auto
+                }
+
+                try? modelContext.save()
+            }
+
+            _ = try TraceEngine.processSavedTurn(
+                turnID: id,
+                redactedText: redacted,
+                repo: repo,
+                modelContext: modelContext,
+                capsuleStore: capsuleStore,
+                learningAllowed: true,
+                now: Date()
+            )
+
+            onCreated()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func autoTitle(from text: String) -> String? {
+        let cleaned = text
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: " ")
+
+        guard !cleaned.isEmpty else { return nil }
+
+        let words = cleaned
+            .split(whereSeparator: \.isWhitespace)
+            .prefix(7)
+            .map(String.init)
+
+        let title = words.joined(separator: " ")
+        let capped = String(title.prefix(56))
+        return capped.isEmpty ? nil : capped
     }
 }
 
