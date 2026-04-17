@@ -9,6 +9,7 @@ struct ClarityApp: App {
     @StateObject private var redactionDictionary = RedactionDictionary()
     @StateObject private var homeSurfaceStore = HomeSurfaceStore()
     @StateObject private var supabaseAuth = SupabaseAuthStore()
+    @StateObject private var nowPlaying = NowPlayingStore.shared
 
     private let container: ModelContainer
 
@@ -70,6 +71,7 @@ struct ClarityApp: App {
                 .environmentObject(redactionDictionary)
                 .environmentObject(homeSurfaceStore)
                 .environmentObject(supabaseAuth)
+                .environmentObject(nowPlaying)
                
         }
         .modelContainer(container)

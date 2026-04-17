@@ -7,6 +7,7 @@ struct TurnDetailView: View {
     @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var dictionary: RedactionDictionary
     @EnvironmentObject private var capsuleStore: CapsuleStore
+    @AppStorage("supporter.access.enabled") private var hasSupporterAccess: Bool = false
 
     let turnID: UUID
 
@@ -603,7 +604,7 @@ struct TurnDetailView: View {
 
     private var actionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(" - Use these options for Buddhist reflection.")
+            Text("Use these options to receive a Buddhist response to your capture.")
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.78))
 
@@ -611,11 +612,7 @@ struct TurnDetailView: View {
             toolButton(title: toolTitle(.perspective), tool: .perspective, enabled: isToolsEnabled)
             toolButton(title: toolTitle(.options), tool: .options, enabled: isToolsEnabled)
             toolButton(title: toolTitle(.questions), tool: .questions, enabled: isToolsEnabled)
-            toolButton(title: "Talk it through", tool: .talkItThrough, enabled: isToolsEnabled)
-
-            Text("Cloud actions are explicit and always require confirmation.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            talkItThroughButton
         }
     }
 
@@ -673,7 +670,38 @@ struct TurnDetailView: View {
         .disabled(!enabled)
     }
 
+    private var talkItThroughButton: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button {
+                requestTool(.talkItThrough)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: hasSupporterAccess ? "bubble.left.and.bubble.right.fill" : "lock.fill")
+                        .font(.callout.weight(.semibold))
+
+                    Text("Talk it through")
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(toolTint(.talkItThrough))
+            .disabled(!isToolsEnabled || !hasSupporterAccess)
+
+            if !hasSupporterAccess {
+                Text("Available with Supporter access")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private func requestTool(_ tool: CloudTool) {
+        if tool == .talkItThrough, !hasSupporterAccess {
+            return
+        }
+
         pendingTool = tool
 
         guard turn != nil else {

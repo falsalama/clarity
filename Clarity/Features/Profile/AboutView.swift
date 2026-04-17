@@ -2,13 +2,14 @@ import SwiftUI
 
 struct AboutView: View {
     var body: some View {
-        ScrollView {
+        GeometryReader { _ in
             VStack(spacing: 14) {
                 contentCard
             }
             .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 22)
+            .padding(.top, 16)
+            .padding(.bottom, 18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("About")
@@ -20,48 +21,54 @@ struct AboutView: View {
             Text("Clarity")
                 .font(.headline)
 
-            Text("A Buddhist daily practice app.")
+            Text("A Buddhist daily practice app for reflection, study, and continuity.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             Divider()
 
-            Text("How it works")
+            Text("Daily practice")
                 .font(.subheadline.weight(.semibold))
 
-            Text("Begin each day by pressing Start daily practice.")
+            Text("Each day begins with a simple practice flow designed to build continuity rather than intensity.")
                 .font(.footnote)
-
-            Text("One practice has three parts:")
-                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Reflect - Answer one question honestly by audio or text.")
-                Text("View - A short teaching to contemplate.")
-                Text("Practice - A method to cultivate inner space.")
+                Text("Reflect: answer one daily question by voice or text.")
+                Text("View: receive a short contemplation or teaching.")
+                Text("Practice: complete the day with a structured method.")
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
 
-            Divider()
-
-            Text("Complete all three to form one unit of practice. These slowly advance over time. Return each day to build continuity.")
-                .font(.footnote.weight(.semibold))
-
-            Divider()
-
-            Text("Reflect")
-                .font(.subheadline.weight(.semibold))
-
-            Text("Reflect is a private thinking instrument. It combines structured reflection with a Buddhist-informed AI assistant designed to help clarify experience rather than analyse or judge it.")
+            Text("Completing the cycle builds one unit of practice and gradually advances your progress over time.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            Text("You can speak or write freely. The system helps organise thoughts, reveal patterns, and support clear seeing.")
+            Divider()
+
+            Text("Daily reflections")
+                .font(.subheadline.weight(.semibold))
+
+            Text("Reflect is a private space for clarifying experience. Wisdom and Compassion add separate daily contemplations, each with their own question or response space.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Text("You can speak or write freely. The app is designed to support clear seeing rather than judgement or performance.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
             Text("On-device mode is fully private. Optional Cloud Tap processing uses redacted, anonymous text for deeper model responses.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Text("Texts, sounds, and calendar")
+                .font(.subheadline.weight(.semibold))
+
+            Text("Clarity also includes a growing library of texts, audio practice spaces, and a calendar feed that can surface observances or special days inside the app.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -73,31 +80,26 @@ struct AboutView: View {
             Text("Capsule is your adaptive learning layer. If enabled, it gradually tailors questions and teachings to your patterns over time. Capsule stores structure, not secrets.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
-
-            Divider()
-
-            Text("Note")
-                .font(.subheadline.weight(.semibold))
-
-            Text("This app is not therapy and does not replace a teacher. It is a structured instrument for contemplative training.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.systemBackground).opacity(0.22))
                 .overlay(alignment: .topTrailing) {
                     Image("clarityMark")
                         .resizable()
                         .scaledToFill()
                         .frame(width: 950, height: 950)
-                        .opacity(0.12)
+                        .opacity(0.10)
                         .offset(x: 140, y: -260)
                         .allowsHitTesting(false)
                 }
                 .clipped()
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.14), lineWidth: 1)
         )
     }
 }

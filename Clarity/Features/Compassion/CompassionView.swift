@@ -2,10 +2,13 @@ import SwiftUI
 
 struct CompassionView: View {
     @EnvironmentObject private var flow: AppFlowRouter
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var loadedEntry: CompassionEntry?
     @State private var loadError: String?
     @State private var isLoading = true
+    @State private var contentReady = false
+    @State private var lastLoadedDayKey = ""
 
     @AppStorage("compassion_current_day_index")
     private var currentCompassionDayIndex: Int = 1
@@ -61,26 +64,6 @@ struct CompassionView: View {
         let item: CompassionEntry?
     }
 
-    private let fallbackEntry = CompassionEntry(
-        id: "fallback_compassion_001",
-        theme: "Let the frame widen.",
-        meaning: "Self-concern narrows experience. Including others can soften pressure, widen perspective, and loosen afflictive heat.",
-        practices: [
-            "Pause once and consider what another person may be carrying.",
-            "Let someone else matter in your attention, not as theory but as reality.",
-            "When irritation appears, widen the frame before reacting."
-        ],
-        teaching: "Afflictive emotion narrows the field around \"me\" and \"my problem\". Compassion interrupts that contraction. It does not deny your own suffering - it stops it becoming the whole frame."
-    )
-
-    private var displayedEntry: CompassionEntry {
-        loadedEntry ?? fallbackEntry
-    }
-
-    private var isUsingFallback: Bool {
-        loadedEntry == nil
-    }
-
     private var todayKey: String {
         Date().dayKey()
     }
@@ -92,9 +75,27 @@ struct CompassionView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                introCard
-                dailyCard
+                if let loadError, !isLoading {
+                    Text(loadError)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                if loadedEntry != nil {
+                    dailyCard
+                        .opacity(contentReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.32), value: contentReady)
+                } else if !isLoading && loadError == nil {
+                    Text("No compassion contemplation available.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                }
+
                 doneCard
+                    .opacity(contentReady ? 1 : 0)
+                    .animation(.easeOut(duration: 0.32), value: contentReady)
                 footerGlyph
             }
             .padding(16)
@@ -102,6 +103,15 @@ struct CompassionView: View {
         .background {
             Color(uiColor: .systemGroupedBackground)
                 .ignoresSafeArea()
+        }
+        .overlay {
+            if isLoading {
+                ProgressView()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.thinMaterial)
+                    .clipShape(Capsule())
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -121,6 +131,14 @@ struct CompassionView: View {
             syncDayIndexIfNeeded()
             await loadCompassionEntry()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            guard lastLoadedDayKey != todayKey else { return }
+            Task {
+                syncDayIndexIfNeeded()
+                await loadCompassionEntry()
+            }
+        }
     }
 
     private func syncDayIndexIfNeeded() {
@@ -135,6 +153,9 @@ struct CompassionView: View {
     @MainActor
     private func loadCompassionEntry() async {
         isLoading = true
+        contentReady = false
+        loadedEntry = nil
+        loadError = nil
 
         do {
             let response = try await fetchCompassionEntry()
@@ -150,16 +171,20 @@ struct CompassionView: View {
                 print("COMPASSION dayIndex =", normalizedDayIndex, "item =", entry.id)
             } else {
                 loadedEntry = nil
-                loadError = "No compassion entry found. Using fallback content."
+                loadError = "No compassion entry found."
                 print("COMPASSION dayIndex =", normalizedDayIndex, "item = nil")
             }
         } catch {
             loadedEntry = nil
-            loadError = "Could not load compassion from database. Using fallback content."
+            loadError = "Could not load compassion from database."
             print("COMPASSION LOAD FAILED: \(error)")
         }
 
         isLoading = false
+        lastLoadedDayKey = todayKey
+        withAnimation(.easeOut(duration: 0.32)) {
+            contentReady = true
+        }
     }
 
     private func fetchCompassionEntry() async throws -> CompassionStepsResponse {
@@ -232,35 +257,12 @@ struct CompassionView: View {
         return nil
     }
 
-    private var introCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Compassion is not decoration. Thinking of others turns attention outward and lightens the burden of self-concern.")
-                .foregroundStyle(.secondary)
-
-            Text("Each day offers a new angle on cultivating compassion.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            if isLoading {
-                Text("Loading today’s compassion...")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if let loadError {
-                Text(loadError)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } else if isUsingFallback {
-                Text("Using fallback compassion content.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private var dailyCard: some View {
+        guard let entry = loadedEntry else {
+            return AnyView(EmptyView())
+        }
+
+        return AnyView(
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
                 Image("lotus")
@@ -273,16 +275,16 @@ struct CompassionView: View {
                     .font(.subheadline.weight(.semibold))
             }
 
-            Text(displayedEntry.theme)
+            Text(entry.theme)
                 .font(.title3.weight(.semibold))
 
-            Text(displayedEntry.meaning)
+            Text(entry.meaning)
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.88))
 
-            if !displayedEntry.practices.isEmpty {
+            if !entry.practices.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
-                    ForEach(displayedEntry.practices, id: \.self) { line in
+                    ForEach(entry.practices, id: \.self) { line in
                         CompassionLine(text: line)
                     }
                 }
@@ -292,13 +294,14 @@ struct CompassionView: View {
             Divider()
                 .padding(.top, 2)
 
-            Text(displayedEntry.teaching)
+            Text(entry.teaching)
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.88))
         }
         .padding(16)
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        )
     }
 
     private var doneCard: some View {

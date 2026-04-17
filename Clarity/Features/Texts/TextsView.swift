@@ -13,69 +13,178 @@ struct TextsView: View {
                 revealSize: 320
             )
 
-            VStack(alignment: .leading, spacing: 22) {
-                headerBlock
-                sectionTitle("Available Now")
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 22) {
+                    headerBlock
 
-                VStack(alignment: .leading, spacing: 14) {
-                    NavigationLink {
-                        PechaReaderView(
-                            title: HeartSutraPecha.title,
-                            subtitle: HeartSutraPecha.subtitle,
-                            pages: HeartSutraPecha.pages
-                        )
-                    } label: {
-                        TextCard(
-                            title: "Heart Sutra",
-                            titleSecondary: "ཤེས་རབ་སྙིང་པོ།",
-                            subtitle: "A pecha-style reading edition for practice and recitation.",
-                            category: "Sutra",
-                            tint: Color(red: 0.55, green: 0.10, blue: 0.14),
-                            isAvailable: true
-                        )
-                    }
-                    .buttonStyle(TextCardPressStyle())
-
-                    NavigationLink {
-                        PechaReaderView(
-                            title: DiamondCutterPecha.title,
-                            subtitle: DiamondCutterPecha.subtitle,
-                            pages: DiamondCutterPecha.pages
-                        )
-                    } label: {
-                        TextCard(
-                            title: "Diamond Sutra",
-                            titleSecondary: "རྡོ་རྗེ་གཅོད་པ།",
-                            subtitle: "Opening movement of a Clarity working edition.",
-                            category: "Sutra",
-                            tint: Color(red: 0.38, green: 0.18, blue: 0.08),
-                            isAvailable: true
-                        )
-                    }
-                    .buttonStyle(TextCardPressStyle())
-                }
-
-                    sectionTitle("Coming Soon")
-
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        NavigationLink {
+                            PechaReaderView(
+                                title: RefugePrayerPecha.title,
+                                subtitle: RefugePrayerPecha.subtitle,
+                                pages: RefugePrayerPecha.pages
+                            )
+                        } label: {
                             TextCard(
                                 title: "Refuge Prayer",
-                                subtitle: "A short daily refuge text for grounding intention and direction.",
+                                titleSecondary: "སྐྱབས་འགྲོ།",
+                                subtitle: "A short daily refuge prayer for grounding intention and direction.",
                                 category: "Prayer",
                                 tint: Color(red: 0.70, green: 0.52, blue: 0.12),
-                                isAvailable: false
+                                isAvailable: true
                             )
+                        }
+                        .buttonStyle(TextCardPressStyle())
 
+                        NavigationLink {
+                            PechaReaderView(
+                                title: HeartSutraPecha.title,
+                                subtitle: HeartSutraPecha.subtitle,
+                                pages: HeartSutraPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "Heart Sutra",
+                                titleSecondary: "ཤེས་རབ་སྙིང་པོ།",
+                                subtitle: "A pecha-style reading edition for practice and recitation.",
+                                category: "Sutra",
+                                tint: Color(red: 0.55, green: 0.10, blue: 0.14),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: DiamondCutterPecha.title,
+                                subtitle: DiamondCutterPecha.subtitle,
+                                pages: DiamondCutterPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "Diamond Sutra",
+                                titleSecondary: "རྡོ་རྗེ་གཅོད་པ།",
+                                subtitle: "Opening movement of a Clarity working edition.",
+                                category: "Sutra",
+                                tint: Color(red: 0.38, green: 0.18, blue: 0.08),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: BodhicittaPrayerPecha.title,
+                                subtitle: BodhicittaPrayerPecha.subtitle,
+                                pages: BodhicittaPrayerPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "Bodhicitta Prayer",
+                                titleSecondary: "བྱང་ཆུབ་སེམས།",
+                                subtitle: "A short aspiration for bodhicitta to arise, remain, and deepen.",
+                                category: "Prayer",
+                                tint: Color(red: 0.48, green: 0.22, blue: 0.16),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: ChenrezigPrayerPecha.title,
+                                subtitle: ChenrezigPrayerPecha.subtitle,
+                                pages: ChenrezigPrayerPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "Chenrezig Prayer",
+                                titleSecondary: "སྤྱན་རས་གཟིགས།",
+                                subtitle: "A short praise with Om Mani Padme Hung.",
+                                category: "Prayer",
+                                tint: Color(red: 0.66, green: 0.44, blue: 0.20),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: ManjushriPrayerPecha.title,
+                                subtitle: ManjushriPrayerPecha.subtitle,
+                                pages: ManjushriPrayerPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "Manjushri Prayer",
+                                titleSecondary: "འཇམ་དཔལ།",
+                                subtitle: "A short praise with Om A Ra Pa Tsa Na Dhih.",
+                                category: "Prayer",
+                                tint: Color(red: 0.58, green: 0.36, blue: 0.14),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: GreenTaraPrayerPecha.title,
+                                subtitle: GreenTaraPrayerPecha.subtitle,
+                                pages: GreenTaraPrayerPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "Green Tara Prayer",
+                                titleSecondary: "སྒྲོལ་མ།",
+                                subtitle: "A concise Tara supplication with the standard Green Tara mantra.",
+                                category: "Prayer",
+                                tint: Color(red: 0.18, green: 0.42, blue: 0.22),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: WhiteTaraPrayerPecha.title,
+                                subtitle: WhiteTaraPrayerPecha.subtitle,
+                                pages: WhiteTaraPrayerPecha.pages
+                            )
+                        } label: {
+                            TextCard(
+                                title: "White Tara Prayer",
+                                titleSecondary: "སྒྲོལ་དཀར།",
+                                subtitle: "A short praise with a White Tara longevity mantra.",
+                                category: "Prayer",
+                                tint: Color(red: 0.60, green: 0.62, blue: 0.70),
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+
+                        NavigationLink {
+                            PechaReaderView(
+                                title: DedicationPrayerPecha.title,
+                                subtitle: DedicationPrayerPecha.subtitle,
+                                pages: DedicationPrayerPecha.pages
+                            )
+                        } label: {
                             TextCard(
                                 title: "Dedication Prayer",
+                                titleSecondary: "བསྔོ་བ།",
                                 subtitle: "A closing dedication for offering merit and ending practice cleanly.",
                                 category: "Prayer",
                                 tint: Color(red: 0.16, green: 0.28, blue: 0.62),
-                            isAvailable: false
-                        )
+                                isAvailable: true
+                            )
+                        }
+                        .buttonStyle(TextCardPressStyle())
+                    }
                 }
+                .padding(16)
+                .padding(.bottom, 28)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .opacity(contentVisible ? 1 : 0)
             .offset(y: contentVisible ? 0 : 8)

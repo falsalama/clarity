@@ -1,21 +1,21 @@
 import Foundation
 
 enum DiamondCutterPecha {
-    static let title = "Diamond-Cutter Wisdom"
-    static let subtitle = "A fresh rendering"
+    static let title = "Diamond-Cutter Sutra"
+    static let subtitle = ""
     static let source = "Clarity working edition"
 
     static let pages: [PechaPage] = [
         PechaPage(
             id: "diamond-title",
             section: .title,
-            title: "Diamond-Cutter Wisdom",
+            title: "Diamond-Cutter Sutra",
             tibetan: """
             ༄༅། །རྒྱ་གར་སྐད་དུ། ཨཱརྱ་བཛྲ་ཙྪིད་ཀནཱ་མ་པྲཛྙཱ་པཱ་ར་མི་ཏཱ་མ་ཧཱ་ཡཱ་ན་སཱུ་ཏྲ།
             བོད་སྐད་དུ། འཕགས་པ་ཤེས་རབ་ཀྱི་ཕ་རོལ་ཏུ་ཕྱིན་པ་རྡོ་རྗེ་གཅོད་པ་ཞེས་བྱ་བ་ཐེག་པ་ཆེན་པོའི་མདོ།
             སངས་རྒྱས་དང་བྱང་ཆུབ་སེམས་དཔའ་ཐམས་ཅད་ལ་ཕྱག་འཚལ་ལོ། །
             """,
-            english: "A fresh rendering"
+            english: nil
         ),
 
         PechaPage(

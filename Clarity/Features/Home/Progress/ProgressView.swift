@@ -41,8 +41,7 @@ struct ProgressScreen: View {
     private var ringOpenCount: Int {
         let total = max(0, dailyUnitCount)
         if total == 0 { return 0 }
-        let mod = total % 27
-        return mod == 0 ? 27 : mod
+        return total % 27
     }
 
     private var layersCompleted: Int {

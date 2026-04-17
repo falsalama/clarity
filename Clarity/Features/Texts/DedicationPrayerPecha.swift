@@ -9,26 +9,23 @@ enum DedicationPrayerPecha {
             id: "dedication-prayer-main",
             pageNumber: 1,
             section: .main,
-            title: "Dedication of Merit",
             tibetan: """
-            བསོད་ནམས་འདི་ཡིས་ཐམས་ཅད་གཟིགས་པ་ཉིད། །
-            ཐོབ་ནས་ཉེས་པའི་དགྲ་རྣམས་ཕམ་བྱས་ཤིང་། །
-            སྐྱེ་རྒ་ན་འཆིའི་རྦ་ཀློང་འཁྲུགས་པ་ཡི། །
-            སྲིད་པའི་མཚོ་ལས་འགྲོ་བ་སྒྲོལ་བར་ཤོག །
+            དགེ་བ་འདི་ཡིས་མྱུར་དུ་བདག །
+            བླ་མ་སངས་རྒྱས་འགྲུབ་གྱུར་ནས། །
+            འགྲོ་བ་གཅིག་ཀྱང་མ་ལུས་པ། །
+            དེ་ཡི་ས་ལ་འགོད་པར་ཤོག །
             """,
             transliteration: """
-            sönam di yi tamché zikpa nyi
-            tob né nyepé dra nam pamjé shing
-            kyé ga na chi balong trukpa yi
-            sipé tso lé drowa drolwar shok
+            ge wa di yi nyur du dak
+            lama sangye drub gyur ne
+            drowa chik kyang ma lu pa
+            de yi sa la gö par shok
             """,
             english: """
-            Through this merit, may all beings attain the omniscient state of enlightenment,
-            And conquer the enemy of faults and delusion,
-            May they all be liberated from this ocean of saṃsāra
-            And from its pounding waves of birth, old age, sickness and death!
-
-            Taken from the Jātakas.
+            Due to this virtue, may I quickly
+            attain the state of a Guru-Buddha,
+            and lead every being, without exception,
+            to that very state.
             """
         )
     ]

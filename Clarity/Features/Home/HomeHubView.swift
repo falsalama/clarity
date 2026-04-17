@@ -21,6 +21,7 @@ struct HomeHubView: View {
     @Query private var practiceCompletions: [PracticeCompletionEntity]
 
     @EnvironmentObject private var flow: AppFlowRouter
+    @StateObject private var calendarStore = CalendarStore()
 
     init() {
         _reflectCompletions = Query(
@@ -48,6 +49,11 @@ struct HomeHubView: View {
         practiceCompletions.first(where: { $0.dayKey == todayKey }) != nil
     }
 
+    private var todayCalendarBadgeText: String? {
+        guard calendarStore.today.isEmpty == false else { return nil }
+        return Self.ordinalDayString(for: Date())
+    }
+
     var body: some View {
         ZStack {
             Color(.systemBackground)
@@ -66,7 +72,8 @@ struct HomeHubView: View {
                         didReflectToday: didReflectToday,
                         didViewToday: didViewToday,
                         didPracticeToday: didPracticeToday,
-                        beginAnimationSeed: flow.homeHubEntrySeed
+                        beginAnimationSeed: flow.homeHubEntrySeed,
+                        todayCalendarBadgeText: todayCalendarBadgeText
                     )
 
                     Spacer(minLength: 12)
@@ -85,6 +92,11 @@ struct HomeHubView: View {
                     .padding(.top, 12)
                     .padding(.bottom, 22)
                 }
+            }
+        }
+        .task {
+            if calendarStore.today.isEmpty, calendarStore.upcoming.isEmpty {
+                await calendarStore.refresh()
             }
         }
     }
@@ -136,6 +148,25 @@ struct HomeHubView: View {
 
             return DayItem(id: key, dayKey: key, label: label, status: status)
         }
+    }
+
+    private static func ordinalDayString(for date: Date) -> String {
+        let day = Calendar.current.component(.day, from: date)
+        let suffix: String
+
+        switch day {
+        case 11, 12, 13:
+            suffix = "th"
+        default:
+            switch day % 10 {
+            case 1: suffix = "st"
+            case 2: suffix = "nd"
+            case 3: suffix = "rd"
+            default: suffix = "th"
+            }
+        }
+
+        return "\(day)\(suffix)"
     }
 }
 
@@ -400,6 +431,7 @@ private struct PracticePanel: View {
     let didViewToday: Bool
     let didPracticeToday: Bool
     let beginAnimationSeed: Int
+    let todayCalendarBadgeText: String?
 
     @State private var beginTouchPoint: CGPoint? = nil
 
@@ -442,6 +474,10 @@ private struct PracticePanel: View {
     private let lotusBottomInset: CGFloat = 25
     private let lotusOpacity: Double = 0.9
 
+    // Today calendar link
+    private let todayLinkLeadingInset: CGFloat = 56
+    private let todayLinkCenterY: CGFloat = 176
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -458,6 +494,16 @@ private struct PracticePanel: View {
                         y: geo.size.height - lotusBottomInset
                     )
                 )
+
+                if let todayCalendarBadgeText {
+                    todayCalendarBlock(
+                        text: todayCalendarBadgeText,
+                        at: CGPoint(
+                            x: todayLinkLeadingInset,
+                            y: todayLinkCenterY
+                        )
+                    )
+                }
 
                 dorjeBlock(
                     at: CGPoint(
@@ -566,6 +612,28 @@ private struct PracticePanel: View {
                     .frame(width: dorjeSize, height: dorjeSize)
                     .opacity(dorjeOpacity)
             }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .position(point)
+    }
+
+    @ViewBuilder
+    private func todayCalendarBlock(text: String, at point: CGPoint) -> some View {
+        NavigationLink {
+            CalendarView()
+        } label: {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text)
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .italic()
+                    .foregroundStyle(Color.primary.opacity(0.62))
+
+                Text("Today")
+                    .font(.callout.weight(.medium))
+                    .foregroundStyle(Color.primary.opacity(0.38))
+            }
+            .frame(width: 64, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

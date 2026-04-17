@@ -3,11 +3,15 @@ import SwiftData
 import UIKit
 
 struct WisdomView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var selectedPrompt: WisdomPrompt?
     @State private var loadedPrompts: [WisdomPrompt] = []
     @State private var loadError: String?
     @State private var isLoadingPrompts = true
     @State private var completedPromptForNavigation: WisdomPrompt?
+    @State private var contentReady = false
+    @State private var lastLoadedDayKey = ""
     
     @AppStorage("wisdom_current_day_index")
     private var currentWisdomDayIndex: Int = 1
@@ -23,27 +27,6 @@ struct WisdomView: View {
     )
     private var responses: [WisdomResponseEntity]
 
-    private let fallbackPrompts: [WisdomPrompt] = [
-        .init(
-            id: "wisdom_q_001",
-            category: "Identity",
-            question: "If a self cannot be found, what exactly is being defended?",
-            prompt: "Be precise. Do not answer with a slogan."
-        ),
-        .init(
-            id: "wisdom_q_002",
-            category: "Emptiness",
-            question: "Can something appear clearly and still lack intrinsic existence?",
-            prompt: "Separate appearance, function, and inherent reality."
-        ),
-        .init(
-            id: "wisdom_q_003",
-            category: "Language",
-            question: "When you name an experience, what is added that was not there before?",
-            prompt: "Distinguish direct experience from conceptual overlay."
-        )
-    ]
-
     private let wisdomFill = Color(red: 0.48, green: 0.18, blue: 0.22)
 
     private var todayKey: String {
@@ -55,7 +38,7 @@ struct WisdomView: View {
     }
 
     private var displayedPrompts: [WisdomPrompt] {
-        let published = loadedPrompts
+        loadedPrompts
             .filter { $0.isPublished }
             .sorted {
                 if let lhsDay = $0.dayIndex, let rhsDay = $1.dayIndex, lhsDay != rhsDay {
@@ -69,8 +52,6 @@ struct WisdomView: View {
                 }
                 return $0.programmeSlug < $1.programmeSlug
             }
-
-        return published.isEmpty ? fallbackPrompts : published
     }
 
     private func response(for prompt: WisdomPrompt) -> WisdomResponseEntity? {
@@ -86,15 +67,9 @@ struct WisdomView: View {
         return displayedPrompts.first(where: { $0.id == response.questionID })
     }
 
-    private var isUsingFallbackPrompts: Bool {
-        displayedPrompts == fallbackPrompts
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                introCard
-
                 if let loadError, !isLoadingPrompts {
                     Text(loadError)
                         .font(.footnote)
@@ -103,9 +78,13 @@ struct WisdomView: View {
 
                 if isDoneToday {
                     doneTodayCard
+                        .opacity(contentReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.32), value: contentReady)
                 } else {
                     todayHeader
                     questionCards
+                        .opacity(contentReady ? 1 : 0)
+                        .animation(.easeOut(duration: 0.32), value: contentReady)
                 }
 
                 HStack {
@@ -128,6 +107,15 @@ struct WisdomView: View {
                 WisdomBackgroundWaterView()
             }
             .ignoresSafeArea()
+        }
+        .overlay {
+            if isLoadingPrompts {
+                ProgressView()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.thinMaterial)
+                    .clipShape(Capsule())
+            }
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -155,6 +143,14 @@ struct WisdomView: View {
             syncDayIndexIfNeeded()
             await loadWisdomPrompts()
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            guard lastLoadedDayKey != todayKey else { return }
+            Task {
+                syncDayIndexIfNeeded()
+                await loadWisdomPrompts()
+            }
+        }
     }
 
     private func syncDayIndexIfNeeded() {
@@ -169,13 +165,16 @@ struct WisdomView: View {
     @MainActor
     private func loadWisdomPrompts() async {
         isLoadingPrompts = true
+        contentReady = false
+        loadedPrompts = []
+        loadError = nil
 
         do {
             let prompts = try await fetchWisdomPrompts()
 
             if prompts.isEmpty {
                 loadedPrompts = []
-                loadError = "No wisdom entries found. Using fallback questions."
+                loadError = "No wisdom entries found."
             } else {
                 loadedPrompts = prompts
                 loadError = nil
@@ -183,11 +182,15 @@ struct WisdomView: View {
             }
         } catch {
             loadedPrompts = []
-            loadError = "Could not load wisdom from database. Using fallback questions."
+            loadError = "Could not load wisdom from database."
             print("WISDOM LOAD FAILED: \(error)")
         }
 
         isLoadingPrompts = false
+        lastLoadedDayKey = todayKey
+        withAnimation(.easeOut(duration: 0.32)) {
+            contentReady = true
+        }
     }
 
     private func fetchWisdomPrompts() async throws -> [WisdomPrompt] {
@@ -246,35 +249,9 @@ struct WisdomView: View {
         return nil
     }
 
-    private var introCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Choose one question each day and answer in your own words.")
-                .foregroundStyle(.secondary)
-
-            Text("This is philosophical and contemplative training for loosening fixation through reasoning, perspective, and analytical inquiry.")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-
-            if !isLoadingPrompts && isUsingFallbackPrompts {
-                Text("Using fallback questions.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .padding(16)
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     private var todayHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Today’s questions")
-                .font(.headline)
-
-            Text("Choose 1 of the following questions.")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.secondary)
-        }
+        Text("Today’s questions")
+            .font(.headline)
     }
 
     private var doneTodayCard: some View {
@@ -324,22 +301,26 @@ struct WisdomView: View {
     }
     private var questionCards: some View {
         VStack(spacing: 12) {
-            if isLoadingPrompts {
-                ProgressView()
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
-            } else {
-                ForEach(displayedPrompts) { prompt in
-                    Button {
-                        selectedPrompt = prompt
-                    } label: {
-                        WisdomQuestionCard(
-                            prompt: prompt,
-                            response: response(for: prompt),
-                            accent: wisdomFill
-                        )
+            if !isLoadingPrompts {
+                if displayedPrompts.isEmpty {
+                    Text("No wisdom questions available.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                } else {
+                    ForEach(displayedPrompts) { prompt in
+                        Button {
+                            selectedPrompt = prompt
+                        } label: {
+                            WisdomQuestionCard(
+                                prompt: prompt,
+                                response: response(for: prompt),
+                                accent: wisdomFill
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }

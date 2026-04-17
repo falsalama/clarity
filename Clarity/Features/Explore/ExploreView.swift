@@ -10,147 +10,209 @@ struct ExploreView: View {
     private let pilgrimageSlate = Color(red: 0.32, green: 0.42, blue: 0.52)
     private let offeringInk = Color(red: 0.13, green: 0.13, blue: 0.14)
     private let gridColumns = [
-        GridItem(.flexible(), spacing: 14),
-        GridItem(.flexible(), spacing: 14)
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
     ]
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                LazyVGrid(columns: gridColumns, spacing: 14) {
-                    NavigationLink {
-                        FocusSoundsHubView()
-                    } label: {
-                        ExploreFeatureTile(
-                            title: "Meditative Sounds",
-                            subtitle: "Songs, tones, and soundscapes",
-                            systemImage: "waveform",
-                            fill: focusBlue
-                        )
-                    }
-                    .buttonStyle(.plain)
+        GeometryReader { geo in
+            let isLandscape = geo.size.width > geo.size.height
+            let horizontalPadding: CGFloat = 32
+            let interItemSpacing: CGFloat = 12
+            let rowSpacing: CGFloat = isLandscape ? 18 : 16
+            let maxContentWidth: CGFloat = isLandscape ? 560 : 430
+            let contentWidth = min(max(0, geo.size.width - horizontalPadding), maxContentWidth)
+            let tileWidth = max(0, (contentWidth - interItemSpacing) / 2)
+            let standardTileHeight = min(
+                isLandscape ? 144 : 126,
+                max(108, floor(tileWidth * (isLandscape ? 0.54 : 0.62)))
+            )
 
-                    NavigationLink {
-                        TextsView()
-                    } label: {
-                        ExploreFeatureTile(
-                            title: "Texts",
-                            subtitle: "Sutras, prayers, and recitations",
-                            systemImage: "book.closed",
-                            fill: textsBurgundy
-                        )
-                    }
-                    .buttonStyle(.plain)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    LazyVGrid(columns: gridColumns, spacing: rowSpacing) {
+                        NavigationLink {
+                            FocusSoundsHubView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Sounds",
+                                subtitle: "Songs, tones, and soundscapes",
+                                fill: focusBlue,
+                                backgroundAssetName: "buttonaudio",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                    NavigationLink {
-                        AppleHealthExploreView()
-                    } label: {
-                        ExploreFeatureTile(
-                            title: "Apple Health",
-                            subtitle: "Sleep, heart, steps, and mindful minutes",
-                            systemImage: "heart.text.square.fill",
-                            fill: healthRose
-                        )
-                    }
-                    .buttonStyle(.plain)
+                        NavigationLink {
+                            TextsView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Texts",
+                                subtitle: "Sutras, prayers, and recitations",
+                                fill: textsBurgundy,
+                                backgroundAssetName: "buttontext",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                    NavigationLink {
-                        GuidanceHubView()
-                    } label: {
-                        ExploreFeatureTile(
-                            title: "Guidance",
-                            subtitle: "Book a one-to-one session",
-                            systemImage: "person.2.fill",
-                            fill: guidanceGreen
-                        )
-                    }
-                    .buttonStyle(.plain)
+                        NavigationLink {
+                            TeachingsAudioView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Teachings",
+                                subtitle: "Audio teachings with a swipeable player card.",
+                                fill: textsBurgundy,
+                                backgroundAssetName: "buttonteaching",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                    NavigationLink {
-                        CalendarView()
-                    } label: {
-                        ExploreFeatureTile(
-                            title: "Calendar",
-                            subtitle: "Lunar dates, observances, and sacred days",
-                            systemImage: "calendar",
-                            fill: calendarAmber
-                        )
-                    }
-                    .buttonStyle(.plain)
+                        NavigationLink {
+                            AppleHealthExploreView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Health",
+                                subtitle: "Sleep, heart, steps, and mindful minutes",
+                                fill: healthRose,
+                                backgroundAssetName: "buttonapplehealth",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                    NavigationLink {
-                        PilgrimageView()
-                    } label: {
-                        ExploreFeatureTile(
-                            title: "Pilgrimage",
-                            subtitle: "Places, routes, and future journeys",
-                            systemImage: "map",
-                            fill: pilgrimageSlate
-                        )
-                    }
-                    .buttonStyle(.plain)
+                        NavigationLink {
+                            GuidanceHubView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Guidance",
+                                subtitle: "Book a one-to-one session",
+                                fill: guidanceGreen,
+                                backgroundAssetName: "buttonguidance",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
 
-                    NavigationLink {
-                        LightOfferingView()
-                    } label: {
+                        NavigationLink {
+                            CalendarView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Calendar",
+                                subtitle: "Lunar dates, observances, and sacred days",
+                                fill: calendarAmber,
+                                backgroundAssetName: "buttoncalender",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            PilgrimageView()
+                        } label: {
+                            ExploreFeatureTile(
+                                title: "Pilgrimage",
+                                subtitle: "Places, routes, and future journeys",
+                                fill: pilgrimageSlate,
+                                backgroundAssetName: "buttonpilgrimage",
+                                tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            LightOfferingView()
+                        } label: {
                         ExploreFeatureTile(
-                            title: "Light Offering",
+                            title: "Virtual Offering",
                             subtitle: "A simple butterlamp practice space",
-                            systemImage: "flame.fill",
-                            fill: offeringInk
-                        )
+                            fill: offeringInk,
+                            backgroundAssetName: "buttonvoffering",
+                            tileHeight: standardTileHeight
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Coming Soon")
+                            .font(.headline)
+
+                        LazyVGrid(columns: gridColumns, spacing: rowSpacing) {
+                            ExplorePlainLink(
+                                title: "Podcast",
+                                subtitle: "Talks, conversations, and reflective audio will appear here.",
+                                systemImage: "mic.circle",
+                                backgroundAssetName: "buttonpodcast",
+                                tileHeight: standardTileHeight
+                            ) {
+                                ExplorePlaceholderView(
+                                    title: "Podcast",
+                                    subtitle: "Talks, conversations, and reflective audio will appear here."
+                                )
+                            }
+
+                            ExplorePlainLink(
+                                title: "Video",
+                                subtitle: "Selected video teachings and visual guidance will appear here.",
+                                systemImage: "play.rectangle",
+                                backgroundAssetName: "buttonvideo",
+                                tileHeight: standardTileHeight
+                            ) {
+                                ExplorePlaceholderView(
+                                    title: "Videos",
+                                    subtitle: "Selected video teachings and visual guidance will appear here."
+                                )
+                            }
+
+                            ExplorePlainLink(
+                                title: "Courses",
+                                subtitle: "Longer guided study journeys will appear here.",
+                                systemImage: "square.stack.3d.up",
+                                backgroundAssetName: "buttonspare",
+                                tileHeight: standardTileHeight
+                            ) {
+                                ExplorePlaceholderView(
+                                    title: "Courses",
+                                    subtitle: "Longer guided study journeys and structured courses will appear here."
+                                )
+                            }
+
+                            ExplorePlainLink(
+                                title: "Shop",
+                                subtitle: "Future books, practice items, and selected merchandise may appear here.",
+                                systemImage: "bag",
+                                backgroundAssetName: "buttonshop",
+                                tileHeight: standardTileHeight
+                            ) {
+                                ExplorePlaceholderView(
+                                    title: "Shop",
+                                    subtitle: "Future books, practice items, and selected merchandise may appear here."
+                                )
+                            }
+
+                            ExplorePlainLink(
+                                title: "Offering",
+                                subtitle: "Support places of practice, learning, and preservation",
+                                systemImage: "seal.fill",
+                                backgroundAssetName: "buttonoffring",
+                                tileHeight: standardTileHeight
+                            ) {
+                                ExplorePlaceholderView(
+                                    title: "Make an Offering",
+                                    subtitle: "A future space for supporting monasteries, nunneries, universities, and authentic practice communities."
+                                )
+                            }
+                        }
+                    }
                 }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Coming Soon")
-                        .font(.headline)
-
-                    ExplorePlainLink(title: "Teachings", subtitle: "Curated teachings and structured learning will appear here.", systemImage: "book.pages") {
-                        ExplorePlaceholderView(
-                            title: "Teachings",
-                            subtitle: "Curated teachings and structured learning will appear here."
-                        )
-                    }
-
-                    ExplorePlainLink(title: "Podcast", subtitle: "Talks, conversations, and reflective audio will appear here.", systemImage: "mic.circle") {
-                        ExplorePlaceholderView(
-                            title: "Podcast",
-                            subtitle: "Talks, conversations, and reflective audio will appear here."
-                        )
-                    }
-
-                    ExplorePlainLink(title: "Videos", subtitle: "Selected video teachings and visual guidance will appear here.", systemImage: "play.rectangle") {
-                        ExplorePlaceholderView(
-                            title: "Videos",
-                            subtitle: "Selected video teachings and visual guidance will appear here."
-                        )
-                    }
-
-                    ExplorePlainLink(title: "Courses", subtitle: "Longer guided pathways and future modules will appear here.", systemImage: "square.stack.3d.up") {
-                        ExplorePlaceholderView(
-                            title: "Courses",
-                            subtitle: "Longer guided pathways and future modules will appear here."
-                        )
-                    }
-
-                    ExplorePlainLink(title: "Shop", subtitle: "Future books, practice items, and selected merchandise may appear here.", systemImage: "bag") {
-                        ExplorePlaceholderView(
-                            title: "Shop",
-                            subtitle: "Future books, practice items, and selected merchandise may appear here."
-                        )
-                    }
-
-                    ExplorePlainLink(title: "Make an Offering", subtitle: "Support places of practice, learning, and preservation", systemImage: "seal.fill") {
-                        ExplorePlaceholderView(
-                            title: "Make an Offering",
-                            subtitle: "A future space for supporting monasteries, nunneries, universities, and authentic practice communities."
-                        )
-                    }
-                }
+                .padding(16)
+                .padding(.bottom, 104)
+                .frame(maxWidth: contentWidth, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-            .padding(16)
         }
         .background {
             ZStack {
@@ -401,62 +463,113 @@ private struct AppleHealthBulletRow: View {
     }
 }
 
+private struct ExploreTileArtworkAdjustment {
+    let xScale: CGFloat
+    let yScale: CGFloat
+    let xOffset: CGFloat
+    let yOffset: CGFloat
+
+    static func forAsset(_ name: String) -> ExploreTileArtworkAdjustment {
+        switch name {
+        case "buttonguidance":
+            // This source image is wider than the rest of the Explore button set,
+            // so it needs a stronger horizontal crop than vertical crop.
+            return .init(xScale: 1.28, yScale: 1.05, xOffset: 0, yOffset: 0)
+        case "buttonspare":
+            // Courses uses the same extra-wide composition and needs the same normalization.
+            return .init(xScale: 1.10, yScale: 1.03, xOffset: 0, yOffset: 0)
+        default:
+            return .init(xScale: 1.0, yScale: 1.0, xOffset: 0, yOffset: 0)
+        }
+    }
+}
+
 private struct ExploreFeatureTile: View {
     let title: String
     let subtitle: String
-    let systemImage: String
     let fill: Color
+    let backgroundAssetName: String?
+    let tileHeight: CGFloat
+
+    init(
+        title: String,
+        subtitle: String,
+        fill: Color,
+        backgroundAssetName: String? = nil,
+        tileHeight: CGFloat = 126
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.fill = fill
+        self.backgroundAssetName = backgroundAssetName
+        self.tileHeight = tileHeight
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.18))
-                    .frame(width: 44, height: 44)
-
-                Image(systemName: systemImage)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(Color.white.opacity(0.96))
-            }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(Color.white.opacity(0.86))
-                    .lineLimit(2)
-            }
-
-            Spacer()
-
-            HStack {
-                Spacer()
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top) {
+                Spacer(minLength: 0)
 
                 Image(systemName: "arrow.up.right")
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(Color.white.opacity(0.88))
+                    .padding(.top, 2)
             }
+
+            if backgroundAssetName == nil {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(Color.white.opacity(0.86))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
+            Spacer(minLength: 0)
         }
         .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 108, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: tileHeight, maxHeight: tileHeight, alignment: .topLeading)
         .foregroundStyle(Color.white)
         .background {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            fill.opacity(0.98),
-                            fill.opacity(0.82)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(fill.opacity(0.92))
+                .overlay {
+                    if let backgroundAssetName {
+                        let artworkAdjustment = ExploreTileArtworkAdjustment.forAsset(backgroundAssetName)
+                        Image(backgroundAssetName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .scaleEffect(
+                                x: artworkAdjustment.xScale,
+                                y: artworkAdjustment.yScale
+                            )
+                            .offset(
+                                x: artworkAdjustment.xOffset,
+                                y: artworkAdjustment.yOffset
+                            )
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    } else {
+                        LinearGradient(
+                            colors: [
+                                fill.opacity(0.98),
+                                fill.opacity(0.82)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    }
+                }
                 .overlay(
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
@@ -487,12 +600,37 @@ private struct ExploreFeatureTile: View {
                                 .blur(radius: 0.5)
                         }
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(backgroundAssetName == nil ? 0.0 : 0.05),
+                                    Color.black.opacity(backgroundAssetName == nil ? 0.0 : 0.24)
+                                ],
+                                startPoint: .center,
+                                endPoint: .bottom
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                )
+        }
+        .overlay(alignment: .bottomLeading) {
+            if backgroundAssetName != nil {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
+                    .shadow(color: .black.opacity(0.28), radius: 6, x: 0, y: 2)
+            }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .stroke(Color.white.opacity(0.18), lineWidth: 1)
         }
-        .shadow(color: fill.opacity(0.18), radius: 20, x: 0, y: 12)
+        .shadow(color: Color.black.opacity(0.025), radius: 2, x: 0, y: 1)
         .accessibilityElement(children: .combine)
     }
 }
@@ -501,37 +639,109 @@ private struct ExplorePlainLink<Destination: View>: View {
     let title: String
     let subtitle: String
     let systemImage: String
+    let backgroundAssetName: String?
+    let tileHeight: CGFloat
     @ViewBuilder let destination: () -> Destination
 
     private let comingSoonBlue = Color(red: 0.16, green: 0.36, blue: 0.78)
+
+    init(
+        title: String,
+        subtitle: String,
+        systemImage: String,
+        backgroundAssetName: String? = nil,
+        tileHeight: CGFloat = 126,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.systemImage = systemImage
+        self.backgroundAssetName = backgroundAssetName
+        self.tileHeight = tileHeight
+        self.destination = destination
+    }
 
     var body: some View {
         NavigationLink {
             destination()
         } label: {
-            HStack(spacing: 12) {
-                Image(systemName: systemImage)
-                    .font(.title3)
-                    .foregroundStyle(comingSoonBlue)
+            if let backgroundAssetName {
+                let artworkAdjustment = ExploreTileArtworkAdjustment.forAsset(backgroundAssetName)
+                ZStack(alignment: .bottomLeading) {
+                    Image(backgroundAssetName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .scaleEffect(
+                            x: artworkAdjustment.xScale,
+                            y: artworkAdjustment.yScale
+                        )
+                        .offset(
+                            x: artworkAdjustment.xOffset,
+                            y: artworkAdjustment.yOffset
+                        )
+                        .clipped()
+                        .overlay {
+                            LinearGradient(
+                                colors: [
+                                    Color.black.opacity(0.02),
+                                    Color.black.opacity(0.28)
+                                ],
+                                startPoint: .center,
+                                endPoint: .bottom
+                            )
+                        }
 
-                VStack(alignment: .leading, spacing: 2) {
+                    HStack(alignment: .top) {
+                        Spacer()
+
+                        Image(systemName: "arrow.up.right")
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(Color.white.opacity(0.88))
+                            .padding(.top, 16)
+                            .padding(.trailing, 16)
+                    }
+
                     Text(title)
-                        .foregroundStyle(.primary)
-
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .lineLimit(1)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 14)
+                        .shadow(color: .black.opacity(0.28), radius: 6, x: 0, y: 2)
                 }
+                .frame(maxWidth: .infinity, minHeight: tileHeight, maxHeight: tileHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 26, style: .continuous)
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                }
+                .shadow(color: Color.black.opacity(0.02), radius: 2, x: 0, y: 1)
+            } else {
+                HStack(spacing: 12) {
+                    Image(systemName: systemImage)
+                        .font(.title3)
+                        .foregroundStyle(comingSoonBlue)
 
-                Spacer()
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .foregroundStyle(.primary)
 
-                Image(systemName: "chevron.right")
-                    .font(.footnote.weight(.semibold))
-                    .foregroundStyle(comingSoonBlue.opacity(0.75))
+                        Text(subtitle)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(comingSoonBlue.opacity(0.75))
+                }
+                .padding(.vertical, 10)
+                .padding(.horizontal, 2)
             }
-            .padding(.vertical, 10)
-            .padding(.horizontal, 2)
         }
         .buttonStyle(.plain)
     }

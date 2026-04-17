@@ -213,13 +213,14 @@ struct CaptureView: View {
             ensureProgrammeState()
 
             Task {
-                await loadStepsIfNeeded()
                 await MainActor.run {
                     advanceIfPending()
-                    withAnimation(.easeOut(duration: 0.55)) {
+                    withAnimation(.easeOut(duration: 0.28)) {
                         isReady = true
                     }
                 }
+
+                await loadStepsIfNeeded()
             }
         }
         .onChange(of: todayKey) { _, _ in
@@ -230,8 +231,9 @@ struct CaptureView: View {
             DailyReflectAnswerSheet(step: currentStep, dayKey: todayKey) {
                 // Stay on the daily reflect screen after saving.
             }
-                .presentationDetents([.medium, .large])
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .presentationBackground(Color.white)
         }
     }
 
@@ -291,7 +293,7 @@ struct CaptureView: View {
                         }
                 }
 
-                cloudsBackgroundImage(named: "CloudsBG", in: proxy, imageOpacity: 0.24)
+                cloudsBackgroundImage(named: "CloudsBG", in: proxy, imageOpacity: 0.30)
             }
         }
         .ignoresSafeArea()
@@ -345,7 +347,7 @@ struct CaptureView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             .scaleEffect(bgPhase ? 1.30 : 1.18, anchor: .bottom)
             .scaleEffect(x: -1, y: 1)
-            .offset(y: bgPhase ? 58 : 78)
+            .offset(y: bgPhase ? 72 : 92)
     }
 
     // MARK: - Steps: load + state
@@ -497,7 +499,7 @@ struct CaptureView: View {
             .padding(.bottom, 16)
             .frame(minHeight: geo.size.height, alignment: .top)
             .opacity(isReady ? 1 : 0)
-            .animation(.easeOut(duration: 0.55), value: isReady)
+            .animation(.easeOut(duration: 0.28), value: isReady)
             .contentShape(Rectangle())
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
@@ -591,7 +593,7 @@ struct CaptureView: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                         .opacity(questionReady ? 1 : 0)
-                        .animation(.easeOut(duration: 0.55), value: questionReady)
+                        .animation(.easeOut(duration: 0.24), value: questionReady)
 
                 } else {
                     Text("No question yet.")
@@ -601,56 +603,19 @@ struct CaptureView: View {
                 }
             }
             .transaction { $0.animation = nil }
-            Button {
-                switch coordinator.phase {
-                case .idle:
-                    showDailyAnswerSheet = true
-                case .recording:
-                    coordinator.stopCapture()
-                default:
-                    break
-                }
-            } label: {
-                Text(dailyVoiceActionTitle)
-                    .font(.system(size: 21, weight: .medium, design: .serif))
-                    .italic()
-                    .foregroundStyle(Color.black.opacity(0.78))
-                    .frame(width: 128, height: 128)
-                    .background(
-                        ZStack {
-                            Circle()
-                                .fill(Color.white)
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Answer")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .multilineTextAlignment(.center)
 
-                            Circle()
-                                .stroke(Color.secondary.opacity(0.12), lineWidth: 11)
-
-                            Circle()
-                                .stroke(
-                                    AngularGradient(
-                                        gradient: Gradient(stops: [
-                                            .init(color: Color(red: 0.78, green: 0.64, blue: 0.20), location: 0.00),
-                                            .init(color: Color(red: 0.95, green: 0.83, blue: 0.34), location: 0.10),
-                                            .init(color: Color(red: 0.88, green: 0.90, blue: 0.96), location: 0.50),
-                                            .init(color: Color(red: 0.95, green: 0.83, blue: 0.34), location: 0.90),
-                                            .init(color: Color(red: 0.78, green: 0.64, blue: 0.20), location: 1.00)
-                                        ]),
-                                        center: .center
-                                    ),
-                                    style: StrokeStyle(lineWidth: 11, lineCap: .round)
-                                )
-                                .rotationEffect(.degrees(-90))
-                                .shadow(
-                                    color: Color(red: 0.90, green: 0.76, blue: 0.28).opacity(0.16),
-                                    radius: 8,
-                                    x: 0,
-                                    y: 3
-                                )
-                        }
-                    )
+                SharedCaptureSurfaceView(
+                    showPromptChips: false,
+                    showTypeButton: true,
+                    onTypeTap: { showDailyAnswerSheet = true }
+                )
             }
-            .buttonStyle(.plain)
-            .disabled(!dailyVoiceActionEnabled)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if hasAnswerToday {
                 Button {
@@ -674,13 +639,6 @@ struct CaptureView: View {
                     currentStep == nil
                 )
             }
-
-            if coordinator.phase != .idle {
-                Text(dailyPhaseStatusText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-            }
         }
         .frame(maxWidth: .infinity)
         .padding(24)
@@ -693,13 +651,14 @@ struct CaptureView: View {
     }
 
     private var reflectExplainerCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 10) {
             Text("Speak or type what’s on your mind.")
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.78))
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding()
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous))
@@ -817,8 +776,6 @@ private struct DailyReflectAnswerSheet: View {
     @EnvironmentObject private var dictionary: RedactionDictionary
     @EnvironmentObject private var capsuleStore: CapsuleStore
 
-    @StateObject private var recorder = AudioRecorder()
-    @StateObject private var transcriber = SpeechTranscriber()
     @State private var text: String = ""
     @State private var errorMessage: String?
     @State private var isSaving: Bool = false
@@ -828,147 +785,55 @@ private struct DailyReflectAnswerSheet: View {
     let dayKey: String
     let onCreated: () -> Void
 
-    private var isMicActive: Bool {
-        recorder.isRecording || transcriber.isTranscribing
-    }
-
-    private var micPhase: TurnCaptureCoordinator.Phase {
-        if recorder.isRecording {
-            return .recording
-        }
-
-        if transcriber.isTranscribing {
-            return .transcribing
-        }
-
-        return .idle
-    }
-
-    private var micStatusText: String {
-        if recorder.isRecording {
-            return "Listening…"
-        }
-
-        if transcriber.isTranscribing {
-            return "Transcribing…"
-        }
-
-        return ""
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Answer")
                 .font(.headline)
 
-            ZStack(alignment: .topTrailing) {
+            ZStack(alignment: .topLeading) {
                 TextEditor(text: $text)
                     .focused($isEditorFocused)
                     .scrollContentBackground(.hidden)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .padding(.trailing, 92)
+                    .padding(.horizontal, 2)
+                    .padding(.vertical, 2)
                     .textSelection(.enabled)
-                    .frame(minHeight: 220)
-                    .disabled(isMicActive)
+                    .frame(minHeight: 280)
 
-                VStack(spacing: 8) {
-                    CaptureButton(
-                        phase: micPhase,
-                        isEnabled: !(transcriber.isTranscribing && !recorder.isRecording),
-                        level: recorder.level,
-                        size: 72,
-                        micIconScale: 0.30,
-                        stopIconScale: 0.33
-                    ) {
-                        if recorder.isRecording {
-                            recorder.stop()
-                            transcriber.stop()
-                        } else if !transcriber.isTranscribing {
-                            startMicCapture()
-                        }
-                    }
-                    .background(
-                        Circle()
-                            .fill(Color.primary.opacity(0.04))
-                            .overlay(
-                                Circle()
-                                    .stroke(Color.white.opacity(0.30), lineWidth: 1)
-                            )
-                    )
-
-                    if !micStatusText.isEmpty {
-                        Text(micStatusText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
+                if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Type answer here")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 10)
+                        .allowsHitTesting(false)
                 }
-                .padding(.top, 14)
-                .padding(.trailing, 8)
             }
-            .padding(10)
-            .background(.thinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            HStack {
+                Spacer(minLength: 0)
+
+                Button(isSaving ? "Saving…" : "Save") {
+                    save()
+                }
+                .font(.subheadline.weight(.semibold))
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(isSaving || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
 
             if let errorMessage {
                 Text(errorMessage)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
-
-            Button(isSaving ? "Saving…" : "Save") {
-                save()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isSaving || isMicActive || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color.white.ignoresSafeArea())
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                 isEditorFocused = true
             }
-        }
-        .onDisappear {
-            if recorder.isRecording {
-                recorder.stop()
-            }
-            if transcriber.isTranscribing {
-                transcriber.cancel()
-            }
-        }
-        .onChange(of: transcriber.lastTranscript) { _, newValue in
-            guard let newValue, !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            text = newValue
-            isEditorFocused = true
-        }
-        .onChange(of: recorder.lastError) { _, newValue in
-            guard let newValue, !newValue.isEmpty else { return }
-            if transcriber.isTranscribing {
-                transcriber.cancel()
-            }
-            errorMessage = newValue
-        }
-        .onChange(of: transcriber.lastError) { _, newValue in
-            guard let newValue, !newValue.isEmpty else { return }
-            errorMessage = newValue
-        }
-    }
-
-    private func startMicCapture() {
-        errorMessage = nil
-        text = ""
-        isEditorFocused = false
-
-        Task { @MainActor in
-            let ok = await transcriber.startSession()
-            guard ok else {
-                errorMessage = transcriber.lastError ?? "Couldn’t start transcription."
-                return
-            }
-
-            transcriber.attach(to: recorder)
-            recorder.start()
         }
     }
 

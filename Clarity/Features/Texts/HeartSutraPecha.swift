@@ -2,7 +2,7 @@ import Foundation
 
 enum HeartSutraPecha {
     static let title = "Heart Sutra"
-    static let subtitle = "The Sutra of the Heart of the Perfection of Wisdom"
+    static let subtitle = ""
     static let source = "Pecha edition"
     static let pages: [PechaPage] = [
         PechaPage(
@@ -15,9 +15,12 @@ enum HeartSutraPecha {
             id: "heart-title",
             section: .title,
             title: "The Sutra of the Heart of the Perfection of Wisdom",
-            tibetan: "༄༅། །བཅོམ་ལྡན་འདས་མ་ཤེས་རབ་ཀྱི་ཕ་རོལ་ཏུ་ཕྱིན་པའི་སྙིང་པོ་བཞུགས། །",
-            transliteration: "Chom Dän Dä Ma She Rab Chi Pa Rol Tu Chin Pe Nying Po",
-            english: "The Sutra of the Heart of the Perfection of Wisdom"
+            tibetan: """
+            ༄༅། །འཕགས་པ་ཤེས་རབ་ཀྱི་སྙིང་པོ་ཞེས་བྱ་བ་ཐེག་པ་ཆེན་པོའི་མདོ།
+            """,
+            transliteration: """
+            Pakpa She Rab Kyi Nyingpo Zhe Ja Wa Tekpa Chenpö Do
+            """
         ),
 
         PechaPage(
@@ -425,8 +428,6 @@ enum HeartSutraPecha {
             and conquer the enemy of faults and delusion.
             May they all be liberated from this ocean of samsara
             and from its pounding waves of birth, old age, sickness and death.
-
-            Taken from the Jatakas.
             """
         )
     ]

@@ -72,6 +72,12 @@ struct LightOfferingView: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("Virtual Offering")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+            }
+
             ToolbarItem(placement: .topBarTrailing) {
                 backgroundMenu
             }
@@ -265,7 +271,7 @@ struct LightOfferingView: View {
     }
 
     private func incenseMetrics(in size: CGSize) -> CGSize {
-        let width = min(max(size.width * 0.21, 64), 98)
+        let width = min(max(size.width * 0.24, 78), 118)
         let height = width * (1145.0 / 378.0)
         return CGSize(width: width, height: height)
     }
@@ -291,7 +297,7 @@ struct LightOfferingView: View {
 
     private func initialWaterBowlPosition(for index: Int, in size: CGSize) -> CGPoint {
         let bowlSize = waterBowlMetrics(in: size)
-        let bottomY = size.height - (bowlSize.height * 0.34 + 10)
+        let bottomY = waterBowlVerticalRange(in: size).upperBound
         let spacing = bowlSize.width * 1.45
         let slot = alternatingSlot(for: index)
         let x = size.width * 0.68 + CGFloat(slot) * spacing
@@ -305,7 +311,7 @@ struct LightOfferingView: View {
     private func initialIncensePosition(for index: Int, in size: CGSize) -> CGPoint {
         let incenseSize = incenseMetrics(in: size)
         let bottomY = size.height - (incenseSize.height * 0.34 + 24)
-        let spacing = incenseSize.width * 2.4
+        let spacing = incenseSize.width * 1.85
         let slot = alternatingSlot(for: index)
         let x = size.width * 0.32 + CGFloat(slot) * spacing
         return clampedIncensePosition(CGPoint(x: x, y: bottomY), in: size)
@@ -362,6 +368,14 @@ struct LightOfferingView: View {
         return minY...maxY
     }
 
+    private func waterBowlVerticalRange(in size: CGSize) -> ClosedRange<CGFloat> {
+        let baseSize = waterBowlMetrics(in: size)
+        let lampRange = lampVerticalRange(in: size)
+        let minY = lampRange.lowerBound + 8
+        let maxY = size.height - (baseSize.height * 0.5 + 6)
+        return minY...max(maxY, minY)
+    }
+
     private func lampPerspectiveScale(for position: CGPoint, in size: CGSize) -> CGFloat {
         let verticalRange = lampVerticalRange(in: size)
         let travel = max(verticalRange.upperBound - verticalRange.lowerBound, 1)
@@ -401,8 +415,8 @@ struct LightOfferingView: View {
     }
 
     private func clampedWaterBowlPosition(_ point: CGPoint, in size: CGSize) -> CGPoint {
-        let verticalRange = lampVerticalRange(in: size)
-        let clampedY = min(max(point.y, verticalRange.lowerBound + 8), verticalRange.upperBound)
+        let verticalRange = waterBowlVerticalRange(in: size)
+        let clampedY = min(max(point.y, verticalRange.lowerBound), verticalRange.upperBound)
         let bowlSize = waterBowlMetrics(for: CGPoint(x: point.x, y: clampedY), in: size)
         let horizontalInset = bowlSize.width * 0.48 + 6
 
@@ -447,7 +461,7 @@ struct LightOfferingView: View {
         let verticalRange = lampVerticalRange(in: size)
         let clampedY = min(max(point.y, verticalRange.lowerBound + 8), verticalRange.upperBound)
         let incenseSize = incenseMetrics(for: CGPoint(x: point.x, y: clampedY), in: size)
-        let horizontalInset = incenseSize.width * 0.75 + 6
+        let horizontalInset = incenseSize.width * 0.24 + 6
 
         return CGPoint(
             x: min(max(point.x, horizontalInset), size.width - horizontalInset),
@@ -655,8 +669,8 @@ struct LightOfferingView: View {
         let dx = candidate.x - otherPosition.x
         let dy = candidate.y - otherPosition.y
 
-        let minHorizontal = (candidateSize.width + otherSize.width) * 0.8
-        let minVertical = (candidateSize.height + otherSize.height) * 0.18
+        let minHorizontal = (candidateSize.width + otherSize.width) * 0.42
+        let minVertical = (candidateSize.height + otherSize.height) * 0.10
 
         guard abs(dx) < minHorizontal, abs(dy) < minVertical else {
             return candidate
@@ -664,10 +678,10 @@ struct LightOfferingView: View {
 
         if abs(dx) >= abs(dy) {
             let directionX: CGFloat = dx == 0 ? (candidateIndex < otherIndex ? -1 : 1) : (dx < 0 ? -1 : 1)
-            return CGPoint(x: candidate.x + directionX * (minHorizontal - abs(dx)), y: candidate.y)
+            return CGPoint(x: candidate.x + directionX * (minHorizontal - abs(dx)) * 0.55, y: candidate.y)
         } else {
             let directionY: CGFloat = dy == 0 ? (candidateIndex < otherIndex ? -1 : 1) : (dy < 0 ? -1 : 1)
-            return CGPoint(x: candidate.x, y: candidate.y + directionY * (minVertical - abs(dy)))
+            return CGPoint(x: candidate.x, y: candidate.y + directionY * (minVertical - abs(dy)) * 0.45)
         }
     }
 }
@@ -906,6 +920,12 @@ private struct MovableIncenseView: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 24.0)) { context in
             let phase = context.date.timeIntervalSinceReferenceDate
+            let swayA = sin(phase * (0.82 + motionSeed * 0.12) + motionSeed * 7.1)
+            let swayB = sin(phase * (1.24 + motionSeed * 0.08) + motionSeed * 11.3)
+            let driftX = (swayA * 0.7 + swayB * 0.3) * size.width * 0.014
+            let rise = (swayB * 0.5 + swayA * 0.18) * size.height * 0.008
+            let smokeRotation = (swayA * 0.85 + swayB * 0.35) * 1.8
+            let smokeTwist = (swayB * 2.8 + swayA * 1.2) * 1.2
 
             ZStack(alignment: .bottom) {
                 Image("butterincense")
@@ -913,6 +933,24 @@ private struct MovableIncenseView: View {
                     .renderingMode(.original)
                     .scaledToFit()
                     .frame(width: size.width, height: size.height)
+                    .mask(IncenseSmokeSuppressedMask(size: size))
+
+                Image("butterincense")
+                    .resizable()
+                    .renderingMode(.original)
+                    .scaledToFit()
+                    .frame(width: size.width, height: size.height)
+                    .mask(IncenseSmokeIsolatedMask(size: size))
+                    .rotationEffect(.degrees(smokeRotation), anchor: UnitPoint(x: 0.47, y: 0.88))
+                    .rotation3DEffect(
+                        .degrees(smokeTwist),
+                        axis: (x: 0, y: 1, z: 0),
+                        anchor: UnitPoint(x: 0.47, y: 0.88),
+                        perspective: 0.75
+                    )
+                    .offset(x: driftX, y: -rise)
+                    .opacity(0.96)
+                    .allowsHitTesting(false)
 
                 ForEach(0..<2, id: \.self) { layer in
                     IncenseSmokeLayerView(
@@ -941,16 +979,16 @@ private struct IncenseSmokeLayerView: View {
             phase * (0.095 + motionSeed * 0.018 + layer * 0.007) + motionSeed * 0.53 + layer * 0.31,
             1.0
         )
-        let rise = CGFloat(cycle) * size.height * (0.072 + CGFloat(layer) * 0.012)
+        let rise = CGFloat(cycle) * size.height * (0.094 + CGFloat(layer) * 0.018)
         let swayA = sin(phase * (0.86 + layer * 0.11 + motionSeed * 0.09) + motionSeed * 7.2 + layer * 0.8)
         let swayB = sin(phase * (1.22 + layer * 0.08 + motionSeed * 0.06) + motionSeed * 11.4 + layer * 1.1)
-        let offsetX = (swayA * 0.75 + swayB * 0.35) * size.width * (0.008 + CGFloat(layer) * 0.002 + CGFloat(cycle) * 0.007)
-        let rotation = (swayA * 0.5 + swayB * 0.25) * (0.55 + CGFloat(cycle) * 0.75)
-        let twist = (swayB * 3.0 + swayA * 0.95) * (0.52 + CGFloat(cycle) * 0.55)
-        let stretchY = 1.0 + CGFloat(cycle) * (0.12 + CGFloat(layer) * 0.03)
-        let stretchX = 1.0 - CGFloat(cycle) * (0.024 + CGFloat(layer) * 0.008)
+        let offsetX = (swayA * 0.8 + swayB * 0.42) * size.width * (0.014 + CGFloat(layer) * 0.004 + CGFloat(cycle) * 0.010)
+        let rotation = (swayA * 0.65 + swayB * 0.30) * (0.85 + CGFloat(cycle) * 1.05)
+        let twist = (swayB * 4.1 + swayA * 1.25) * (0.78 + CGFloat(cycle) * 0.75)
+        let stretchY = 1.0 + CGFloat(cycle) * (0.18 + CGFloat(layer) * 0.04)
+        let stretchX = 1.0 - CGFloat(cycle) * (0.036 + CGFloat(layer) * 0.010)
         let bellFade = pow(max(0, sin(cycle * .pi)), 1.45)
-        let fade = bellFade * (0.26 - CGFloat(layer) * 0.04)
+        let fade = bellFade * (0.36 - CGFloat(layer) * 0.05)
 
         return Image("butterincense2")
             .resizable()
@@ -1041,13 +1079,27 @@ private struct IncenseHitShape: Shape {
         var path = Path()
 
         let stickRect = CGRect(
-            x: rect.midX - rect.width * 0.16,
-            y: rect.height * 0.12,
-            width: rect.width * 0.32,
-            height: rect.height * 0.82
+            x: rect.midX - rect.width * 0.11,
+            y: rect.height * 0.18,
+            width: rect.width * 0.22,
+            height: rect.height * 0.76
         )
 
-        path.addRoundedRect(in: stickRect, cornerSize: CGSize(width: rect.width * 0.08, height: rect.width * 0.08))
+        let smokeRect = CGRect(
+            x: rect.midX - rect.width * 0.15,
+            y: rect.height * 0.02,
+            width: rect.width * 0.30,
+            height: rect.height * 0.24
+        )
+
+        path.addRoundedRect(
+            in: stickRect,
+            cornerSize: CGSize(width: rect.width * 0.06, height: rect.width * 0.06)
+        )
+        path.addRoundedRect(
+            in: smokeRect,
+            cornerSize: CGSize(width: rect.width * 0.10, height: rect.width * 0.10)
+        )
 
         return path
     }
@@ -1078,6 +1130,22 @@ private struct IncenseSmokeShapeMask: View {
         }
         .compositingGroup()
         .blur(radius: size.width * 0.016)
+        .mask(IncenseSmokeWindowMask(size: size))
+    }
+}
+
+private struct IncenseSmokeWindowMask: View {
+    let size: CGSize
+
+    var body: some View {
+        RoundedRectangle(
+            cornerRadius: size.width * 0.09,
+            style: .continuous
+        )
+        .fill(.white)
+        .frame(width: size.width * 0.42, height: size.height * 0.30)
+        .offset(x: -size.width * 0.03, y: -size.height * 0.34)
+        .blur(radius: size.width * 0.008)
     }
 }
 
@@ -1086,6 +1154,29 @@ private struct IncenseHelperSmokeIsolatedMask: View {
 
     var body: some View {
         IncenseSmokeShapeMask(size: size)
+    }
+}
+
+private struct IncenseSmokeIsolatedMask: View {
+    let size: CGSize
+
+    var body: some View {
+        IncenseSmokeShapeMask(size: size)
+    }
+}
+
+private struct IncenseSmokeSuppressedMask: View {
+    let size: CGSize
+
+    var body: some View {
+        Rectangle()
+            .fill(.white)
+            .overlay {
+                IncenseSmokeShapeMask(size: size)
+                    .foregroundStyle(.black)
+                    .blendMode(.destinationOut)
+            }
+            .compositingGroup()
     }
 }
 
