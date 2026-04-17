@@ -79,8 +79,14 @@ struct TeachingsAudioView: View {
     }
 }
 
+private enum TeachingShelf: String {
+    case byClarity = "By Clarity"
+    case livesOfTheMasters = "Lives of the Masters"
+}
+
 private struct TeachingEntry: Identifiable {
     let id: String
+    let shelf: TeachingShelf
     let title: String
     let teacher: String
     let lineage: String
@@ -95,6 +101,7 @@ private struct TeachingEntry: Identifiable {
     static let seed: [TeachingEntry] = [
         TeachingEntry(
             id: "hhdl-mind-training",
+            shelf: .livesOfTheMasters,
             title: "Mind Training and Bodhichitta",
             teacher: "His Holiness the Dalai Lama",
             lineage: "Gelug / universal",
@@ -116,6 +123,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "karmapa-lojong",
+            shelf: .livesOfTheMasters,
             title: "Mind Training (Lojong)",
             teacher: "His Holiness the 17th Karmapa Ogyen Trinley Dorje",
             lineage: "Karma Kagyu",
@@ -136,7 +144,48 @@ private struct TeachingEntry: Identifiable {
             attributionNote: "In-app note based on the official Karmapa teaching page."
         ),
         TeachingEntry(
+            id: "dzongsar-what-makes-you-a-buddhist",
+            shelf: .livesOfTheMasters,
+            title: "What Makes You a Buddhist",
+            teacher: "Dzongsar Jamyang Khyentse Rinpoche",
+            lineage: "Sakya / Rime",
+            sourceLabel: "Lion's Roar",
+            sourceURL: "https://www.lionsroar.com/what-makes-you-a-buddhist/",
+            cardSummary: "Not appearance. Not culture. Not identity. The path turns on whether impermanence, suffering, emptiness, and liberation beyond concepts are actually accepted.",
+            overview: "Dzongsar Jamyang Khyentse Rinpoche makes the point very plainly: being Buddhist is not decided by robes, diet, rituals, or cultural appearance. The real criterion is whether one accepts the four seals: all compounded things are impermanent, all emotions are pain, all things have no inherent existence, and nirvana is beyond concepts.",
+            paragraphs: [
+                "It is easy to turn Buddhism into style, temperament, or belonging. Peaceful image, certain habits, certain language, certain symbols. Dzongsar cuts through that quickly.",
+                "The point is not whether the outer form looks Buddhist. The point is whether the view has shifted deeply enough to accept impermanence, dissatisfaction, emptiness, and freedom beyond conceptual fixation.",
+                "That makes the path much less decorative and much more demanding. You cannot hide inside identity if the teaching keeps undoing whatever tries to become solid and self-confirming.",
+                "This is why the four seals matter. They are not branding. They are the ground of view. If they are present, the path is genuinely Buddhist. If they are absent, outward resemblance does not carry very far."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Dzongsar Jamyang Khyentse Rinpoche. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
+            id: "geshe-tashi-emptiness",
+            shelf: .livesOfTheMasters,
+            title: "Emptiness Is Not Nothingness",
+            teacher: "Geshe Tashi Tsering",
+            lineage: "Gelug",
+            sourceLabel: "The Wisdom Experience",
+            sourceURL: "https://wisdomexperience.org/product/emptiness/",
+            cardSummary: "When emptiness is misunderstood, it becomes either cold abstraction or collapse into nothing. Properly understood, it reveals dependence, contingency, and room for wisdom and compassion.",
+            overview: "This is the point I would anchor most strongly to Geshe Tashi. Emptiness is not a void that cancels life. It is the fact that nothing stands alone, from its own side, in the rigid way grasping imagines. Because things arise dependently, they are workable. Because they are not fixed, change is possible.",
+            paragraphs: [
+                "The word emptiness can mislead before it helps. It can sound like removal. Negation. A flattening of life. A philosophical vacuum where warmth, ethics, and meaning are expected to disappear.",
+                "But that is not the point. What is empty is not absent. What is empty is unpinned. Unsealed. Not established in the hard, independent way confusion keeps insisting on.",
+                "So the teaching does not take the world away. It takes away the extra solidity we project onto it. A self appears, but not in the way grasping says. A problem appears, but not as a final block. A feeling appears, but not as a sovereign truth.",
+                "Then something softens. You do not have to deny what is happening. You do not have to worship it either. You can begin to meet experience as contingent, conditioned, relational, moving.",
+                "That is a gentler world. And also a more responsible one. Because when things are dependently arisen, they matter. Causes matter. Speech matters. Habits matter. Care matters.",
+                "Emptiness is not the collapse of meaning. It is the end of false solidity."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on public source material by and about Geshe Tashi Tsering. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
             id: "yeshe-tsogyal-copper-coloured-mountain",
+            shelf: .livesOfTheMasters,
             title: "Aspiration for the Copper-Coloured Mountain",
             teacher: "Yeshe Tsogyal",
             lineage: "Nyingma",
@@ -158,6 +207,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "guru-rinpoche-view-karma",
+            shelf: .livesOfTheMasters,
             title: "View Higher Than the Sky",
             teacher: "Guru Rinpoche",
             lineage: "Nyingma / Vajrayana",
@@ -179,6 +229,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "bokar-rinpoche-mahamudra",
+            shelf: .livesOfTheMasters,
             title: "Mahamudrā in Ordinary Life",
             teacher: "His Eminence Bokar Rinpoche",
             lineage: "Karma Kagyu / Shangpa Kagyu",
@@ -200,6 +251,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "gyalwang-drukpa-rejoicing",
+            shelf: .livesOfTheMasters,
             title: "Rejoicing and Positive Relationship",
             teacher: "His Holiness the Gyalwang Drukpa",
             lineage: "Drukpa Kagyu",
@@ -210,7 +262,7 @@ private struct TeachingEntry: Identifiable {
             paragraphs: [
                 "The teaching begins with ordinary life. Friendship, family, and Dharma relationship all change as emotions harden and appreciation drops away. Rejoicing is presented as an antidote to that contraction.",
                 "This is not superficial positivity. To rejoice genuinely is to loosen envy, resentment, and habitual self-reference. That creates the space in which understanding can deepen.",
-                "What makes the instruction strong is that it treats relationship as practice. The way one meets others is not separate from realisation; it reveals the state of one’s own mind."
+                "Here relationship itself becomes practice. The way one meets others is not separate from realisation; it reveals the state of one’s own mind."
             ],
             keyPoints: [
                 "Rejoicing is a real practice, not a mood.",
@@ -221,6 +273,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "lama-zopa-compassion",
+            shelf: .livesOfTheMasters,
             title: "Compassion in Everyday Practice",
             teacher: "Lama Zopa Rinpoche",
             lineage: "Gelug / FPMT",
@@ -242,6 +295,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "namkhai-norbu-integration",
+            shelf: .livesOfTheMasters,
             title: "Meditation and Integration",
             teacher: "Chogyal Namkhai Norbu",
             lineage: "Dzogchen",
@@ -263,6 +317,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "garab-dorje-three-statements",
+            shelf: .livesOfTheMasters,
             title: "Three Statements that Strike the Vital Point",
             teacher: "Garab Dorje",
             lineage: "Dzogchen",
@@ -284,6 +339,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "mandarava-prayer",
+            shelf: .livesOfTheMasters,
             title: "Princess Mandāravā’s Prayer",
             teacher: "Mandāravā",
             lineage: "Nyingma / Guru Rinpoche cycle",
@@ -294,7 +350,7 @@ private struct TeachingEntry: Identifiable {
             paragraphs: [
                 "The prayer first praises Guru Rinpoche’s body, speech, and awakened compassion. It is devotional, but not vague. The devotion is tied to liberation from suffering, not to sentiment alone.",
                 "Then the text turns through the familiar structures of life: homeland, house, wealth, family, reputation. Each is acknowledged and then stripped of permanence. On the day of death, none can be carried through.",
-                "That is what gives the prayer its force. Mandāravā is not rejecting life in bitterness. She is clarifying where lasting refuge and inheritance really lie."
+                "Mandāravā is not rejecting life in bitterness. She is clarifying where lasting refuge and inheritance really lie."
             ],
             keyPoints: [
                 "Use devotion to clarify refuge, not to avoid reality.",
@@ -305,13 +361,14 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "pema-sal-nyingtik",
-            title: "A Brief Life, a Lasting Transmission",
+            shelf: .livesOfTheMasters,
+            title: "Pema Sal and the Nyingtik Transmission",
             teacher: "Princess Pema Sal",
             lineage: "Nyingma / Nyingtik",
             sourceLabel: "Rigpa Wiki",
             sourceURL: "https://www.rigpawiki.org/index.php?title=Pema_Sal",
-            cardSummary: "A short but important lineage moment: Guru Rinpoche revives the young princess briefly, entrusts the Nyingtik, and a major transmission continues across lives.",
-            overview: "Pema Sal’s story matters because it holds fragility and continuity together. Her life is brief, but the transmission entrusted to her carries forward through later revelation and rebirth.",
+            cardSummary: "A lineage moment rather than a sermon: Guru Rinpoche revives the young princess briefly, entrusts the Nyingtik, and the transmission continues across lives.",
+            overview: "Pema Sal’s place here is not as a philosopher or preacher, but as a holder of an important transmission. Her life is brief, yet the Nyingtik entrusted to her carries forward through later revelation and rebirth.",
             paragraphs: [
                 "The story is stark. The daughter of Trisong Detsen dies young, is briefly restored by Guru Rinpoche, receives the Nyingtik transmission, and then passes away again. The scene is small, but its implications are vast.",
                 "What stands out is that the Dharma is not measured by the length of a life or the outward scale of an event. A brief opening can still carry enormous consequence.",
@@ -326,6 +383,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "machik-focused-relaxed",
+            shelf: .livesOfTheMasters,
             title: "Tightly Focused and Loosely Relaxed",
             teacher: "Machik Labdron",
             lineage: "Chöd",
@@ -336,7 +394,7 @@ private struct TeachingEntry: Identifiable {
             paragraphs: [
                 "If attention is too loose, awareness becomes vague and sleepy. If it is too tight, the mind becomes brittle, effortful, and narrow.",
                 "Machik’s instruction points to a middle poise: gathered enough to be awake, open enough to remain natural. This balance is not only for formal meditation but for difficult life situations too.",
-                "The line is memorable because it names a subtle art. Many practitioners know one side of practice better than the other."
+                "It names a subtle art. Many practitioners know one side of practice better than the other."
             ],
             keyPoints: [
                 "Avoid both slackness and strain.",
@@ -347,6 +405,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "tilopa-ganges-mahamudra",
+            shelf: .livesOfTheMasters,
             title: "Ganges Mahamudra",
             teacher: "Tilopa",
             lineage: "Mahamudra",
@@ -368,6 +427,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "naropa-eight-difficulties",
+            shelf: .livesOfTheMasters,
             title: "Eight Supreme Difficulties",
             teacher: "Naropa",
             lineage: "Kagyu / Mahamudra",
@@ -389,9 +449,10 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "training-the-monkey-mind",
+            shelf: .livesOfTheMasters,
             title: "Training the Monkey Mind",
             teacher: "",
-            lineage: "Shamatha / mind training",
+            lineage: "Shamatha / taming the mind",
             sourceLabel: "",
             sourceURL: nil,
             cardSummary: "A practical reading of the monk, elephant, and monkey image: attention is not forced into silence, but steadily educated.",
@@ -409,7 +470,40 @@ private struct TeachingEntry: Identifiable {
             attributionNote: ""
         ),
         TeachingEntry(
+            id: "clarity-passing-weather",
+            shelf: .byClarity,
+            title: "Do Not Turn Passing Weather Into Self",
+            teacher: "",
+            lineage: "",
+            sourceLabel: "",
+            sourceURL: nil,
+            cardSummary: "Buddhism is not asking for a better performance of you. It is asking for less confusion, less grasping, and less unnecessary suffering.",
+            overview: "An original Clarity synthesis informed by traditional public Buddhist source texts. This is not a translation and not a quotation from any single master.",
+            paragraphs: [
+                "Buddhism begins very close to home.",
+                "Pain happens. Pleasure happens. Thought happens. Fear happens. Desire happens. Loss happens.",
+                "Then something extra happens.",
+                "Mind begins to gather around what is passing. Around feeling, it builds a self. Around thought, it builds a position. Around memory, it builds identity. Around fear, it builds a future. Around desire, it builds a promise.",
+                "This building is exhausting. It is also the main source of confusion.",
+                "So the path is not mainly about becoming special. It is not about collecting spiritual language. It is not about winning a private purity.",
+                "It is simpler and more difficult than that.",
+                "See clearly. Cause less harm. Notice how grasping tightens the whole field. Notice how compassion softens it. Notice how everything you call solid is moving, dependent, contingent, and not fully ownable in the way habit insists.",
+                "Ethics steadies the ground. Meditation reveals the machinery. Wisdom stops believing it so completely. Compassion keeps the path from folding back into self-concern.",
+                "Then freedom does not need to arrive from somewhere else.",
+                "It begins here: less tightening, less claiming, less defence of what was never stable enough to secure.",
+                "What remains is not blankness. It is not indifference. It is not some polished state with no weather in it.",
+                "It is a more honest way of being.",
+                "Thought can still appear. Grief can still appear. Love can still appear. Confusion can still appear.",
+                "But what appears does not need to become prison. What passes does not need to become someone. What is empty need not be feared for being empty.",
+                "Then clarity is less like something achieved and more like what is noticed when less has been added.",
+                "That is already a profound relief. And quietly, the path comes into view."
+            ],
+            keyPoints: [],
+            attributionNote: ""
+        ),
+        TeachingEntry(
             id: "marpa-death-as-friend",
+            shelf: .livesOfTheMasters,
             title: "Taking Death as a Friend",
             teacher: "Marpa Lotsawa",
             lineage: "Kagyu",
@@ -431,27 +525,25 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "milarepa-horror-of-death",
-            title: "In Horror of Death",
+            shelf: .livesOfTheMasters,
+            title: "Let Urgency Simplify You",
             teacher: "Milarepa",
             lineage: "Kagyu",
             sourceLabel: "Lotsawa House",
             sourceURL: "https://www.lotsawahouse.org/tibetan-masters/milarepa/in-horror-of-death",
-            cardSummary: "A brief and forceful Milarepa verse: fear of death drove him to retreat, and realisation dissolved that fear at the root.",
-            overview: "This short verse is one of the clearest windows into Milarepa’s style. He does not romanticize retreat. Retreat is what he entered because death became undeniable.",
+            cardSummary: "Fear can either scatter the mind or clarify it. What matters is whether it sends you deeper, or just keeps you busy.",
+            overview: "This is not a teaching about morbidity for its own sake. It points to using mortality properly. Death is not treated as an idea to admire, but as something sharp enough to cut through delay, pretence, and the endless rearranging of life around avoidance.",
             paragraphs: [
-                "The mountain is not presented as a scenic preference. It is the place to which he fled because ordinary life could no longer cover over impermanence.",
-                "Repeatedly contemplating the uncertainty of death becomes the doorway to the deathless nature of mind. Fear is not merely soothed; it is outgrown through recognition.",
-                "That makes the verse both fierce and encouraging. The same anxiety that unsettles life can become the very force that turns the mind toward truth."
+                "Most people know death as background pressure. A low constant hum. Something to avoid, postpone, decorate around. Milarepa turns and faces it, not to become dark and not to become severe, but to stop wasting the chance of being here.",
+                "When death is kept abstract, life easily fills with secondary things: more postponement, more self-arrangement, more little loops presented as necessity. But when impermanence is felt properly, some things begin to fall away on their own. What matters becomes plainer. What does not matter loses some of its theatre.",
+                "This is the harder kindness of the path: do not wait for everything to feel settled before you practise. Let instability itself ripen understanding. The point is not to become frightened. The point is to become simple."
             ],
-            keyPoints: [
-                "Use fear of death as fuel for practice.",
-                "Retreat begins in existential honesty.",
-                "Recognition of mind dissolves fear at the root."
-            ],
-            attributionNote: "In-app note based on a public quotation page at Lotsawa House."
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text attributed to Milarepa. This reflection is original writing for the app and not a direct quotation."
         ),
         TeachingEntry(
             id: "ayang-rinpoche-phowa",
+            shelf: .livesOfTheMasters,
             title: "Phowa and Dying with Confidence",
             teacher: "His Eminence Ayang Rinpoche",
             lineage: "Drikung Kagyu / Nyingma",
@@ -473,6 +565,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "chandrakirti-compassion-middle-way",
+            shelf: .livesOfTheMasters,
             title: "Compassion at the Start of the Middle Way",
             teacher: "Chandrakirti",
             lineage: "Madhyamaka",
@@ -494,6 +587,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "dharmakirti-clear-light",
+            shelf: .livesOfTheMasters,
             title: "Clear Light and Adventitious Stains",
             teacher: "Dharmakirti",
             lineage: "Pramana / Buddhist philosophy",
@@ -514,7 +608,124 @@ private struct TeachingEntry: Identifiable {
             attributionNote: "In-app note based on the public Lotsawa House quotations page for Dharmakīrti."
         ),
         TeachingEntry(
+            id: "patrul-advice-to-myself",
+            shelf: .livesOfTheMasters,
+            title: "Do Not Stop at Calm",
+            teacher: "Patrul Rinpoche",
+            lineage: "Nyingma",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/tibetan-masters/patrul-rinpoche/meaning-of-natural-great-perfection",
+            cardSummary: "A quiet mind is not yet freedom. What matters is whether experience releases, or just goes still for a while.",
+            overview: "In this text, Patrul Rinpoche says that present awareness, left in natural ease, is already beyond adding and removing. He warns that merely calming the mind is not enough if one does not understand liberation. Without that key, afflictions may only be suppressed for a time and then return when circumstances stir them again.",
+            paragraphs: [
+                "It is possible to become very sincere about managing the mind and still remain trapped in the manager. Sometimes the inner world becomes a project: less noise, better state, cleaner meditation, fewer thoughts. And for a while that can look like progress.",
+                "But Patrul cuts deeper than that. A moment of quiet is not the same as release. A controlled surface is not the same as freedom. What matters is not only whether thought settles, but whether, when it rises, it binds.",
+                "If every passing movement still becomes hope, fear, correction, identity, or commentary, then the knot has not gone very far. It has only become more polite. So leave some room even there. Not sloppy room. Not drift. Room enough that arising does not instantly become ownership.",
+                "A thought appears. Before it becomes a position, let it be lighter than that. Before it becomes self, let it be weather. Before it becomes struggle, let it pass through open ground.",
+                "Calm has its place. But the deeper point is gentler and more radical: what comes need not stay, and what stays need not define."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Patrul Rinpoche. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
+            id: "atisha-lamp-path",
+            shelf: .livesOfTheMasters,
+            title: "Start Where You Actually Are",
+            teacher: "Atiśa",
+            lineage: "Kadam / Lamrim",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/indian-masters/atisha/lamp-path-enlightenment",
+            cardSummary: "The path does not open by pretending to be further along. It opens when honesty, intention, and direction begin to line up.",
+            overview: "Atiśa’s strength is order without heaviness. He does not blur everything into one vague spirituality. He explains that beings differ in scope and motivation, and that the path should be understood accordingly. That gives the teaching a very clean honesty: do not perform the highest view while still avoiding the basics. Begin where you are, clarify your intention, and let the path deepen from there.",
+            paragraphs: [
+                "A great deal of confusion comes from wanting the furthest teaching first, without letting the ground become simple. So much effort goes into appearing advanced: more view, more language, more identity around practice.",
+                "Atiśa cuts through that. Do not reach upward by skipping what is near. Do not use grand ideas to avoid plain causes and conditions. Do not borrow the voice of realisation while the heart is still bargaining with the basics.",
+                "Start where you actually are. What do you serve? What are you still clinging to? What do you call practice, and what do you quietly refuse? This is not a smaller path. It is the beginning of a true one.",
+                "When intention becomes cleaner, the road becomes clearer. When the road becomes clearer, compassion stops being decoration. Then what is higher is not performed; it grows naturally from what has been made honest.",
+                "The path does not ask for display. It asks for alignment."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Atiśa. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
+            id: "gampopa-four-dharmas",
+            shelf: .livesOfTheMasters,
+            title: "Let the Dharma Go All the Way Through",
+            teacher: "Gampopa",
+            lineage: "Kagyu / Lamrim",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/tibetan-masters/gampopa-sonam-rinchen/four-dharmas-lamrim-precious-garland",
+            cardSummary: "It is not enough to admire the path. The point is that it changes what leads, what matters, and what confusion becomes.",
+            overview: "Gampopa’s strength is that he does not leave Dharma at the level of inspiration. The movement is sequential and uncompromising: first the mind actually turns, then practice deepens into path, then confusion is not merely suppressed but understood, and finally even confusion becomes workable as wisdom. The text also places this within the graduated approaches of lesser, intermediate, and great capacities rather than flattening everything into one mood or slogan.",
+            paragraphs: [
+                "Many people like the sound of Dharma before they let it alter the centre of gravity.",
+                "Gampopa asks for more than agreement. More than language. More than spiritual preference. Has the mind actually turned? Has practice entered your habits deeply enough to interrupt momentum? Has confusion become something you study and open, rather than merely repeat?",
+                "That is the harder kindness here. Not just to collect teachings, but to let them continue their work until even the places that once trapped you begin to serve understanding.",
+                "The path is not complete when it sounds right. It becomes real when it moves through the whole structure of how you live."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Gampopa. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
+            id: "shantideva-bodhicitta-benefits",
+            shelf: .livesOfTheMasters,
+            title: "Make Your Concern Wider Than Yourself",
+            teacher: "Śāntideva",
+            lineage: "Mahāyāna",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/indian-masters/shantideva/bodhicharyavatara-1",
+            cardSummary: "The path changes when awakening is no longer imagined as private improvement. Bodhicitta widens the whole field.",
+            overview: "Śāntideva keeps returning to a simple but radical shift: the path deepens when concern is no longer organised around this small centre alone. Bodhicitta is not a sentimental add-on. It is a reorientation of value, effort, and meaning. In that sense, Chapter 1 is not decorative praise; it is the hinge on which the whole book turns.",
+            paragraphs: [
+                "A great deal of suffering is tightened by the scale at which the mind keeps measuring. My problem. My lack. My progress. My wound. My future.",
+                "Śāntideva does not deny pain. He widens it. Not into abstraction, but into bodhicitta: a heart large enough that awakening is no longer pursued as a refined form of self-concern.",
+                "That widening changes everything. It changes what effort is for. It changes what practice protects. It changes what counts as success.",
+                "Sometimes what heals the mind is not better management of the self. Sometimes it is a purpose wider than the self can comfortably contain."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Śāntideva. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
+            id: "mipham-three-crucial-statements",
+            shelf: .livesOfTheMasters,
+            title: "Know It Inwardly",
+            teacher: "Mipham Rinpoche",
+            lineage: "Nyingma",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/tibetan-masters/mipham/instruction-on-three-crucial-points",
+            cardSummary: "The crucial point is not a better theory of mind. It is direct familiarity with what mind is before talk multiplies.",
+            overview: "Mipham’s gift is precision without overbuilding. He does not inflate the path with unnecessary complexity here. He identifies the essence, the sustaining, and the self-liberation very cleanly. The text keeps turning away from conceptual excess and back toward direct recognition.",
+            paragraphs: [
+                "The mind likes to stand slightly outside itself and discuss the way in. Mipham cuts that off early.",
+                "Do not mistake explanation for recognition. Do not mistake a good description for contact. Do not mistake searching for the view for resting in what the search was looking for.",
+                "The whole thing becomes quieter here. More exact. Less theatrical.",
+                "There is knowing before commentary. There is openness before construction. There is a way thoughts can move without needing to become architecture. The path is not made clearer by endless mental furniture. Often it becomes clearer when the extra pieces are not installed."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Mipham Rinpoche. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
+            id: "jigten-sumgon-sevenfold-refuge",
+            shelf: .livesOfTheMasters,
+            title: "Return to Refuge Before Complication",
+            teacher: "Jigten Sumgön",
+            lineage: "Drikung Kagyu",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/tibetan-masters/drikung-kyobpa-jikten-sumgon/sevenfold-tara-refuge-supplication",
+            cardSummary: "Protection is not only something asked for. It is also what appears when confusion stops leaving its ground.",
+            overview: "This is not refuge as mere fear-management. It is much subtler. The prayer repeatedly pairs confusion with a failure to recognise what is already the case: cause and effect, non-dual wisdom, the inseparability of reality and appearance, and the sky-like nature free of elaboration. Protection, in that sense, is not only rescue from outside danger. It is protection from the habits of misrecognition that keep re-solidifying experience.",
+            paragraphs: [
+                "The mind becomes complicated very quickly. It gathers views, reactions, stories, positions. Then even the path gets handled as one more thing to organise.",
+                "Jigten Sumgön brings it back to refuge. But refuge here is not shrinking. It is remembering ground.",
+                "Remembering that confusion does not stand apart from causes and conditions. Remembering that what appears is not outside reality. Remembering that wisdom is not somewhere else, waiting dramatically in the distance.",
+                "Then prayer becomes less like pleading from exile and more like re-entering alignment. Sometimes the simplest movement is the deepest one: stop scattering, stop hardening, return."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Jigten Sumgön. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
             id: "dilgo-heart-advice",
+            shelf: .livesOfTheMasters,
             title: "Heart Advice in Four Lines",
             teacher: "Dilgo Khyentse Rinpoche",
             lineage: "Nyingma / Rime",
@@ -538,6 +749,7 @@ private struct TeachingEntry: Identifiable {
         ),
         TeachingEntry(
             id: "jamgon-kongtrul-lhawang-tashi",
+            shelf: .livesOfTheMasters,
             title: "Advice to Lhawang Tashi",
             teacher: "Jamgon Kongtrul Lodro Thaye",
             lineage: "Rime / Kagyu",
@@ -560,7 +772,30 @@ private struct TeachingEntry: Identifiable {
             attributionNote: "Based on a public Lotsawa House translation. Attribution and source link retained."
         ),
         TeachingEntry(
+            id: "mindrolling-trichen-study-retreat-transmission",
+            shelf: .livesOfTheMasters,
+            title: "Do Not Separate Study, Retreat, and Transmission",
+            teacher: "Mindrolling Trichen Rinpoche",
+            lineage: "Nyingma / Mindrolling",
+            sourceLabel: "Mindrolling International",
+            sourceURL: "https://www.mindrollinginternational.org/lineage-and-history/kyabje-mindrolling-trichen/",
+            cardSummary: "The Dharma is weakened when it is admired in fragments. It becomes living when understanding, practice, and continuity remain joined.",
+            overview: "This entry is anchored to official Mindrolling biography and lineage history, not a commercial book. Those sources present the 11th Mindrolling Trichen, Gyurme Kunzang Wangyal, as a throne holder who received extensive teachings and empowerments from major masters, was especially trained in the Guhyagarbha Tantra and its commentaries under Dzongsar Khyentse Chökyi Lodrö, spent more than fourteen years in retreat, composed teachings, discovered terma, and later re-established the Mindrolling seat in exile while working to preserve the purity of the teachings and samaya.",
+            paragraphs: [
+                "The strongest thread here is integration. Study alone is not enough. Retreat alone is not enough. Institutional continuity alone is not enough. In the official materials, Mindrolling Trichen’s life is presented as all three held together: deep instruction received accurately, practice carried through in long retreat, and transmission preserved carefully for future generations.",
+                "The wider Mindrolling history also describes the lineage as low-profile, service-oriented, and devoted to preserving and propagating the Dharma rather than display. That makes the emphasis here very clean: the path becomes thin when it is divided into admired pieces.",
+                "Some want learning without retreat. Some want retreat without responsibility. Some want lineage without the burden of truly receiving and carrying it. But a living tradition does not survive by atmosphere. It survives when understanding is exact, when practice is real, and when what is received is passed on without being thinned out by carelessness.",
+                "Study clarifies. Retreat ripens. Transmission protects continuity. If one is missing, something weakens. Learning without practice becomes cleverness circling itself. Practice without grounding can become private mood. Transmission without inner digestion becomes form without depth.",
+                "So keep them joined. Learn until the teaching is precise enough not to be vague. Practise until it changes more than your vocabulary. Transmit only what has been honoured enough not to be distorted.",
+                "This is quieter than spiritual display. That is part of its strength. Official biographies also make clear that he was revered as a great accomplished master, and the strongest public basis remains his retreat life, training, and lineage preservation.",
+                "A lineage remains alive not when it is praised, but when it is embodied carefully enough that what was true before is still true when it reaches the next hands."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on official public source material about Mindrolling Trichen Rinpoche. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
             id: "longchenpa-heart-advice",
+            shelf: .livesOfTheMasters,
             title: "Thirty Pieces of Heart Advice",
             teacher: "Longchen Rabjam",
             lineage: "Nyingma",
@@ -583,7 +818,27 @@ private struct TeachingEntry: Identifiable {
             attributionNote: "Based on a public Lotsawa House translation. Attribution and source link retained."
         ),
         TeachingEntry(
+            id: "longchenpa-illusion-light",
+            shelf: .livesOfTheMasters,
+            title: "Let Appearance Stay Light",
+            teacher: "Longchen Rabjam",
+            lineage: "Nyingma / Dzogchen",
+            sourceLabel: "Lotsawa House",
+            sourceURL: "https://www.lotsawahouse.org/tibetan-masters/longchen-rabjam/gyuma-ngalso-wish-fulfilling-gem",
+            cardSummary: "What appears need not be denied. But it also need not be held as heavily as habit suggests.",
+            overview: "This text is not saying that nothing appears. It is saying that appearance is easy to over-believe. Longchenpa’s instruction is to train so that whatever appears and exists is recognised in an illusory way, while remaining free from ordinary conceptual fixation. The point is not numbness or denial, but a lighter, less grasping relationship to experience.",
+            paragraphs: [
+                "Most suffering does not begin with appearance itself. It begins when appearance is pressed into certainty.",
+                "A feeling comes. A thought comes. A fear, a memory, a pull, a world. Then habit moves quickly. This means something. This proves something. This is me. This is solid. This must be followed or fought. Longchenpa loosens that reflex.",
+                "What appears can appear. But it does not need to arrive with the full weight of verdict and ownership. A mood is not yet a truth. A thought is not yet a structure. A passing intensity is not yet a self.",
+                "Leave things a little more dreamlike, not vague, not dismissed, just lighter. Lighter in the hand. Lighter in the naming. Lighter in the need to build around them. Then experience can move without hardening so quickly. And what seemed dense begins to show more space. Not because nothing was there, but because less was added."
+            ],
+            keyPoints: [],
+            attributionNote: "Clarity reflection on a public source text by Longchenpa. This reflection is original writing for the app and not a direct quotation."
+        ),
+        TeachingEntry(
             id: "tsongkhapa-three-principal-aspects",
+            shelf: .livesOfTheMasters,
             title: "Three Principal Aspects of the Path",
             teacher: "Je Tsongkhapa",
             lineage: "Gelug",
@@ -620,6 +875,10 @@ private struct TeachingCard: View {
     }
 
     private var subtitleText: String {
+        if teaching.shelf == .byClarity {
+            return TeachingShelf.byClarity.rawValue
+        }
+
         let parts = [teaching.teacher, teaching.lineage]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { $0.isEmpty == false }
@@ -683,6 +942,16 @@ private struct TeachingDetailView: View {
         return parts.joined(separator: " · ")
     }
 
+    private var footerText: String? {
+        if teaching.shelf == .byClarity {
+            let note = teaching.attributionNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            return note.isEmpty ? nil : note
+        }
+
+        let source = teaching.sourceLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        return source.isEmpty ? nil : "Source: \(source)"
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -690,15 +959,34 @@ private struct TeachingDetailView: View {
                     Text(teaching.title)
                         .font(.title3.weight(.semibold))
 
-                    if teacherLineText.isEmpty == false {
+                    if teaching.shelf == .byClarity {
+                        Text(TeachingShelf.byClarity.rawValue)
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    } else if teacherLineText.isEmpty == false {
                         Text(teacherLineText)
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(.secondary)
                     }
                 }
 
-                Text(teaching.overview)
-                    .font(.body)
+                if teaching.shelf == .byClarity {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Note")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+
+                        Text(teaching.overview)
+                            .font(.body)
+                    }
+
+                    Text("Teaching")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text(teaching.overview)
+                        .font(.body)
+                }
 
                 ForEach(teaching.paragraphs, id: \.self) { paragraph in
                     Text(paragraph)
@@ -726,8 +1014,8 @@ private struct TeachingDetailView: View {
                     }
                 }
 
-                if teaching.attributionNote.isEmpty == false {
-                    Text(teaching.attributionNote)
+                if let footerText {
+                    Text(footerText)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
