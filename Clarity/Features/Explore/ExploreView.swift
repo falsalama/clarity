@@ -235,6 +235,26 @@ private struct AppleHealthExploreView: View {
         healthKit.mindfulShareAuthorizationStatus == .sharingAuthorized
     }
 
+    private var patternSnapshot: HealthKitManager.PatternSnapshot? {
+        healthKit.patternSnapshot
+    }
+
+    private func formattedHours(_ value: Double?) -> String? {
+        guard let value else { return nil }
+        let hours = Int(value)
+        let minutes = Int(((value - Double(hours)) * 60).rounded())
+
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+
+        return "\(minutes)m"
+    }
+
+    private func formattedWholeNumber(_ value: Double?) -> String? {
+        guard let value else { return nil }
+        return NumberFormatter.localizedString(from: NSNumber(value: Int(value.rounded())), number: .decimal)
+    }
 
     var body: some View {
         ScrollView {
@@ -260,7 +280,7 @@ private struct AppleHealthExploreView: View {
                         Spacer()
                     }
                     
-                    Text("Connect Apple Health to help Clarity notice patterns around sleep, heart rhythm, daily movement, and mindful time alongside your reflections.")
+                    Text("Connect Apple Health to help Clarity notice patterns around sleep, heart-rate trends, daily movement, and mindful time alongside your reflections.")
                         .foregroundStyle(.secondary)
                 }
                 
@@ -276,7 +296,7 @@ private struct AppleHealthExploreView: View {
                     
                     AppleHealthBulletRow(
                         systemImage: "heart.fill",
-                        title: "Heart rhythm",
+                        title: "Heart rate trends",
                         subtitle: "Use heart-rate patterns as gentle context, not diagnosis."
                     )
                     
@@ -295,6 +315,78 @@ private struct AppleHealthExploreView: View {
                 .padding(16)
                 .background(Color(.secondarySystemGroupedBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+                if healthKit.isLoadingPatterns {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(spacing: 10) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Looking for recent Apple Health patterns…")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                } else if let patternSnapshot {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Emerging patterns")
+                            .font(.headline)
+
+                        if patternSnapshot.summary.sampleDays > 0 {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Recent averages")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+
+                                AppleHealthBulletRow(
+                                    systemImage: "bed.double.fill",
+                                    title: "Sleep",
+                                    subtitle: formattedHours(patternSnapshot.summary.averageSleepHours).map { "\($0) per day" } ?? "Not enough recent sleep data yet."
+                                )
+
+                                AppleHealthBulletRow(
+                                    systemImage: "heart.fill",
+                                    title: "Heart rate",
+                                    subtitle: formattedWholeNumber(patternSnapshot.summary.averageHeartRate).map { "\($0) bpm average" } ?? "Not enough recent heart-rate data yet."
+                                )
+
+                                AppleHealthBulletRow(
+                                    systemImage: "figure.walk",
+                                    title: "Steps",
+                                    subtitle: formattedWholeNumber(patternSnapshot.summary.averageDailySteps).map { "\($0) per day" } ?? "Not enough recent step data yet."
+                                )
+
+                                AppleHealthBulletRow(
+                                    systemImage: "brain.head.profile",
+                                    title: "Mindful minutes",
+                                    subtitle: formattedWholeNumber(patternSnapshot.summary.averageMindfulMinutes).map { "\($0) per day" } ?? "No recent mindful sessions yet."
+                                )
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("What Clarity is noticing")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.secondary)
+
+                            ForEach(patternSnapshot.insights) { insight in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(insight.title)
+                                        .font(.subheadline.weight(.semibold))
+
+                                    Text(insight.detail)
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
                 
                 VStack(alignment: .leading, spacing: 0) {
                     Button {
@@ -304,6 +396,7 @@ private struct AppleHealthExploreView: View {
                             Task {
                                 await healthKit.requestAuthorization()
                                 healthKit.refreshAuthorizationState()
+                                await healthKit.refreshPatterns()
                             }
                         }
                     } label: {
@@ -413,7 +506,7 @@ private struct AppleHealthExploreView: View {
                     Text("Health data is sensitive. Clarity should keep raw Apple Health data on device, ask only for the types it genuinely uses, and make read and write behaviour clear before permission is requested.")
                         .foregroundStyle(.secondary)
                     
-                    Text("For now, only completed Meditation Zone sessions should count as mindful minutes.")
+                    Text("Pattern notes should be treated as gentle context, not diagnosis or proof of causation.")
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
                 }
@@ -428,6 +521,9 @@ private struct AppleHealthExploreView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             healthKit.refreshAuthorizationState()
+            Task {
+                await healthKit.refreshPatterns()
+            }
         }
         .alert("Manage Apple Health access", isPresented: $showManageAccessAlert) {
             Button("OK", role: .cancel) { }
