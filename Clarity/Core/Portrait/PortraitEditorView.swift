@@ -151,7 +151,7 @@ private struct PortraitEditorBackgroundButterlampView: View {
 }
 
 private enum PortraitEditorBackgroundButterlampStyle {
-    static let assetName = "butterlamp"
+    static let assetName = "CloudsBG"
     static let baseOpacity: Double = 0.14
     static let startScale: CGFloat = 0.70
     static let endScale: CGFloat = 1.04
