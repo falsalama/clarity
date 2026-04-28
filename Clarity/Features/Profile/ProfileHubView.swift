@@ -3,6 +3,7 @@ import SwiftData
 
 struct ProfileHubView: View {
     @EnvironmentObject private var flow: AppFlowRouter
+    @EnvironmentObject private var reflectStore: ClarityReflectStore
 
     @Query private var reflectCompletions: [ReflectCompletionEntity]
     @Query private var focusCompletions: [FocusCompletionEntity]
@@ -92,6 +93,17 @@ struct ProfileHubView: View {
                     sectionTitle("App")
 
                     VStack(alignment: .leading, spacing: 14) {
+                        NavigationLink {
+                            ClarityReflectView()
+                        } label: {
+                            ProfileMenuCard(
+                                title: "Account",
+                                subtitle: accountSubtitle,
+                                systemImage: "sparkle.magnifyingglass"
+                            )
+                        }
+                        .buttonStyle(ProfileMenuCardPressStyle())
+
                         NavigationLink {
                             AboutView()
                         } label: {
@@ -200,6 +212,16 @@ struct ProfileHubView: View {
             .font(.headline)
             .foregroundStyle(.secondary)
     }
+
+    private var accountSubtitle: String {
+        if reflectStore.isSupportOnlyActive {
+            return "Support Clarity active."
+        }
+        if reflectStore.hasPaidTier {
+            return "Manage Clarity Reflect and support."
+        }
+        return "Core app free. Paid Reflect tools are optional."
+    }
 }
 
 // MARK: - Profile background
@@ -213,7 +235,7 @@ private struct ProfileBackgroundView: View {
         GeometryReader { proxy in
             ZStack {
                 backgroundImage(named: "profilebg", in: proxy)
-                    .opacity(0.74)
+                    .opacity(0.60)
 
                 if let revealPoint {
                     backgroundImage(named: "profilebgcol", in: proxy)
@@ -298,7 +320,7 @@ private struct ProfileMenuCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.systemBackground).opacity(0.22))
+                .fill(Color(.systemBackground).opacity(0.34))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -335,7 +357,7 @@ private struct ProfilePortraitCard: View {
         .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color(.systemBackground).opacity(0.22))
+                .fill(Color(.systemBackground).opacity(0.34))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)

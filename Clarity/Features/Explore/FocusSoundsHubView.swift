@@ -234,10 +234,12 @@ private struct FocusSoundHeroCard: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text("Meditative Sounds")
-                        .font(.caption.weight(.bold))
-                        .tracking(1.2)
-                        .foregroundStyle(Color.white.opacity(0.84))
+                    if item.collectionTitle != "Longchen Dzó" {
+                        Text("Meditative Sounds")
+                            .font(.caption.weight(.bold))
+                            .tracking(1.2)
+                            .foregroundStyle(Color.white.opacity(0.84))
+                    }
 
                     Spacer()
 
@@ -314,6 +316,46 @@ enum FocusSoundsLibrary {
             collectionTitle: "Longchen Dzó"
         ),
         .init(
+            title: "Dakini Code",
+            subtitle: "Longchen Dzó",
+            note: "A spacious reflective song with the same player structure as Teachings.",
+            fileName: "Dakini code",
+            artworkAssetName: "placeholder21",
+            durationLabel: "0m 00s",
+            tint: Color(red: 0.42, green: 0.08, blue: 0.10),
+            collectionTitle: "Longchen Dzó"
+        ),
+        .init(
+            title: "ཨོཾ་ཨ་ར་པ་ཙ་ན་དྷཱིཿ།",
+            subtitle: "Longchen Dzó",
+            note: "A spacious reflective song with the same player structure as Teachings.",
+            fileName: "ཨོཾ་ཨ་ར་པ་ཙ་ན་དྷཱིཿ།",
+            artworkAssetName: "LongchenDzó",
+            durationLabel: "2m 54s",
+            tint: Color(red: 0.42, green: 0.08, blue: 0.10),
+            collectionTitle: "Longchen Dzó"
+        ),
+        .init(
+            title: "ཨོཾ་ཨཱཿཧཱུྃ་བཛྲ་གུ་རུ་པདྨ་སིདྡྷི་ཧཱུྃ༔",
+            subtitle: "Longchen Dzó",
+            note: "A spacious reflective song with the same player structure as Teachings.",
+            fileName: "om ah hung benza guru pema siddhi hung",
+            artworkAssetName: "LongchenDzó",
+            durationLabel: "3m 33s",
+            tint: Color(red: 0.42, green: 0.08, blue: 0.10),
+            collectionTitle: "Longchen Dzó"
+        ),
+        .init(
+            title: "ཨོཾ་མ་ཎི་པདྨེ་ཧཱུྃ།",
+            subtitle: "Longchen Dzó",
+            note: "A spacious reflective song with the same player structure as Teachings.",
+            fileName: "ཨོཾ་མ་ཎི་པདྨེ་ཧཱུྃ།",
+            artworkAssetName: "LongchenDzó",
+            durationLabel: "3m 23s",
+            tint: Color(red: 0.42, green: 0.08, blue: 0.10),
+            collectionTitle: "Longchen Dzó"
+        ),
+        .init(
             title: "Crystal Cave",
             subtitle: "Settling spacious tones",
             note: "Held crystalline tones with a slightly warmer field.",
@@ -330,16 +372,6 @@ enum FocusSoundsLibrary {
             artworkAssetName: "placeholder17",
             durationLabel: "1m 29s",
             tint: Color(red: 0.55, green: 0.10, blue: 0.14)
-        ),
-        .init(
-            title: "Dakini Code",
-            subtitle: "Longchen Dzó",
-            note: "A spacious reflective song with the same player structure as Teachings.",
-            fileName: "Dakini code",
-            artworkAssetName: "placeholder21",
-            durationLabel: "0m 00s",
-            tint: Color(red: 0.42, green: 0.08, blue: 0.10),
-            collectionTitle: "Longchen Dzó"
         ),
         .init(
             title: "Vast Drop",

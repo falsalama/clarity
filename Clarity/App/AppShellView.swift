@@ -34,7 +34,7 @@ struct AppShellView: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
-                TabView(selection: $flow.selectedTab) {
+                TabView(selection: tabSelection) {
 
                     NavigationStack { HomeView() }
                         .id(flow.homeNavigationResetSeed)
@@ -169,6 +169,20 @@ struct AppShellView: View {
                 homeSurface.stopDailyAutoRefresh()
             }
         }
+    }
+
+    private var tabSelection: Binding<AppFlowRouter.Tab> {
+        Binding(
+            get: { flow.selectedTab },
+            set: { newValue in
+                switch newValue {
+                case .home:
+                    flow.openPracticeHomeAtRoot()
+                default:
+                    flow.selectedTab = newValue
+                }
+            }
+        )
     }
     // MARK: - Fixed tab bar appearance
 

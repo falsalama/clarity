@@ -449,7 +449,7 @@ private struct PechaReaderTheme {
     )
 
     static let heartSutraDark = PechaReaderTheme(
-        background: Color.black,
+        background: Color(red: 0.03, green: 0.05, blue: 0.10),
         primaryText: Color(red: 0.80, green: 0.67, blue: 0.35),
         secondaryText: Color(red: 0.66, green: 0.56, blue: 0.33),
         tertiaryText: Color(red: 0.52, green: 0.45, blue: 0.28),

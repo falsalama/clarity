@@ -4,10 +4,10 @@ import SwiftData
 struct TurnDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @EnvironmentObject private var cloudTap: CloudTapSettings
+    @EnvironmentObject private var reflectStore: ClarityReflectStore
     @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var dictionary: RedactionDictionary
     @EnvironmentObject private var capsuleStore: CapsuleStore
-    @AppStorage("supporter.access.enabled") private var hasSupporterAccess: Bool = false
 
     let turnID: UUID
 
@@ -117,6 +117,8 @@ struct TurnDetailView: View {
                 switch route {
                 case .cloudTapOff:
                     CloudTapOffSheet()
+                case .clarityReflect:
+                    ClarityReflectView()
                 case .missingCapture:
                     MissingCaptureSheet()
                 }
@@ -660,14 +662,32 @@ struct TurnDetailView: View {
 
 
     private func toolButton(title: String, tool: CloudTool, enabled: Bool) -> some View {
-        Button { requestTool(tool) } label: {
-            Text(title)
+        let locked = requiresClarityReflect(tool) && !reflectStore.hasReflectAccess
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Button { requestTool(tool) } label: {
+                HStack(spacing: 8) {
+                    if locked {
+                        Image(systemName: "lock.fill")
+                            .font(.callout.weight(.semibold))
+                    }
+
+                    Text(title)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
                 .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .tint(toolTint(tool))
+            .disabled(!enabled)
+
+            if locked {
+                Text("Available with Clarity Reflect or Support Clarity")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
-        .tint(toolTint(tool))
-        .disabled(!enabled)
     }
 
     private var talkItThroughButton: some View {
@@ -676,7 +696,7 @@ struct TurnDetailView: View {
                 requestTool(.talkItThrough)
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: hasSupporterAccess ? "bubble.left.and.bubble.right.fill" : "lock.fill")
+                    Image(systemName: reflectStore.hasReflectAccess ? "bubble.left.and.bubble.right.fill" : "lock.fill")
                         .font(.callout.weight(.semibold))
 
                     Text("Talk it through")
@@ -687,10 +707,10 @@ struct TurnDetailView: View {
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .tint(toolTint(.talkItThrough))
-            .disabled(!isToolsEnabled || !hasSupporterAccess)
+            .disabled(!isToolsEnabled)
 
-            if !hasSupporterAccess {
-                Text("Available with Supporter access")
+            if !reflectStore.hasReflectAccess {
+                Text("Available with Clarity Reflect or Support Clarity")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -698,14 +718,15 @@ struct TurnDetailView: View {
     }
 
     private func requestTool(_ tool: CloudTool) {
-        if tool == .talkItThrough, !hasSupporterAccess {
-            return
-        }
-
         pendingTool = tool
 
         guard turn != nil else {
             sheetRoute = .missingCapture
+            return
+        }
+
+        guard !requiresClarityReflect(tool) || reflectStore.hasReflectAccess else {
+            sheetRoute = .clarityReflect
             return
         }
 
@@ -731,6 +752,15 @@ struct TurnDetailView: View {
             return true
         case .deviceTapApple, .deviceTapLlama:
             return false
+        }
+    }
+
+    private func requiresClarityReflect(_ tool: CloudTool) -> Bool {
+        switch tool {
+        case .reflect:
+            return shouldUseCloudTap(for: tool)
+        case .perspective, .options, .questions, .talkItThrough:
+            return true
         }
     }
 
@@ -972,6 +1002,7 @@ struct TurnDetailView: View {
 
 private enum SheetRoute: String, Identifiable {
     case cloudTapOff
+    case clarityReflect
     case missingCapture
     var id: String { rawValue }
 }

@@ -398,7 +398,7 @@ No analysis. Just a clean label.
                     PracticeItem(
                         title: step.title,
                         body: step.body,
-                        mantra: step.mantra
+                        mantra: step.mantra.flatMap { $0.nilIfBlank }
                     )
                 }
 

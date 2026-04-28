@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var cloudTap: CloudTapSettings
+    @EnvironmentObject private var reflectStore: ClarityReflectStore
     @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var redactionDictionary: RedactionDictionary
 
@@ -20,7 +21,72 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            // Processing (model picker)
+            Section {
+                NavigationLink {
+                    ClarityReflectView()
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Account")
+
+                        Text(accountSubtitle)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Account")
+            } footer: {
+                Text("Perspective, Options, Questions, and Talk it through require Clarity Reflect or Support Clarity.")
+            }
+
+            Section {
+                Toggle("Daily check-in reminder", isOn: $dailyNudgeEnabled)
+                    .onChange(of: dailyNudgeEnabled) {
+                        let isOn = dailyNudgeEnabled
+                        UserDefaults.standard.set(isOn, forKey: "daily_nudge_enabled")
+
+                        Task {
+                            if isOn {
+                                let ok = await NotificationManager.shared.requestPermissionIfNeeded()
+                                guard ok else {
+                                    NotificationManager.shared.openSystemSettings()
+                                    dailyNudgeEnabled = false
+                                    UserDefaults.standard.set(false, forKey: "daily_nudge_enabled")
+                                    return
+                                }
+
+                                // Confirm delivery immediately (normal UX, not debug).
+                                await NotificationManager.shared.scheduleTestIn(
+                                    seconds: 10,
+                                    title: "Clarity",
+                                    body: "Reminder is on."
+                                )
+
+                                // Daily repeating reminder.
+                                await NotificationManager.shared.scheduleDaily(
+                                    hour: 10,
+                                    minute: 0
+                                )
+                            } else {
+                                await NotificationManager.shared.cancelDaily()
+                            }
+                        }
+                    }
+
+
+
+
+                Button("Notification Settings") {
+                    NotificationManager.shared.openSystemSettings()
+                }
+                .font(.footnote)
+            } header: {
+                Text("Reminders")
+            } footer: {
+                Text("You can also turn this off in iOS Settings → Notifications → Clarity.")
+            }
+
+            // Processing
             Section {
                 Picker(SettingsCopy.providerLabel, selection: $providerSettings.choice) {
                     ForEach(ContemplationProviderSettings.Choice.allCases) { choice in
@@ -39,7 +105,7 @@ struct SettingsView: View {
                 Text(SettingsCopy.processingFootnote)
             }
 
-            // Local model manager (moved directly under model picker)
+            // Local model manager
             Section {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(localModel.modelNameForUI)
@@ -101,7 +167,7 @@ struct SettingsView: View {
                 Text(SettingsCopy.localModelStoredOnDeviceOnly)
             }
 
-            // Privacy / Cloud Tap (keep toggle here; link to page without another toggle)
+            // Privacy / Cloud Tap
             Section {
                 Toggle("Enable Cloud Tap", isOn: $cloudTap.isEnabled)
 
@@ -150,52 +216,6 @@ struct SettingsView: View {
                 } label: {
                     Text(SettingsCopy.redactionRemoveAll)
                 }
-            }
-            Section {
-                Toggle("Daily check-in reminder", isOn: $dailyNudgeEnabled)
-                    .onChange(of: dailyNudgeEnabled) {
-                        let isOn = dailyNudgeEnabled
-                        UserDefaults.standard.set(isOn, forKey: "daily_nudge_enabled")
-
-                        Task {
-                            if isOn {
-                                let ok = await NotificationManager.shared.requestPermissionIfNeeded()
-                                guard ok else {
-                                    NotificationManager.shared.openSystemSettings()
-                                    dailyNudgeEnabled = false
-                                    UserDefaults.standard.set(false, forKey: "daily_nudge_enabled")
-                                    return
-                                }
-
-                                // Confirm delivery immediately (normal UX, not debug).
-                                await NotificationManager.shared.scheduleTestIn(
-                                    seconds: 10,
-                                    title: "Clarity",
-                                    body: "Reminder is on."
-                                )
-
-                                // Daily repeating reminder.
-                                await NotificationManager.shared.scheduleDaily(
-                                    hour: 10,
-                                    minute: 0
-                                )
-                            } else {
-                                await NotificationManager.shared.cancelDaily()
-                            }
-                        }
-                    }
-
-
-
-
-                Button("Notification Settings") {
-                    NotificationManager.shared.openSystemSettings()
-                }
-                .font(.footnote)
-            } header: {
-                Text("Reminders")
-            } footer: {
-                Text("You can also turn this off in iOS Settings → Notifications → Clarity.")
             }
 
             // Transparency
@@ -300,6 +320,16 @@ struct SettingsView: View {
         }
     }
 
+    private var accountSubtitle: String {
+        if reflectStore.isSupportOnlyActive {
+            return "Support Clarity active."
+        }
+        if reflectStore.hasPaidTier {
+            return "Clarity Reflect active."
+        }
+        return "Core app free. Manage paid Reflect tools and support."
+    }
+
     private func addToken() {
         let t = newToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return }
@@ -396,6 +426,7 @@ enum SettingsCopy {
     NavigationStack {
         SettingsView()
             .environmentObject(CloudTapSettings())
+            .environmentObject(ClarityReflectStore())
             .environmentObject(ContemplationProviderSettings())
             .environmentObject(RedactionDictionary())
             .environmentObject(CapsuleStore())

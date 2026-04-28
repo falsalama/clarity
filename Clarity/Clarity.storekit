@@ -1,0 +1,66 @@
+{
+  "identifier" : "Clarity.storekit",
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "identifier" : "clarity_reflect_monthly",
+      "localizations" : [
+        {
+          "description" : "Cloud Tap responses in Reflect, billed monthly.",
+          "displayName" : "Clarity Reflect Monthly",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "clarity_reflect_monthly",
+      "referenceName" : "Clarity Reflect Monthly",
+      "subscriptionGroupID" : "clarity_reflect_group",
+      "type" : "SUBSCRIPTION"
+    },
+    {
+      "displayPrice" : "49.99",
+      "identifier" : "clarity_reflect_annual",
+      "localizations" : [
+        {
+          "description" : "Cloud Tap responses in Reflect, billed annually.",
+          "displayName" : "Clarity Reflect Annual",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "clarity_reflect_annual",
+      "referenceName" : "Clarity Reflect Annual",
+      "subscriptionGroupID" : "clarity_reflect_group",
+      "type" : "SUBSCRIPTION"
+    },
+    {
+      "displayPrice" : "14.99",
+      "identifier" : "support_clarity",
+      "localizations" : [
+        {
+          "description" : "A one-time contribution to support the app.",
+          "displayName" : "Support Clarity",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "support_clarity",
+      "referenceName" : "Support Clarity",
+      "type" : "NON_CONSUMABLE"
+    }
+  ],
+  "settings" : {
+
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "clarity_reflect_group",
+      "name" : "Clarity Reflect",
+      "subscriptions" : [
+        "clarity_reflect_monthly",
+        "clarity_reflect_annual"
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 1,
+    "minor" : 0
+  }
+}

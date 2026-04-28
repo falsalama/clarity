@@ -4,6 +4,7 @@ import SwiftData
 @main
 struct ClarityApp: App {
     @StateObject private var cloudTap = CloudTapSettings()
+    @StateObject private var clarityReflect = ClarityReflectStore()
     @StateObject private var providerSettings = ContemplationProviderSettings()
     @StateObject private var capsuleStore = CapsuleStore()
     @StateObject private var redactionDictionary = RedactionDictionary()
@@ -66,12 +67,16 @@ struct ClarityApp: App {
         WindowGroup {
             AppShellView()
                 .environmentObject(cloudTap)
+                .environmentObject(clarityReflect)
                 .environmentObject(providerSettings)
                 .environmentObject(capsuleStore)
                 .environmentObject(redactionDictionary)
                 .environmentObject(homeSurfaceStore)
                 .environmentObject(supabaseAuth)
                 .environmentObject(nowPlaying)
+                .task {
+                    await clarityReflect.prepare()
+                }
                
         }
         .modelContainer(container)

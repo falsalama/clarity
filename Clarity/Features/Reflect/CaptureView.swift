@@ -8,6 +8,7 @@ import UIKit
 
 struct CaptureView: View {
     @EnvironmentObject private var coordinator: TurnCaptureCoordinator
+    @Environment(\.scenePhase) private var scenePhase
 
     @Environment(\.modelContext) private var modelContext
 
@@ -37,6 +38,7 @@ struct CaptureView: View {
 
     // fade in of question card
     @State private var questionReady: Bool = false
+    @State private var activeDayKey: String = Date().dayKey()
 
     // Captures list (unchanged)
     @Query private var completedTurns: [TurnEntity]
@@ -96,12 +98,7 @@ struct CaptureView: View {
     // MARK: - Derived state
 
     private var todayKey: String {
-        let cal = Calendar.current
-        let d = cal.startOfDay(for: Date())
-        let y = cal.component(.year, from: d)
-        let m = cal.component(.month, from: d)
-        let day = cal.component(.day, from: d)
-        return String(format: "%04d-%02d-%02d", y, m, day)
+        activeDayKey
     }
 
     private var isDoneToday: Bool {
@@ -172,7 +169,9 @@ struct CaptureView: View {
             guard let id = newValue else { return }
             guard coordinator.isCarPlayConnected == false else { return }
 
+            tagCompletedTurnForDailyReflectIfNeeded(id)
             coordinator.clearLiveTranscript()
+            coordinator.forceIdleIfProcessing()
             path.append(id)
             coordinator.lastCompletedTurnID = nil
         }
@@ -211,10 +210,10 @@ struct CaptureView: View {
             bgPhase.toggle()
             isReady = false
             ensureProgrammeState()
+            refreshDailyState()
 
             Task {
                 await MainActor.run {
-                    advanceIfPending()
                     withAnimation(.easeOut(duration: 0.28)) {
                         isReady = true
                     }
@@ -223,10 +222,15 @@ struct CaptureView: View {
                 await loadStepsIfNeeded()
             }
         }
-        .onChange(of: todayKey) { _, _ in
-            // New calendar day: advance if yesterday was marked done.
-            advanceIfPending()
+        .onChange(of: scenePhase) { _, newPhase in
+            guard newPhase == .active else { return }
+            refreshDailyState()
         }
+#if os(iOS)
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.significantTimeChangeNotification)) { _ in
+            refreshDailyState()
+        }
+#endif
         .sheet(isPresented: $showDailyAnswerSheet) {
             DailyReflectAnswerSheet(step: currentStep, dayKey: todayKey) {
                 // Stay on the daily reflect screen after saving.
@@ -370,6 +374,7 @@ struct CaptureView: View {
                 self.steps = resp.steps
                 self.stepsLoading = false
                 self.stepsError = resp.steps.isEmpty ? "No steps returned." : nil
+                self.advanceIfPending()
                 self.questionReady = !resp.steps.isEmpty
             }
         } catch {
@@ -379,6 +384,17 @@ struct CaptureView: View {
                 self.questionReady = true
             }
         }
+    }
+
+    private func refreshDailyState() {
+        let newDayKey = Date().dayKey()
+        guard newDayKey != activeDayKey else {
+            advanceIfPending()
+            return
+        }
+
+        activeDayKey = newDayKey
+        advanceIfPending()
     }
 
     private var canRepairTodaySnapshot: Bool {
@@ -419,7 +435,8 @@ struct CaptureView: View {
     private func applyDailyPromptSnapshot(to turnID: UUID?) {
         guard let turnID else { return }
         guard let step = currentStep else { return }
-        guard let turn = completedTurns.first(where: { $0.id == turnID }) else { return }
+        let repo = TurnRepository(context: modelContext)
+        guard let turn = try? repo.fetch(id: turnID) else { return }
 
         turn.promptKindRaw = "daily_reflect"
         turn.promptProgrammeSlug = "starter_5day"
@@ -427,6 +444,12 @@ struct CaptureView: View {
         turn.promptTitle = step.title
         turn.promptBody = step.body
         turn.promptDayKey = todayKey
+    }
+
+    private func tagCompletedTurnForDailyReflectIfNeeded(_ turnID: UUID) {
+        guard hideDailyQuestion == false else { return }
+        applyDailyPromptSnapshot(to: turnID)
+        do { try modelContext.save() } catch { /* best-effort */ }
     }
     
     private func markDoneToday() {

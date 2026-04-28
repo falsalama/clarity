@@ -495,9 +495,7 @@ final class TurnCaptureCoordinator: ObservableObject {
         pendingCaptureURL = nil
 
         isPostStopActive = false
-        // Intentionally do NOT set phase = .idle here to avoid a “Ready” blink
-        // while the UI begins navigation to the capture page. Let the view call
-        // forceIdleIfProcessing() on disappear to return to idle cleanly.
+        phase = .idle
         stopIdleGuard()
         setIdleTimerDisabled(false)
     }
@@ -675,4 +673,3 @@ final class TurnCaptureCoordinator: ObservableObject {
         hasWarmedUp = true
     }
 }
-
