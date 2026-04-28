@@ -21,7 +21,9 @@ enum SparkleAudio {
             player.play()
             self.player = player
         } catch {
+#if DEBUG
             print("Failed to play sparkle.mp3: \(error)")
+#endif
         }
     }
 }

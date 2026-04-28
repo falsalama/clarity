@@ -59,7 +59,7 @@ struct AboutView: View {
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
-            Text("On-device mode is fully private. Optional Cloud Tap processing uses redacted, anonymous text for deeper model responses.")
+            Text("On-device mode is fully private. Optional Cloud Tap processing uses selected redacted text for deeper model responses.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -78,6 +78,15 @@ struct AboutView: View {
                 .font(.subheadline.weight(.semibold))
 
             Text("Capsule is your adaptive learning layer. If enabled, it gradually tailors questions and teachings to your patterns over time. Capsule stores structure, not secrets.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Divider()
+
+            Text("Scope")
+                .font(.subheadline.weight(.semibold))
+
+            Text("Clarity is a practice companion, not medical advice, therapy, diagnosis, treatment, or crisis support.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }

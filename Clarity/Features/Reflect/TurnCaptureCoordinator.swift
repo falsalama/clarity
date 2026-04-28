@@ -365,6 +365,10 @@ final class TurnCaptureCoordinator: ObservableObject {
         lastHandledFilePath = path
 
         pendingCaptureURL = url
+
+        if phase == .recording, activeTurnID == nil {
+            createTurnIfNeededNowThatRecordingIsLive()
+        }
     }
 
     private func handleRecorderRecordingChanged(_ isRecording: Bool) {

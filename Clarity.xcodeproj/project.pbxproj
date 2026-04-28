@@ -310,10 +310,10 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Clarity can read your mindful sessions, sleep, heart rate, and steps to show patterns alongside your reflections.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Clarity can save completed meditation sessions to Apple Health as mindful minutes.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Used to show nearby pilgrimage places. Location is processed on-device and not stored.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity uses the microphone when you choose to record a reflection.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app saves daily images to your photo library.";
-				INFOPLIST_KEY_NSSiriUsageDescription = "to open and record audio captures";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on-device";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Clarity uses Siri so you can open the app and start reflection capture by voice.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on device when you choose voice capture.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = NO;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = NO;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -369,10 +369,10 @@
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Clarity can read your mindful sessions, sleep, heart rate, and steps to show patterns alongside your reflections.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Clarity can save completed meditation sessions to Apple Health as mindful minutes.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Used to show nearby pilgrimage places. Location is processed on-device and not stored.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity records audio for capture";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Clarity uses the microphone when you choose to record a reflection.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "This app saves daily images to your photo library.";
-				INFOPLIST_KEY_NSSiriUsageDescription = "to open and record audio captures";
-				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on-device";
+				INFOPLIST_KEY_NSSiriUsageDescription = "Clarity uses Siri so you can open the app and start reflection capture by voice.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Clarity transcribes your recordings on device when you choose voice capture.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = NO;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = NO;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

@@ -30,6 +30,7 @@ struct CaptureView: View {
     @State private var showPasteSheet: Bool = false
     @State private var goToDailyFocus = false
     @State private var showDailyAnswerSheet = false
+    @State private var dailyAnswerTurnIDOverride: UUID? = nil
 
     // Steps (Reflect onboarding)
     @State private var steps: [CloudTapStep] = []
@@ -170,9 +171,14 @@ struct CaptureView: View {
             guard coordinator.isCarPlayConnected == false else { return }
 
             tagCompletedTurnForDailyReflectIfNeeded(id)
+            if hideDailyQuestion == false {
+                dailyAnswerTurnIDOverride = id
+            }
             coordinator.clearLiveTranscript()
             coordinator.forceIdleIfProcessing()
-            path.append(id)
+            if hideDailyQuestion {
+                path.append(id)
+            }
             coordinator.lastCompletedTurnID = nil
         }
         .onChange(of: coordinator.uiError) { _, newValue in
@@ -234,6 +240,7 @@ struct CaptureView: View {
         .sheet(isPresented: $showDailyAnswerSheet) {
             DailyReflectAnswerSheet(step: currentStep, dayKey: todayKey) {
                 // Stay on the daily reflect screen after saving.
+                dailyAnswerTurnIDOverride = $0
             }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
@@ -394,6 +401,7 @@ struct CaptureView: View {
         }
 
         activeDayKey = newDayKey
+        dailyAnswerTurnIDOverride = nil
         advanceIfPending()
     }
 
@@ -422,6 +430,10 @@ struct CaptureView: View {
     }
 
     private var dailyAnswerTurnIDToday: UUID? {
+        if let dailyAnswerTurnIDOverride {
+            return dailyAnswerTurnIDOverride
+        }
+
         let cal = Calendar.current
         let now = Date()
 
@@ -806,7 +818,7 @@ private struct DailyReflectAnswerSheet: View {
 
     let step: CloudTapStep?
     let dayKey: String
-    let onCreated: () -> Void
+    let onCreated: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -907,7 +919,7 @@ private struct DailyReflectAnswerSheet: View {
                 now: Date()
             )
 
-            onCreated()
+            onCreated(id)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

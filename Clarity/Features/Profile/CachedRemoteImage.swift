@@ -68,18 +68,24 @@ struct CachedRemoteImage: View {
     @MainActor
     private func load() async {
         guard let url else {
+#if DEBUG
             print("Image: nil url (no request)")
+#endif
             uiImage = nil
             return
         }
 
+#if DEBUG
         print("Image GET:", url.absoluteString)
+#endif
 
         // No stale fallback image
         uiImage = nil
 
         if let cached = ImageMemoryCache.shared.image(for: url) {
+#if DEBUG
             print("Image: memory cache hit")
+#endif
             uiImage = cached
             return
         }
@@ -97,10 +103,14 @@ struct CachedRemoteImage: View {
 
         // 2) If it failed, try the same filename under /category/
         if let alt = alternateCategoryURL(from: url), alt != url {
+#if DEBUG
             print("Image ALT GET:", alt.absoluteString)
+#endif
 
             if let cachedAlt = ImageMemoryCache.shared.image(for: alt) {
+#if DEBUG
                 print("Image: memory cache hit (alt)")
+#endif
                 uiImage = cachedAlt
                 return
             }
@@ -112,7 +122,9 @@ struct CachedRemoteImage: View {
             }
         }
 
+#if DEBUG
         print("Image: failed (kept placeholder)")
+#endif
         // keep placeholder
     }
 
@@ -128,7 +140,9 @@ struct CachedRemoteImage: View {
             let code = http?.statusCode ?? -1
             let mime = http?.mimeType ?? "nil"
 
+#if DEBUG
             print("Image HTTP:", code, "mime:", mime, "bytes:", data.count)
+#endif
 
             guard (200...299).contains(code) else {
                 return nil
@@ -136,11 +150,15 @@ struct CachedRemoteImage: View {
 
             let img = downsample(data: data, maxPixelSize: maxPixelSize)
             if img == nil {
+#if DEBUG
                 print("Image: downsample/decode failed")
+#endif
             }
             return img
         } catch {
+#if DEBUG
             print("Image error:", error.localizedDescription)
+#endif
             return nil
         }
     }

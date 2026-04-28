@@ -696,8 +696,10 @@ struct TurnDetailView: View {
                 requestTool(.talkItThrough)
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: reflectStore.hasReflectAccess ? "bubble.left.and.bubble.right.fill" : "lock.fill")
-                        .font(.callout.weight(.semibold))
+                    if !reflectStore.hasReflectAccess {
+                        Image(systemName: "lock.fill")
+                            .font(.callout.weight(.semibold))
+                    }
 
                     Text("Talk it through")
                         .frame(maxWidth: .infinity, alignment: .center)

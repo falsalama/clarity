@@ -2,11 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict/>
-		<dict/>
-	</array>
 	<key>CloudTapBaseURL</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1</string>
 	<key>SupabaseAnonKey</key>
@@ -44,8 +39,7 @@
 	<key>WELCOME_MANIFEST_ENDPOINT</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/welcome-manifest</string>
 	<key>WISDOM_STEPS_ENDPOINT</key>
-	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/wisdom-steps
-</string>
+	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/wisdom-steps</string>
 	<key>COMPASSION_STEPS_ENDPOINT</key>
 	<string>https://yaxpwhimwktqqxyzitao.supabase.co/functions/v1/compassion-steps</string>
 </dict>

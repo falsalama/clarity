@@ -111,9 +111,13 @@ struct AppShellView: View {
             if !didBootstrapSupabaseAuth {
                 didBootstrapSupabaseAuth = true
                 Task {
+#if DEBUG
                     print("Supabase bootstrap from AppShellView starting")
+#endif
                     await supabaseAuth.bootstrapAnonymousSessionIfNeeded()
+#if DEBUG
                     print("Supabase bootstrap from AppShellView finished")
+#endif
                 }
             }
             

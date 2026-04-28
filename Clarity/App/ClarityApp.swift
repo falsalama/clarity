@@ -15,6 +15,7 @@ struct ClarityApp: App {
     private let container: ModelContainer
 
     init() {
+#if DEBUG
         print("CloudTapBaseURL =",
               Bundle.main.object(forInfoDictionaryKey: "CloudTapBaseURL") ?? "nil")
         print("SupabaseURL =",
@@ -27,6 +28,7 @@ struct ClarityApp: App {
               ?? Bundle.main.object(forInfoDictionaryKey: "WelcomeManifestEndpoint")
               ?? Bundle.main.object(forInfoDictionaryKey: "WELCOME_MANIFEST_ENDPOINT")
               ?? "nil")
+#endif
 
         do {
             let storeURL = try Self.storeURL(filename: "clarity.store")
@@ -57,7 +59,9 @@ struct ClarityApp: App {
 
             AppServices.modelContainer = self.container
 
+#if DEBUG
             print("SwiftData store URL =", storeURL.path)
+#endif
         } catch {
             fatalError("SwiftData container init failed: \(error)")
         }

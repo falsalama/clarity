@@ -311,7 +311,9 @@ private struct SimplePinnedARView: UIViewRepresentable {
             } else {
                 material.color = .init(tint: .systemPink)
                 material.blending = .opaque
+#if DEBUG
                 print("AR: UIImage(named:) failed for asset:", assetName)
+#endif
             }
 
             let e = ModelEntity(mesh: mesh, materials: [material])

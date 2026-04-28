@@ -168,16 +168,22 @@ struct CompassionView: View {
             if let entry = response.item {
                 loadedEntry = entry
                 loadError = nil
+#if DEBUG
                 print("COMPASSION dayIndex =", normalizedDayIndex, "item =", entry.id)
+#endif
             } else {
                 loadedEntry = nil
                 loadError = "No compassion entry found."
+#if DEBUG
                 print("COMPASSION dayIndex =", normalizedDayIndex, "item = nil")
+#endif
             }
         } catch {
             loadedEntry = nil
             loadError = "Could not load compassion from database."
+#if DEBUG
             print("COMPASSION LOAD FAILED: \(error)")
+#endif
         }
 
         isLoading = false
@@ -218,7 +224,9 @@ struct CompassionView: View {
 
         guard http.statusCode == 200 else {
             let body = String(data: data, encoding: .utf8) ?? "<no body>"
+#if DEBUG
             print("COMPASSION HTTP \(http.statusCode): \(body)")
+#endif
             throw URLError(.badServerResponse)
         }
 
@@ -232,10 +240,14 @@ struct CompassionView: View {
 
         if let accessToken = AppServices.supabaseAccessToken, !accessToken.isEmpty {
             req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+#if DEBUG
             print("COMPASSION using user access token")
+#endif
         } else {
             req.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
+#if DEBUG
             print("COMPASSION using anon key")
+#endif
         }
     }
 

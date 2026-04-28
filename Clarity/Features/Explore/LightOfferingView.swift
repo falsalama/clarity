@@ -48,7 +48,7 @@ struct LightOfferingView: View {
 
                 addButtons(for: proxy.size)
                     .padding(.trailing, 22)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, 92)
             }
             .onAppear {
                 if lamps.isEmpty {

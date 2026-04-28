@@ -36,7 +36,7 @@ struct ClarityReflectView: View {
                             .foregroundStyle(.green)
                             .font(.footnote.weight(.semibold))
                     } else {
-                        Text("The rest of Clarity stays available without a subscription. Clarity Reflect opens Cloud Tap responses with our original Buddhist reflection model for deeper practice support.")
+                        Text("The rest of Clarity stays available without a subscription. Clarity Reflect adds deeper Cloud Tap responses for practice reflection, using selected redacted text only when you choose to send it.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -81,7 +81,7 @@ struct ClarityReflectView: View {
                         }
                     }
 
-                    Text("Clarity Reflect uses our original Buddhist reflection model to help untangle recurring concerns, surface patterns in what returns, and support practice without labelling or judging. Audio and raw transcripts stay on this iPhone. Only the selected redacted text is sent when you choose a Cloud Tap response.")
+                    Text("Clarity Reflect is built to help reveal recurring patterns, tensions, and fixed views without labelling or judging. It supports working through concerns in relation to practice, compassion, and a less contracted view. Audio and raw transcripts stay on this iPhone. Only the selected redacted text is sent when you choose a Cloud Tap response.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -116,7 +116,7 @@ struct ClarityReflectView: View {
                         supportCard
                     }
 
-                    Text("These support purchases are voluntary app support, not charitable donations. Clarity also supports monasteries, nunneries, and worthwhile Buddhist charities as part of the wider work around the app.")
+                    Text("These support purchases are voluntary app support, not charitable donations. They help keep the app, cloud processing, and wider Dharma-supporting work sustainable.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -493,7 +493,7 @@ struct ClarityReflectView: View {
     private var currentPlanSubtitle: String {
 #if DEBUG
         if reflectStore.hasDebugReflectOverride && !reflectStore.hasPaidTier {
-            return "You are on the free plan. Clarity Reflect opens Cloud Tap responses with our original Buddhist reflection model."
+            return "You are on the free plan. Clarity Reflect adds deeper Cloud Tap responses for practice reflection."
         }
 #endif
         if reflectStore.isSupportOnlyActive {
@@ -502,7 +502,7 @@ struct ClarityReflectView: View {
         if reflectStore.hasPaidTier {
             return "Clarity Reflect is unlocked on this Apple ID."
         }
-        return "You are on the free plan. Clarity Reflect opens Cloud Tap responses with our original Buddhist reflection model."
+        return "You are on the free plan. Clarity Reflect adds deeper Cloud Tap responses for practice reflection."
     }
 
     private func benefitRow(_ text: String) -> some View {
@@ -532,20 +532,20 @@ struct ClarityReflectView: View {
     }
 
     private var monthlyDescription: String {
-        "Unlocks Cloud Tap reflections with our original Buddhist reflection model: built to surface patterns, tensions, and recurring views without judgment, so you can work through what weighs on the mind and support clearer, more compassionate practice. Audio and raw transcripts stay on this iPhone; only selected redacted text is sent when you choose Cloud Tap."
+        "Unlocks deeper Cloud Tap reflections built to surface patterns, tensions, and recurring views without judgment, so you can work through what weighs on the mind and support clearer, more compassionate practice. Audio and raw transcripts stay on this iPhone; only selected redacted text is sent when you choose Cloud Tap."
     }
 
     private var annualDescription: String {
-        "The same original Reflect model and paid tools, with a lower total over the year than monthly."
+        "The same deeper Reflect tools, with a lower total over the year than monthly."
     }
 
     private var paidReflectFeatures: [String] {
         [
-            "Perspective shifts",
+            "Practice-focused perspective",
             "Questions and next steps",
             "Talk it through",
-            "Original Buddhist reflection model",
-            "Expanded audio library"
+            "Pattern and tension reflection",
+            "Expanded practice audio"
         ]
     }
 
@@ -575,26 +575,20 @@ struct ClarityReflectView: View {
             .init(
                 id: ClarityReflectStore.support100ProductID,
                 title: "Sponsor the Work",
-                price: "£100.00",
+                price: "£99.99",
                 note: "A larger one-time contribution for those who want to support the work further."
             ),
             .init(
                 id: ClarityReflectStore.support500ProductID,
                 title: "Sponsor the Work",
-                price: "£500.00",
+                price: "£499.99",
                 note: "A deeper one-time contribution that helps carry the work further."
             ),
             .init(
                 id: ClarityReflectStore.support1000ProductID,
                 title: "Sponsor the Work",
-                price: "£1,000.00",
+                price: "£999.99",
                 note: "A major one-time contribution for those who want to back the work in a serious way."
-            ),
-            .init(
-                id: ClarityReflectStore.support10000ProductID,
-                title: "Sponsor the Work",
-                price: "£10,000.00",
-                note: "A substantial one-time sponsorship for those who want to underwrite the work at a high level."
             )
         ]
     }
@@ -647,8 +641,6 @@ struct ClarityReflectView: View {
             return "A deeper one-time contribution that helps carry the work further."
         case ClarityReflectStore.support1000ProductID:
             return "A major one-time contribution for those who want to back the work in a serious way."
-        case ClarityReflectStore.support10000ProductID:
-            return "A substantial one-time sponsorship for those who want to underwrite the work at a high level."
         default:
             return "A one-time contribution in support of the app."
         }

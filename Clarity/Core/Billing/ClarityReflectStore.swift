@@ -19,7 +19,6 @@ final class ClarityReflectStore: ObservableObject {
     static let support100ProductID = "support_clarity_100"
     static let support500ProductID = "support_clarity_500"
     static let support1000ProductID = "support_clarity_1000"
-    static let support10000ProductID = "support_clarity_10000"
 
     @Published private(set) var products: [Product] = []
     @Published private(set) var hasReflectAccess: Bool
@@ -37,6 +36,10 @@ final class ClarityReflectStore: ObservableObject {
     private var updatesTask: Task<Void, Never>?
     private var actualReflectEntitlement: Bool
 
+    private struct AppleEntitlementSyncRequest: Encodable {
+        let signedTransactionInfo: String
+    }
+
     init() {
         let defaults = UserDefaults.standard
         let storedReflect = defaults.bool(forKey: Keys.reflectAccess)
@@ -47,10 +50,11 @@ final class ClarityReflectStore: ObservableObject {
         let debugOverride = defaults.bool(forKey: Keys.debugReflectOverride)
         self.hasDebugReflectOverride = debugOverride
         self.hasReflectAccess = storedReflect || storedSupport || debugOverride
-#else
-        self.hasReflectAccess = storedReflect || storedSupport
-#endif
         self.actualReflectEntitlement = storedReflect
+#else
+        self.hasReflectAccess = storedSupport
+        self.actualReflectEntitlement = false
+#endif
         self.currentReflectProductID = nil
         self.updatesTask = Task { [weak self] in
             await self?.listenForTransactions()
@@ -70,8 +74,7 @@ final class ClarityReflectStore: ObservableObject {
             Self.supportProductID,
             Self.support100ProductID,
             Self.support500ProductID,
-            Self.support1000ProductID,
-            Self.support10000ProductID
+            Self.support1000ProductID
         ]
     }
 
@@ -137,6 +140,13 @@ final class ClarityReflectStore: ObservableObject {
                     applySupportPurchased(true)
                 }
 
+                let synced = await syncServerEntitlement(
+                    signedTransactionInfo: verification.jwsRepresentation
+                )
+                if !synced {
+                    lastError = "Purchase completed, but cloud access could not be synced. Try Restore Purchases."
+                }
+
                 await transaction.finish()
                 await refreshEntitlements()
 
@@ -177,8 +187,7 @@ final class ClarityReflectStore: ObservableObject {
                 Self.supportProductID,
                 Self.support100ProductID,
                 Self.support500ProductID,
-                Self.support1000ProductID,
-                Self.support10000ProductID
+                Self.support1000ProductID
             ])
             products = orderProducts(loaded)
         } catch {
@@ -194,6 +203,7 @@ final class ClarityReflectStore: ObservableObject {
         var hasSupport = hasSupportedClarity
         var activeReflectProductID: String?
         var supportIDs: Set<String> = []
+        var serverSyncTransactions: [String] = []
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -202,9 +212,11 @@ final class ClarityReflectStore: ObservableObject {
             case Self.monthlyProductID, Self.annualProductID:
                 hasReflect = true
                 activeReflectProductID = transaction.productID
+                serverSyncTransactions.append(result.jwsRepresentation)
             case let productID where Self.supportProductIDs.contains(productID):
                 hasSupport = true
                 supportIDs.insert(productID)
+                serverSyncTransactions.append(result.jwsRepresentation)
             default:
                 break
             }
@@ -214,6 +226,10 @@ final class ClarityReflectStore: ObservableObject {
         applyReflectAccess(hasReflect)
         currentReflectProductID = activeReflectProductID
         applySupportPurchased(hasSupport)
+
+        for signedTransactionInfo in serverSyncTransactions {
+            _ = await syncServerEntitlement(signedTransactionInfo: signedTransactionInfo)
+        }
     }
 
     private func listenForTransactions() async {
@@ -222,6 +238,14 @@ final class ClarityReflectStore: ObservableObject {
 
             if Self.supportProductIDs.contains(transaction.productID) {
                 applySupportPurchased(true)
+            }
+
+            if transaction.productID == Self.monthlyProductID ||
+                transaction.productID == Self.annualProductID ||
+                Self.supportProductIDs.contains(transaction.productID) {
+                _ = await syncServerEntitlement(
+                    signedTransactionInfo: result.jwsRepresentation
+                )
             }
 
             await transaction.finish()
@@ -236,8 +260,7 @@ final class ClarityReflectStore: ObservableObject {
             Self.supportProductID,
             Self.support100ProductID,
             Self.support500ProductID,
-            Self.support1000ProductID,
-            Self.support10000ProductID
+            Self.support1000ProductID
         ]
         let byID = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
         return ids.compactMap { byID[$0] }
@@ -267,8 +290,47 @@ final class ClarityReflectStore: ObservableObject {
         let effective = base
 #endif
         hasReflectAccess = effective
-        UserDefaults.standard.set(effective, forKey: Keys.reflectAccess)
-        UserDefaults.standard.set(effective, forKey: Keys.legacySupporterAccess)
+        UserDefaults.standard.set(actualReflectEntitlement, forKey: Keys.reflectAccess)
+        UserDefaults.standard.set(base, forKey: Keys.legacySupporterAccess)
+    }
+
+    private func syncServerEntitlement(signedTransactionInfo: String) async -> Bool {
+        guard case .available(let cfg) = CloudTapConfig.availability() else {
+            return false
+        }
+        guard let accessToken = AppServices.supabaseAccessToken, !accessToken.isEmpty else {
+            return false
+        }
+
+        let url = cloudFunctionURL(base: cfg.baseURL, endpoint: "verify-apple-entitlement")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 30
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            req.httpBody = try JSONEncoder().encode(
+                AppleEntitlementSyncRequest(
+                    signedTransactionInfo: signedTransactionInfo
+                )
+            )
+
+            let (_, response) = try await URLSession.shared.data(for: req)
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            return (200..<300).contains(statusCode)
+        } catch {
+            return false
+        }
+    }
+
+    private func cloudFunctionURL(base: URL, endpoint: String) -> URL {
+        if base.lastPathComponent.hasPrefix("cloudtap-") {
+            return base.deletingLastPathComponent().appendingPathComponent(endpoint)
+        }
+        return base.appendingPathComponent(endpoint)
     }
 
     private func verify<T>(_ result: VerificationResult<T>) throws -> T {

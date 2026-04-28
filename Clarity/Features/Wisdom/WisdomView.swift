@@ -178,12 +178,16 @@ struct WisdomView: View {
             } else {
                 loadedPrompts = prompts
                 loadError = nil
+#if DEBUG
                 print("WISDOM loaded \(prompts.count) prompts from edge function")
+#endif
             }
         } catch {
             loadedPrompts = []
             loadError = "Could not load wisdom from database."
+#if DEBUG
             print("WISDOM LOAD FAILED: \(error)")
+#endif
         }
 
         isLoadingPrompts = false
@@ -222,12 +226,16 @@ struct WisdomView: View {
 
         guard http.statusCode == 200 else {
             let body = String(data: data, encoding: .utf8) ?? "<no body>"
+#if DEBUG
             print("WISDOM HTTP \(http.statusCode): \(body)")
+#endif
             throw URLError(.badServerResponse)
         }
 
         let decoded = try JSONDecoder().decode(WisdomStepsResponse.self, from: data)
+#if DEBUG
         print("WISDOM dayIndex =", decoded.dayIndex, "items =", decoded.items.count)
+#endif
         return decoded.items
     }
 

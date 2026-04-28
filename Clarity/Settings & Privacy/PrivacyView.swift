@@ -7,7 +7,8 @@ struct PrivacyView: View {
             Section {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Audio and raw transcripts stay on this device.")
-                    Text("Redaction is applied before data is sent.")
+                    Text("Cloud Tap sends only the selected redacted text when you choose a cloud response.")
+                    Text("Health data is used on device for gentle pattern context. It is not sent to Cloud Tap.")
                 }
                 .font(.footnote)
                 .foregroundStyle(.secondary)
@@ -16,7 +17,7 @@ struct PrivacyView: View {
 
             Section {
                 LabeledContent("What can be sent") { Text("Redacted text only") }
-                LabeledContent("Never sent") { Text("Audio, raw transcript") }
+                LabeledContent("Never sent") { Text("Audio, raw transcript, Health data") }
                 LabeledContent("Per-call consent") { Text("Always required") }
 
                 NavigationLink("View Send Preview") {
@@ -26,6 +27,15 @@ struct PrivacyView: View {
                 Text("Data sharing")
             } footer: {
                 Text("Preview exactly what would be sent for a specific action.")
+            }
+
+            Section {
+                Text("Clarity supports reflection, practice, and Buddhist learning. It is not medical advice, therapy, diagnosis, treatment, or crisis support.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Scope")
             }
         }
         .navigationTitle("Privacy / Cloud Tap")
@@ -54,6 +64,7 @@ private struct PayloadPreviewExplainerView: View {
             Section("Excluded") {
                 Text("Audio files")
                 Text("Raw transcript")
+                Text("Health data")
             }
         }
         .navigationTitle("Send Preview")

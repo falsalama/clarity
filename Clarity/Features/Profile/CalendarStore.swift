@@ -60,10 +60,12 @@ final class CalendarStore: ObservableObject {
             let (data, resp) = try await URLSession.shared.data(for: req)
 
             if let http = resp as? HTTPURLResponse {
+#if DEBUG
                 print("Calendar HTTP:", http.statusCode)
                 if http.statusCode >= 400 {
                     print(String(data: data, encoding: .utf8) ?? "no body")
                 }
+#endif
             }
 
             let decoded = try JSONDecoder().decode([CalendarObservance].self, from: data)
@@ -72,7 +74,9 @@ final class CalendarStore: ObservableObject {
             self.today = decoded.filter { $0.date == todayISO }
             self.upcoming = decoded
         } catch {
+#if DEBUG
             print("CalendarStore.refresh error:", error)
+#endif
             self.today = []
             self.upcoming = []
         }

@@ -6,7 +6,7 @@
       "identifier" : "clarity_reflect_monthly",
       "localizations" : [
         {
-          "description" : "Cloud Tap responses in Reflect, billed monthly.",
+          "description" : "Deeper Cloud Tap practice reflections, billed monthly.",
           "displayName" : "Clarity Reflect Monthly",
           "locale" : "en_US"
         }
@@ -21,7 +21,7 @@
       "identifier" : "clarity_reflect_annual",
       "localizations" : [
         {
-          "description" : "Cloud Tap responses in Reflect, billed annually.",
+          "description" : "Deeper Cloud Tap practice reflections, billed annually.",
           "displayName" : "Clarity Reflect Annual",
           "locale" : "en_US"
         }
@@ -46,7 +46,7 @@
       "type" : "NON_CONSUMABLE"
     },
     {
-      "displayPrice" : "£100.00",
+      "displayPrice" : "£99.99",
       "identifier" : "support_clarity_100",
       "localizations" : [
         {
@@ -60,11 +60,11 @@
       "type" : "NON_CONSUMABLE"
     },
     {
-      "displayPrice" : "£500.00",
+      "displayPrice" : "£499.99",
       "identifier" : "support_clarity_500",
       "localizations" : [
         {
-          "description" : "A larger one-time sponsorship to support the work.",
+          "description" : "A larger one-time contribution to support the work.",
           "displayName" : "Sponsor the Work",
           "locale" : "en_US"
         }
@@ -74,31 +74,17 @@
       "type" : "NON_CONSUMABLE"
     },
     {
-      "displayPrice" : "£1,000.00",
+      "displayPrice" : "£999.99",
       "identifier" : "support_clarity_1000",
       "localizations" : [
         {
-          "description" : "A major one-time sponsorship to support the work.",
+          "description" : "A major one-time contribution to support the work.",
           "displayName" : "Sponsor the Work",
           "locale" : "en_US"
         }
       ],
       "productID" : "support_clarity_1000",
-      "referenceName" : "Support Clarity £1000",
-      "type" : "NON_CONSUMABLE"
-    },
-    {
-      "displayPrice" : "£10,000.00",
-      "identifier" : "support_clarity_10000",
-      "localizations" : [
-        {
-          "description" : "A substantial one-time sponsorship to support the work.",
-          "displayName" : "Sponsor the Work",
-          "locale" : "en_US"
-        }
-      ],
-      "productID" : "support_clarity_10000",
-      "referenceName" : "Support Clarity £10000",
+      "referenceName" : "Support Clarity £999.99",
       "type" : "NON_CONSUMABLE"
     }
   ],
