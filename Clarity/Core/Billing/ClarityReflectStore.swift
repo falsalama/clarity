@@ -16,10 +16,15 @@ final class ClarityReflectStore: ObservableObject {
     static let monthlyProductID = "clarity_reflect_monthly"
     static let annualProductID = "clarity_reflect_annual"
     static let supportProductID = "support_clarity"
+    static let support100ProductID = "support_clarity_100"
+    static let support500ProductID = "support_clarity_500"
+    static let support1000ProductID = "support_clarity_1000"
+    static let support10000ProductID = "support_clarity_10000"
 
     @Published private(set) var products: [Product] = []
     @Published private(set) var hasReflectAccess: Bool
     @Published private(set) var hasSupportedClarity: Bool
+    @Published private(set) var purchasedSupportProductIDs: Set<String>
     @Published private(set) var currentReflectProductID: String?
     @Published private(set) var isLoadingProducts = false
     @Published private(set) var isRefreshingEntitlements = false
@@ -37,6 +42,7 @@ final class ClarityReflectStore: ObservableObject {
         let storedReflect = defaults.bool(forKey: Keys.reflectAccess)
         let storedSupport = defaults.bool(forKey: Keys.supportPurchased)
         self.hasSupportedClarity = storedSupport
+        self.purchasedSupportProductIDs = []
 #if DEBUG
         let debugOverride = defaults.bool(forKey: Keys.debugReflectOverride)
         self.hasDebugReflectOverride = debugOverride
@@ -57,6 +63,20 @@ final class ClarityReflectStore: ObservableObject {
 
     var reflectProducts: [Product] {
         orderProducts(matching: [Self.monthlyProductID, Self.annualProductID])
+    }
+
+    static var supportProductIDs: [String] {
+        [
+            Self.supportProductID,
+            Self.support100ProductID,
+            Self.support500ProductID,
+            Self.support1000ProductID,
+            Self.support10000ProductID
+        ]
+    }
+
+    var supportProducts: [Product] {
+        orderProducts(matching: Self.supportProductIDs)
     }
 
     var supportProduct: Product? {
@@ -113,7 +133,7 @@ final class ClarityReflectStore: ObservableObject {
             case .success(let verification):
                 let transaction = try verify(verification)
 
-                if transaction.productID == Self.supportProductID {
+                if Self.supportProductIDs.contains(transaction.productID) {
                     applySupportPurchased(true)
                 }
 
@@ -154,7 +174,11 @@ final class ClarityReflectStore: ObservableObject {
             let loaded = try await Product.products(for: [
                 Self.monthlyProductID,
                 Self.annualProductID,
-                Self.supportProductID
+                Self.supportProductID,
+                Self.support100ProductID,
+                Self.support500ProductID,
+                Self.support1000ProductID,
+                Self.support10000ProductID
             ])
             products = orderProducts(loaded)
         } catch {
@@ -169,6 +193,7 @@ final class ClarityReflectStore: ObservableObject {
         var hasReflect = false
         var hasSupport = hasSupportedClarity
         var activeReflectProductID: String?
+        var supportIDs: Set<String> = []
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -177,13 +202,15 @@ final class ClarityReflectStore: ObservableObject {
             case Self.monthlyProductID, Self.annualProductID:
                 hasReflect = true
                 activeReflectProductID = transaction.productID
-            case Self.supportProductID:
+            case let productID where Self.supportProductIDs.contains(productID):
                 hasSupport = true
+                supportIDs.insert(productID)
             default:
                 break
             }
         }
 
+        purchasedSupportProductIDs = supportIDs
         applyReflectAccess(hasReflect)
         currentReflectProductID = activeReflectProductID
         applySupportPurchased(hasSupport)
@@ -193,7 +220,7 @@ final class ClarityReflectStore: ObservableObject {
         for await result in Transaction.updates {
             guard case .verified(let transaction) = result else { continue }
 
-            if transaction.productID == Self.supportProductID {
+            if Self.supportProductIDs.contains(transaction.productID) {
                 applySupportPurchased(true)
             }
 
@@ -203,7 +230,15 @@ final class ClarityReflectStore: ObservableObject {
     }
 
     private func orderProducts(_ loaded: [Product]) -> [Product] {
-        let ids = [Self.monthlyProductID, Self.annualProductID, Self.supportProductID]
+        let ids = [
+            Self.monthlyProductID,
+            Self.annualProductID,
+            Self.supportProductID,
+            Self.support100ProductID,
+            Self.support500ProductID,
+            Self.support1000ProductID,
+            Self.support10000ProductID
+        ]
         let byID = Dictionary(uniqueKeysWithValues: loaded.map { ($0.id, $0) })
         return ids.compactMap { byID[$0] }
     }

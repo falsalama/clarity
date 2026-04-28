@@ -360,7 +360,7 @@ enum FocusSoundsLibrary {
             subtitle: "Settling spacious tones",
             note: "Held crystalline tones with a slightly warmer field.",
             fileName: "focus-crystal cave-1",
-            artworkAssetName: "placeholder16",
+            artworkAssetName: "placeholder11",
             durationLabel: "1m 38s",
             tint: Color(red: 0.78, green: 0.58, blue: 0.10)
         ),
@@ -369,7 +369,7 @@ enum FocusSoundsLibrary {
             subtitle: "Clear resonant pace",
             note: "A clear bell-like pulse with a more defined attack.",
             fileName: "focus-crystal shell-2",
-            artworkAssetName: "placeholder17",
+            artworkAssetName: "placeholder7",
             durationLabel: "1m 29s",
             tint: Color(red: 0.55, green: 0.10, blue: 0.14)
         ),
@@ -378,7 +378,7 @@ enum FocusSoundsLibrary {
             subtitle: "Longchen Dzó",
             note: "A spacious reflective song with the same player structure as Teachings.",
             fileName: "vast drop",
-            artworkAssetName: "placeholder22",
+            artworkAssetName: "placeholder26",
             durationLabel: "0m 00s",
             tint: Color(red: 0.42, green: 0.08, blue: 0.10),
             collectionTitle: "Longchen Dzó"
@@ -397,7 +397,7 @@ enum FocusSoundsLibrary {
             subtitle: "Soft spacious sustain",
             note: "A deeper room-like resonance with gentle decay.",
             fileName: "focus-crystal gompa-4",
-            artworkAssetName: "placeholder24",
+            artworkAssetName: "placeholder4",
             durationLabel: "1m 50s",
             tint: Color(red: 0.14, green: 0.44, blue: 0.26)
         ),
@@ -406,7 +406,7 @@ enum FocusSoundsLibrary {
             subtitle: "Longer reflective tone",
             note: "A rounded layered bowl texture with longer sustain.",
             fileName: "focus-crystal bowls-5",
-            artworkAssetName: "placeholder25",
+            artworkAssetName: "placeholder8",
             durationLabel: "1m 27s",
             tint: Color(red: 0.70, green: 0.52, blue: 0.12)
         ),
@@ -451,7 +451,7 @@ enum FocusSoundsLibrary {
             subtitle: "Simple focus sound",
             note: "A single resonant bowl tone for settling attention.",
             fileName: "singing-bowl",
-            artworkAssetName: "placeholder6",
+            artworkAssetName: "placeholder5",
             durationLabel: "1m 27s",
             tint: Color(red: 0.70, green: 0.52, blue: 0.12)
         )

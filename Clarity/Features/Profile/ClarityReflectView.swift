@@ -4,12 +4,20 @@ import StoreKit
 struct ClarityReflectView: View {
     @EnvironmentObject private var reflectStore: ClarityReflectStore
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedSupportProductID = ClarityReflectStore.supportProductID
 
     fileprivate enum AccountCardKind {
         case current
         case monthly
         case annual
         case support
+    }
+
+    private struct SupportOptionDisplay: Identifiable {
+        let id: String
+        let title: String
+        let price: String
+        let note: String
     }
 
     var body: some View {
@@ -19,7 +27,7 @@ struct ClarityReflectView: View {
                     Text("Account")
                         .font(.title2.weight(.semibold))
 
-                    Text("Core features stay free. Account manages paid Reflect tools and support.")
+                    Text("Core features stay free. Account manages Clarity Reflect and optional support.")
                         .font(.body)
                         .foregroundStyle(.secondary)
 
@@ -28,7 +36,7 @@ struct ClarityReflectView: View {
                             .foregroundStyle(.green)
                             .font(.footnote.weight(.semibold))
                     } else {
-                        Text("The rest of Clarity stays available without a subscription. Perspective, Options, Questions, and Talk it through require Clarity Reflect or Support Clarity.")
+                        Text("The rest of Clarity stays available without a subscription. Clarity Reflect opens Cloud Tap responses with our original Buddhist reflection model for deeper practice support.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -73,7 +81,7 @@ struct ClarityReflectView: View {
                         }
                     }
 
-                    Text("Perspective, Options, Questions, and Talk it through are paid Reflect tools. When you choose a Cloud Tap response, only the selected redacted text is sent. Audio and raw transcripts stay on this iPhone.")
+                    Text("Clarity Reflect uses our original Buddhist reflection model to help untangle recurring concerns, surface patterns in what returns, and support practice without labelling or judging. Audio and raw transcripts stay on this iPhone. Only the selected redacted text is sent when you choose a Cloud Tap response.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -102,22 +110,13 @@ struct ClarityReflectView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     sectionTitle("Support Clarity")
 
-                    if let product = reflectStore.supportProduct {
-                        supportRow(for: product)
-                    } else if reflectStore.isLoadingProducts {
+                    if reflectStore.isLoadingProducts && reflectStore.supportProducts.isEmpty {
                         ProgressView("Loading support option…")
                     } else {
-                        placeholderPlanCard(
-                            kind: .support,
-                            title: "Support Clarity",
-                            subtitle: "A one-time contribution to help support ongoing work on the app.",
-                            badge: nil,
-                            price: plannedPrice(for: .support),
-                            buttonTitle: "Coming soon"
-                        )
+                        supportCard
                     }
 
-                    Text("This is a one-time purchase. It also unlocks the paid Reflect tools on this Apple ID.")
+                    Text("These support purchases are voluntary app support, not charitable donations. Clarity also supports monasteries, nunneries, and worthwhile Buddhist charities as part of the wider work around the app.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -158,6 +157,7 @@ struct ClarityReflectView: View {
         }
         .task {
             await reflectStore.prepare()
+            syncSupportSelection()
         }
         .alert("Purchase issue", isPresented: Binding(
             get: { reflectStore.lastError != nil },
@@ -209,11 +209,9 @@ struct ClarityReflectView: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(.secondary)
 
-                    unavailableRow("Perspective")
-                    unavailableRow("Options and Questions")
-                    unavailableRow("Talk it through")
-                    unavailableRow("Extended Buddhist responses")
-                    unavailableRow("Expanded audio library")
+                    ForEach(paidReflectFeatures, id: \.self) { feature in
+                        unavailableRow(feature)
+                    }
                 }
             }
         }
@@ -261,11 +259,9 @@ struct ClarityReflectView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                benefitRow("Perspective")
-                benefitRow("Options and Questions")
-                benefitRow("Talk it through")
-                benefitRow("Extended Buddhist responses")
-                benefitRow("Expanded audio library")
+                ForEach(paidReflectFeatures, id: \.self) { feature in
+                    benefitRow(feature)
+                }
             }
 
             Button {
@@ -328,11 +324,9 @@ struct ClarityReflectView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                benefitRow("Perspective")
-                benefitRow("Options and Questions")
-                benefitRow("Talk it through")
-                benefitRow("Extended Buddhist responses")
-                benefitRow("Expanded audio library")
+                ForEach(paidReflectFeatures, id: \.self) { feature in
+                    benefitRow(feature)
+                }
             }
 
             Button(buttonTitle) {}
@@ -344,22 +338,15 @@ struct ClarityReflectView: View {
         .accountCardStyle(kind: kind, accent: cardAccent(for: kind))
     }
 
-    private func supportRow(for product: Product) -> some View {
+    private var supportCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Support Clarity")
-                        .font(.headline)
-
-                    Text("A one-time purchase that supports the app and unlocks the paid Reflect tools.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 12)
-
-                Text(product.displayPrice)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Support Clarity")
                     .font(.headline)
+
+                Text("An optional one-time contribution that unlocks Clarity Reflect and supports the app, cloud costs, and ongoing work.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             Divider()
@@ -369,28 +356,47 @@ struct ClarityReflectView: View {
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                benefitRow("Perspective")
-                benefitRow("Options and Questions")
-                benefitRow("Talk it through")
-                benefitRow("Extended Buddhist responses")
-                benefitRow("Expanded audio library")
+                ForEach(paidReflectFeatures, id: \.self) { feature in
+                    benefitRow(feature)
+                }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Choose amount")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                Picker("Support amount", selection: $selectedSupportProductID) {
+                    ForEach(supportOptions) { option in
+                        Text("\(option.title) · \(option.price)")
+                            .tag(option.id)
+                    }
+                }
+                .pickerStyle(.menu)
+
+                Text(selectedSupportOption.note)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
             if reflectStore.hasSupportedClarity {
                 Label("Thank you for supporting Clarity", systemImage: "heart.fill")
                     .foregroundStyle(cardAccent(for: .support))
                     .font(.footnote.weight(.semibold))
-            } else {
-                Button {
-                    Task { await reflectStore.purchase(product) }
-                } label: {
-                    Text("Support Clarity")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(cardAccent(for: .support))
-                .disabled(reflectStore.isPurchasing)
             }
+
+            Button {
+                guard let product = selectedSupportProduct else { return }
+                Task { await reflectStore.purchase(product) }
+            } label: {
+                Text(selectedSupportButtonTitle)
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .tint(cardAccent(for: .support))
+            .disabled(reflectStore.isPurchasing || selectedSupportProduct == nil || isSelectedSupportProductPurchased)
         }
         .accountCardStyle(kind: .support, accent: cardAccent(for: .support))
     }
@@ -487,16 +493,16 @@ struct ClarityReflectView: View {
     private var currentPlanSubtitle: String {
 #if DEBUG
         if reflectStore.hasDebugReflectOverride && !reflectStore.hasPaidTier {
-            return "You are on the free plan. Perspective, Options, Questions, and Talk it through require Clarity Reflect or Support Clarity."
+            return "You are on the free plan. Clarity Reflect opens Cloud Tap responses with our original Buddhist reflection model."
         }
 #endif
         if reflectStore.isSupportOnlyActive {
-            return "Support Clarity is active on this Apple ID. Paid Reflect tools are unlocked."
+            return "Support Clarity is active on this Apple ID. Clarity Reflect is unlocked."
         }
         if reflectStore.hasPaidTier {
-            return "Paid Reflect tools are unlocked on this Apple ID."
+            return "Clarity Reflect is unlocked on this Apple ID."
         }
-        return "You are on the free plan. Perspective, Options, Questions, and Talk it through require Clarity Reflect or Support Clarity."
+        return "You are on the free plan. Clarity Reflect opens Cloud Tap responses with our original Buddhist reflection model."
     }
 
     private func benefitRow(_ text: String) -> some View {
@@ -526,11 +532,126 @@ struct ClarityReflectView: View {
     }
 
     private var monthlyDescription: String {
-        "Unlocks Perspective, Options, Questions, and Talk it through in Reflect."
+        "Unlocks Cloud Tap reflections with our original Buddhist reflection model: built to surface patterns, tensions, and recurring views without judgment, so you can work through what weighs on the mind and support clearer, more compassionate practice. Audio and raw transcripts stay on this iPhone; only selected redacted text is sent when you choose Cloud Tap."
     }
 
     private var annualDescription: String {
-        "The same paid Reflect tools, with a lower total over the year than monthly."
+        "The same original Reflect model and paid tools, with a lower total over the year than monthly."
+    }
+
+    private var paidReflectFeatures: [String] {
+        [
+            "Perspective shifts",
+            "Questions and next steps",
+            "Talk it through",
+            "Original Buddhist reflection model",
+            "Expanded audio library"
+        ]
+    }
+
+    private var supportOptions: [SupportOptionDisplay] {
+        if reflectStore.supportProducts.isEmpty {
+            return supportOptionPlaceholders
+        }
+
+        return reflectStore.supportProducts.map { product in
+            SupportOptionDisplay(
+                id: product.id,
+                title: supportTitle(for: product.id),
+                price: product.displayPrice,
+                note: supportNote(for: product.id)
+            )
+        }
+    }
+
+    private var supportOptionPlaceholders: [SupportOptionDisplay] {
+        [
+            .init(
+                id: ClarityReflectStore.supportProductID,
+                title: "Support Clarity",
+                price: "£14.99",
+                note: "A one-time contribution that unlocks Clarity Reflect and supports the work."
+            ),
+            .init(
+                id: ClarityReflectStore.support100ProductID,
+                title: "Sponsor the Work",
+                price: "£100.00",
+                note: "A larger one-time contribution for those who want to support the work further."
+            ),
+            .init(
+                id: ClarityReflectStore.support500ProductID,
+                title: "Sponsor the Work",
+                price: "£500.00",
+                note: "A deeper one-time contribution that helps carry the work further."
+            ),
+            .init(
+                id: ClarityReflectStore.support1000ProductID,
+                title: "Sponsor the Work",
+                price: "£1,000.00",
+                note: "A major one-time contribution for those who want to back the work in a serious way."
+            ),
+            .init(
+                id: ClarityReflectStore.support10000ProductID,
+                title: "Sponsor the Work",
+                price: "£10,000.00",
+                note: "A substantial one-time sponsorship for those who want to underwrite the work at a high level."
+            )
+        ]
+    }
+
+    private var selectedSupportOption: SupportOptionDisplay {
+        supportOptions.first(where: { $0.id == selectedSupportProductID }) ?? supportOptions.first ?? supportOptionPlaceholders[0]
+    }
+
+    private var selectedSupportProduct: Product? {
+        reflectStore.supportProducts.first(where: { $0.id == selectedSupportProductID })
+    }
+
+    private var selectedSupportButtonTitle: String {
+        if isSelectedSupportProductPurchased {
+            return "Already added"
+        }
+        switch selectedSupportProductID {
+        case ClarityReflectStore.supportProductID:
+            return "Support Clarity"
+        default:
+            return "Offer support"
+        }
+    }
+
+    private var isSelectedSupportProductPurchased: Bool {
+        reflectStore.purchasedSupportProductIDs.contains(selectedSupportProductID)
+    }
+
+    private func syncSupportSelection() {
+        guard supportOptions.contains(where: { $0.id == selectedSupportProductID }) == false else { return }
+        selectedSupportProductID = supportOptions.first?.id ?? ClarityReflectStore.supportProductID
+    }
+
+    private func supportTitle(for productID: String) -> String {
+        switch productID {
+        case ClarityReflectStore.supportProductID:
+            return "Support Clarity"
+        default:
+            return "Sponsor the Work"
+        }
+    }
+
+    private func supportNote(for productID: String) -> String {
+        switch productID {
+        case ClarityReflectStore.supportProductID:
+            return "A one-time contribution that unlocks Clarity Reflect and supports the work."
+        case ClarityReflectStore.support100ProductID:
+            return "A larger one-time contribution for those who want to support the work further."
+        case ClarityReflectStore.support500ProductID:
+            return "A deeper one-time contribution that helps carry the work further."
+        case ClarityReflectStore.support1000ProductID:
+            return "A major one-time contribution for those who want to back the work in a serious way."
+        case ClarityReflectStore.support10000ProductID:
+            return "A substantial one-time sponsorship for those who want to underwrite the work at a high level."
+        default:
+            return "A one-time contribution in support of the app."
+        }
     }
 
     private func cardAccent(for kind: AccountCardKind) -> Color {
@@ -549,11 +670,11 @@ struct ClarityReflectView: View {
     private func plannedPrice(for kind: AccountCardKind) -> String {
         switch kind {
         case .monthly:
-            return "4.99 / month"
+            return "£4.99 / month"
         case .annual:
-            return "49.99 / year"
+            return "£49.99 / year"
         case .support:
-            return "14.99 once"
+            return "£14.99 once"
         case .current:
             return ""
         }
