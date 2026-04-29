@@ -6,15 +6,18 @@ This is the lean path for getting Clarity through App Store review without addin
 
 - Bundle ID: `Krunch.Clarity`
 - Marketing version: `2.0`
-- Build number: `8`
+- Build number: `9`
 - Release simulator build: passing
 - Privacy manifest: included in the built app bundle
 - Local StoreKit file: kept outside the app bundle
+- In-app cloud account deletion: implemented
+- Backend entitlement enforcement: implemented for `cloudtap-reflect`; must be confirmed on the other Cloud Tap functions before release
+- Backend Cloud Tap rate-limit SQL: prepared
 
 ## Before Upload
 
 - Archive a Release build from Xcode.
-- Confirm the archive uses build number `8` or higher.
+- Confirm the archive uses build number `9` or higher.
 - Confirm `PrivacyInfo.xcprivacy` is present in the archive app bundle.
 - Smoke test these paths on a real device where possible:
   - Daily Practice
@@ -23,6 +26,7 @@ This is the lean path for getting Clarity through App Store review without addin
   - gated Cloud Tap tools
   - Account purchases screen
   - Restore Purchases
+  - Delete Cloud Account and Data in Privacy / Cloud Tap
   - Meditation timer
   - Audio playback
   - Calendar
@@ -51,8 +55,10 @@ This is the lean path for getting Clarity through App Store review without addin
 6. Create the one-time non-consumable support products listed in `docs/STOREKIT_SETUP.md`.
 7. Add product localizations, prices, review notes, and review screenshots for each paid product.
 8. Wait for product metadata to become available in sandbox, then test purchases.
-9. Archive and upload build `8` or higher.
-10. Attach the build and required in-app purchases to the same App Review submission.
+9. Run `supabase/sql/cloudtap_rate_limits.sql`.
+10. Confirm every paid Cloud Tap function checks user entitlement and rate limit before OpenAI.
+11. Archive and upload build `9` or higher.
+12. Attach the build and required in-app purchases to the same App Review submission.
 
 ## Privacy Answers To Keep Aligned
 
@@ -78,6 +84,7 @@ Tell Apple:
 - Only selected redacted text is sent when the user chooses a Cloud Tap response.
 - Health data is optional and used for local pattern display.
 - Support purchases are app support, not charitable donations.
+- The Privacy / Cloud Tap screen includes Delete Cloud Account and Data.
 
 ## Testing Purchases Without Real Money
 
@@ -94,8 +101,11 @@ Useful Apple docs:
 
 ## Still Needed Before Public Release
 
-- Backend entitlement enforcement for paid Cloud Tap requests. See `docs/BACKEND_ENTITLEMENT_ENFORCEMENT.md`.
-- App Store Connect product creation and sandbox purchase testing.
+- Deploy `supabase/functions/delete-account/index.ts`.
+- Run `supabase/sql/cloudtap_rate_limits.sql`.
+- Confirm `cloudtap-clarity-perspective`, `cloudtap-options`, `cloudtap-questions`, and `cloudtap-talkitthrough` have the same server-side entitlement and rate-limit checks as `cloudtap-reflect`.
+- App Store Connect sandbox purchase testing.
 - Real device smoke test.
 - Privacy Policy page with real support/contact email.
 - App screenshots and metadata.
+- Confirm Apple accepts the CarPlay audio entitlement, or remove CarPlay before final submission.

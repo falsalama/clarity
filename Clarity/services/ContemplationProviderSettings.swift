@@ -11,7 +11,6 @@ final class ContemplationProviderSettings: ObservableObject {
     enum Choice: String, CaseIterable, Identifiable {
         case auto
         case deviceTapApple
-        case deviceTapLlama
         case cloudTap
 
         var id: String { rawValue }
@@ -20,7 +19,6 @@ final class ContemplationProviderSettings: ObservableObject {
             switch self {
             case .auto: return "Auto"
             case .deviceTapApple: return "Device Tap (Apple)"
-            case .deviceTapLlama: return "Device Tap (Llama)"
             case .cloudTap: return "Cloud Tap"
             }
         }
@@ -31,12 +29,24 @@ final class ContemplationProviderSettings: ObservableObject {
                 return "Prefer on-device when available; otherwise Cloud Tap (if enabled)."
             case .deviceTapApple:
                 return "Uses the system on-device model when available."
-            case .deviceTapLlama:
-                return "Uses a bundled on-device model (if installed)."
             case .cloudTap:
                 return "Uses Cloud Tap for all supported tools."
             }
         }
+    }
+
+    static var visibleChoices: [Choice] {
+        var choices: [Choice] = [.cloudTap]
+
+        if FeatureFlags.showAppleDeviceTapProvider {
+            choices.append(.deviceTapApple)
+        }
+
+        return choices
+    }
+
+    static func isVisible(_ choice: Choice) -> Bool {
+        visibleChoices.contains(choice)
     }
 
     private enum Keys {
@@ -49,11 +59,13 @@ final class ContemplationProviderSettings: ObservableObject {
 
     init() {
         if let raw = UserDefaults.standard.string(forKey: Keys.choice),
-           let parsed = Choice(rawValue: raw)
+           let parsed = Choice(rawValue: raw),
+           Self.isVisible(parsed)
         {
             self.choice = parsed
         } else {
-            self.choice = .auto
+            self.choice = .cloudTap
+            UserDefaults.standard.set(Choice.cloudTap.rawValue, forKey: Keys.choice)
         }
     }
 }

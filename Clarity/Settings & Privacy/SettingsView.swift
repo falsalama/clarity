@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @EnvironmentObject private var cloudTap: CloudTapSettings
@@ -7,16 +6,10 @@ struct SettingsView: View {
     @EnvironmentObject private var providerSettings: ContemplationProviderSettings
     @EnvironmentObject private var redactionDictionary: RedactionDictionary
 
-    // Local model manager (singleton)
-    @ObservedObject private var localModel = LocalModelManager.shared
-
     // Redaction entry
     @State private var newToken: String = ""
     @FocusState private var tokenFieldFocused: Bool
 
-    // File import for .gguf
-    @State private var showImporter: Bool = false
-    @State private var importError: String? = nil
     @State private var dailyNudgeEnabled: Bool = UserDefaults.standard.bool(forKey: "daily_nudge_enabled")
 
     var body: some View {
@@ -36,7 +29,7 @@ struct SettingsView: View {
             } header: {
                 Text("Account")
             } footer: {
-                Text("Perspective, Options, Questions, and Talk it through require Clarity Reflect or Support Clarity.")
+                Text("Generated Reflect responses require Clarity Reflect or Support Clarity.")
             }
 
             Section {
@@ -87,84 +80,24 @@ struct SettingsView: View {
             }
 
             // Processing
-            Section {
-                Picker(SettingsCopy.providerLabel, selection: $providerSettings.choice) {
-                    ForEach(ContemplationProviderSettings.Choice.allCases) { choice in
-                        Text(choice.title).tag(choice)
-                    }
-                }
-
-                if let foot = providerFootnote {
-                    Text(foot)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text(SettingsCopy.processingHeader)
-            } footer: {
-                Text(SettingsCopy.processingFootnote)
-            }
-
-            // Local model manager
-            Section {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(localModel.modelNameForUI)
-                        .font(.headline)
-
-                    Text(statusText)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-
-                    if localModel.existsForUI {
-                        Text("File: \(localModel.expectedFileNameForUI)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        if localModel.fileSizeBytesForUI > 0 {
-                            Text("Size: \(formatBytes(localModel.fileSizeBytesForUI))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Text("Expected file: \(localModel.expectedFileNameForUI)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                if case .downloading(let p) = localModel.state {
-                    if let p = p {
-                        ProgressView(value: p)
-                    } else {
-                        ProgressView()
-                    }
-                }
-
-                HStack {
-                    switch localModel.state {
-                    case .notInstalled, .failed:
-                        Button(SettingsCopy.localModelDownload) { localModel.startDownload() }
-                        Button(SettingsCopy.localModelImport) { showImporter = true }
-
-                    case .downloading:
-                        Button("Cancel download") { localModel.cancelDownload() }
-                            .tint(.orange)
-
-                    case .ready:
-                        Button(SettingsCopy.localModelDelete, role: .destructive) { localModel.deleteModel() }
-                        Button("Re-download") {
-                            localModel.deleteModel()
-                            localModel.startDownload()
+            if FeatureFlags.showModelProviderSettings {
+                Section {
+                    Picker(SettingsCopy.providerLabel, selection: $providerSettings.choice) {
+                        ForEach(ContemplationProviderSettings.visibleChoices) { choice in
+                            Text(choice.title).tag(choice)
                         }
                     }
-                }
 
-                Text(SettingsCopy.localModelImportHint)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text(SettingsCopy.localModelHeader)
-            } footer: {
-                Text(SettingsCopy.localModelStoredOnDeviceOnly)
+                    if let foot = providerFootnote {
+                        Text(foot)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text(SettingsCopy.processingHeader)
+                } footer: {
+                    Text(SettingsCopy.processingFootnote)
+                }
             }
 
             // Privacy / Cloud Tap
@@ -261,33 +194,6 @@ struct SettingsView: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
-        .onAppear { localModel.refreshStatePublic() }
-        .fileImporter(
-            isPresented: $showImporter,
-            allowedContentTypes: [UTType(filenameExtension: "gguf") ?? .data],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    do {
-                        try localModel.importModel(from: url)
-                    } catch {
-                        importError = error.localizedDescription
-                    }
-                }
-            case .failure(let error):
-                importError = error.localizedDescription
-            }
-        }
-        .alert(SettingsCopy.importFailedTitle, isPresented: Binding(
-            get: { importError != nil },
-            set: { if !$0 { importError = nil } }
-        )) {
-            Button(SettingsCopy.ok, role: .cancel) {}
-        } message: {
-            Text(importError ?? "")
-        }
     }
 
     // MARK: - Helpers
@@ -295,7 +201,6 @@ struct SettingsView: View {
     private var providerFootnote: String? {
         switch providerSettings.choice {
         case .deviceTapApple: return SettingsCopy.appleProviderFootnote
-        case .deviceTapLlama: return SettingsCopy.llamaProviderFootnote
         case .auto, .cloudTap: return nil
         }
     }
@@ -304,20 +209,6 @@ struct SettingsView: View {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
         return "\(v) (\(b))"
-    }
-
-    private var statusText: String {
-        switch localModel.state {
-        case .notInstalled:
-            return SettingsCopy.localModelNotInstalled
-        case .downloading(let p):
-            if let p = p { return "\(SettingsCopy.localModelDownloading) \(Int(p * 100))%" }
-            return SettingsCopy.localModelDownloading
-        case .ready:
-            return SettingsCopy.localModelInstalled
-        case .failed(let msg):
-            return "Failed: \(msg)"
-        }
     }
 
     private var accountSubtitle: String {
@@ -338,11 +229,6 @@ struct SettingsView: View {
         tokenFieldFocused = false
     }
 
-    private func formatBytes(_ n: Int64) -> String {
-        let mb = Double(n) / (1024.0 * 1024.0)
-        if mb >= 1024 { return String(format: "%.1f GB", mb / 1024.0) }
-        return String(format: "%.0f MB", mb)
-    }
 }
 
 enum SettingsCopy {
@@ -352,36 +238,14 @@ enum SettingsCopy {
 
     // MARK: - Processing
     static let processingHeader = "Processing"
-    static let providerLabel = "LLM model"
+    static let providerLabel = "Reflect processing"
 
     // One short sentence. Avoid dense explanations in primary Settings rows.
     static let processingFootnote =
-    "Choose where responses are generated. On-device stays on this iPhone. Cloud Tap sends selected text to the cloud when you choose it."
+    "Choose where responses are generated. Cloud Tap sends selected text to the cloud when you choose it."
 
     static let appleProviderFootnote =
-    "Uses Apple’s on-device model (requires iOS 26+ and an Apple Intelligence-capable device)."
-
-    static let llamaProviderFootnote =
-    "Runs locally using a downloaded model."
-
-    // MARK: - Local model
-    static let localModelHeader = "Local model"
-    static let localModelStoredOnDeviceOnly =
-    "Stored on this device only."
-
-    static let localModelStatus = "Status"
-    static let localModelInstalled = "Installed"
-    static let localModelNotInstalled = "Not installed"
-    static let localModelDownloading = "Downloading…"
-
-    static let localModelDownload = "Download model"
-    static let localModelImport = "Import model…"
-    static let localModelDelete = "Delete model"
-    static let localModelRefresh = "Refresh status"
-    static let localModelAdvanced = "Advanced"
-
-    static let localModelImportHint =
-    "Choose a .gguf file from Files. Clarity will copy it into Application Support."
+    "Uses Apple's on-device model on compatible devices. Responses may be simpler than Cloud Tap."
 
     // MARK: - Redaction
     static let redactionHeader = "Redaction"

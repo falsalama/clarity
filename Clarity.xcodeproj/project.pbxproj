@@ -10,7 +10,6 @@
 		F534AC5A2F32C9010046860C /* WALBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F534AC592F32C9010046860C /* WALBuilder.swift */; };
 		F573096E2F7408D50017A732 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = F573096D2F7408D50017A732 /* Auth */; };
 		F57309712F740A940017A732 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = F57309702F740A940017A732 /* Supabase */; };
-		F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */ = {isa = PBXBuildFile; productRef = F5A6E0222F3939A00097A43D /* LlamaSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,7 +49,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				F573096E2F7408D50017A732 /* Auth in Frameworks */,
-				F5A6E0232F3939A00097A43D /* LlamaSwift in Frameworks */,
 				F57309712F740A940017A732 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -104,7 +102,6 @@
 			);
 			name = Clarity;
 			packageProductDependencies = (
-				F5A6E0222F3939A00097A43D /* LlamaSwift */,
 				F573096D2F7408D50017A732 /* Auth */,
 				F57309702F740A940017A732 /* Supabase */,
 			);
@@ -137,7 +134,6 @@
 			mainGroup = F54A105F2F1F9624003FF874;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */,
 				F573096C2F7408D50017A732 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -297,7 +293,7 @@
 				CODE_SIGN_ENTITLEMENTS = Clarity/Clarity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = 9WUKD3DY42;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -339,7 +335,6 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "Clarity/LocalLlamaRuntime/Clarity-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
@@ -356,7 +351,7 @@
 				CODE_SIGN_ENTITLEMENTS = Clarity/Clarity.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEVELOPMENT_TEAM = 9WUKD3DY42;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_PREVIEWS = YES;
@@ -398,7 +393,6 @@
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				"SWIFT_OBJC_BRIDGING_HEADER[arch=*]" = "Clarity/LocalLlamaRuntime/Clarity-Bridging-Header.h";
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2,7";
@@ -438,14 +432,6 @@
 				minimumVersion = 2.5.1;
 			};
 		};
-		F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/mattt/llama.swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.7972.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -458,11 +444,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F573096C2F7408D50017A732 /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
-		};
-		F5A6E0222F3939A00097A43D /* LlamaSwift */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F5A6E0212F3939A00097A43D /* XCRemoteSwiftPackageReference "llama" */;
-			productName = LlamaSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

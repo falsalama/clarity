@@ -30,6 +30,8 @@ struct ClarityApp: App {
               ?? "nil")
 #endif
 
+        Self.cleanupLegacyLocalModelStorageIfNeeded()
+
         do {
             let storeURL = try Self.storeURL(filename: "clarity.store")
 
@@ -101,5 +103,42 @@ struct ClarityApp: App {
         }
 
         return dir.appendingPathComponent(filename)
+    }
+
+    private static func cleanupLegacyLocalModelStorageIfNeeded() {
+        let key = "legacy.local.model.storage.cleaned.v1"
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: key) else { return }
+
+        defer { defaults.set(true, forKey: key) }
+
+        guard let appSupport = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
+            return
+        }
+
+        let fileName = "Llama-3.2-3B-Instruct-Q4_K_M.gguf"
+        let modelFiles = [
+            appSupport.appendingPathComponent("models", isDirectory: true).appendingPathComponent(fileName),
+            appSupport.appendingPathComponent("Models", isDirectory: true).appendingPathComponent(fileName)
+        ]
+
+        for url in modelFiles where FileManager.default.fileExists(atPath: url.path) {
+            try? FileManager.default.removeItem(at: url)
+            removeDirectoryIfEmpty(url.deletingLastPathComponent())
+        }
+    }
+
+    private static func removeDirectoryIfEmpty(_ url: URL) {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: nil
+        ), contents.isEmpty else {
+            return
+        }
+
+        try? FileManager.default.removeItem(at: url)
     }
 }

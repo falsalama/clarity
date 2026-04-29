@@ -17,6 +17,9 @@ final class CloudTapSettings: ObservableObject {
     }
 
     init() {
+        if UserDefaults.standard.object(forKey: Keys.enabled) == nil {
+            UserDefaults.standard.set(true, forKey: Keys.enabled)
+        }
         self.isEnabled = UserDefaults.standard.bool(forKey: Keys.enabled)
 
         // Default true (transparent by default). If unset, register default.
@@ -26,4 +29,3 @@ final class CloudTapSettings: ObservableObject {
         self.showLaneBadges = UserDefaults.standard.bool(forKey: Keys.showLaneBadges)
     }
 }
-

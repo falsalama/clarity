@@ -84,6 +84,8 @@ Cloud Tap sends only selected redacted text when the user chooses a Cloud Tap re
 
 The app uses HealthKit only for user-authorized, on-device mindfulness and health pattern support. Health data is not sold or used for advertising.
 
+The app creates an anonymous Supabase account for Cloud Tap access and entitlement checks. Users can delete the current cloud account from Profile > Privacy > Delete Cloud Account and Data.
+
 The app is not medical advice, therapy, diagnosis, treatment, or crisis support.
 
 ## Privacy Answers Working Notes

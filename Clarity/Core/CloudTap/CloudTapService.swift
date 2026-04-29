@@ -8,6 +8,27 @@ enum CloudTapError: Error, Equatable {
     case network(String)
 }
 
+extension CloudTapError {
+    var userFacingMessage: String {
+        switch self {
+        case .unavailable:
+            return "Cloud Tap is not available right now."
+        case .http(401, _):
+            return "Your cloud session has expired. Reopen the app and try again."
+        case .http(402, _):
+            return "Clarity Reflect access is not active yet. Open Account to subscribe or restore purchases."
+        case .http(429, _):
+            return "Cloud Tap is temporarily paused for this account. Try again later."
+        case .http:
+            return "Cloud Tap could not complete that request. Check your connection and try again."
+        case .decoding:
+            return "Cloud Tap returned an unexpected response. Try again later."
+        case .network:
+            return "Cloud Tap could not connect. Check your signal and try again."
+        }
+    }
+}
+
 final class CloudTapService {
     private let session: URLSession
 

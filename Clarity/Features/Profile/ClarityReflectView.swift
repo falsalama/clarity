@@ -541,10 +541,10 @@ struct ClarityReflectView: View {
 
     private var paidReflectFeatures: [String] {
         [
+            "Cloud Tap Reflect response",
             "Practice-focused perspective",
             "Questions and next steps",
             "Talk it through",
-            "Pattern and tension reflection",
             "Expanded practice audio"
         ]
     }

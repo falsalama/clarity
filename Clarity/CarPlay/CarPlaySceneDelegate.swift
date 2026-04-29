@@ -16,13 +16,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
     private weak var interfaceController: CPInterfaceController?
     private var tabBarTemplate: CPTabBarTemplate?
 
-    // MARK: - CPTemplateApplicationSceneDelegate
-
-    func templateApplicationScene(
-        _ templateApplicationScene: CPTemplateApplicationScene,
-        didConnect interfaceController: CPInterfaceController,
-        to window: CPWindow
-    ) {
+    private func connect(_ interfaceController: CPInterfaceController) {
         self.interfaceController = interfaceController
 
         let sounds = makeSoundsListTemplate()
@@ -34,11 +28,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         interfaceController.setRootTemplate(tabs, animated: true, completion: nil)
     }
 
-    func templateApplicationScene(
-        _ templateApplicationScene: CPTemplateApplicationScene,
-        didDisconnect interfaceController: CPInterfaceController,
-        from window: CPWindow
-    ) {
+    private func disconnect() {
         self.interfaceController = nil
         self.tabBarTemplate = nil
     }
@@ -91,5 +81,39 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
 
             return item
         }
+    }
+}
+
+// MARK: - CPTemplateApplicationSceneDelegate
+
+extension CarPlaySceneDelegate {
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didConnect interfaceController: CPInterfaceController
+    ) {
+        connect(interfaceController)
+    }
+
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didConnect interfaceController: CPInterfaceController,
+        to window: CPWindow
+    ) {
+        connect(interfaceController)
+    }
+
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didDisconnect interfaceController: CPInterfaceController
+    ) {
+        disconnect()
+    }
+
+    func templateApplicationScene(
+        _ templateApplicationScene: CPTemplateApplicationScene,
+        didDisconnect interfaceController: CPInterfaceController,
+        from window: CPWindow
+    ) {
+        disconnect()
     }
 }

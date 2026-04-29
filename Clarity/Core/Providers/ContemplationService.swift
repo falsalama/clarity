@@ -20,6 +20,10 @@ final class ContemplationService {
     }
 
     private func resolveProvider(for mode: ContemplationMode) throws -> ContemplationProvider {
+        if !FeatureFlags.showModelProviderSettings {
+            return try resolveCloudTapProvider()
+        }
+
         // Talk-it-through is cloud-only for now.
         if mode == .talkItThrough {
             return try resolveCloudTapProvider()
@@ -31,9 +35,6 @@ final class ContemplationService {
 
         case .deviceTapApple:
             return AppleFMProvider()
-
-        case .deviceTapLlama:
-            return LocalLlamaProvider.shared
 
         case .auto:
             // Only pick Apple FM when it is *actually* available.
@@ -58,4 +59,3 @@ final class ContemplationService {
         return CloudTapProvider(service: service)
     }
 }
-

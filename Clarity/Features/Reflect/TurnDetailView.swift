@@ -598,7 +598,7 @@ struct TurnDetailView: View {
                 rolled.remove(at: idx)
                 saveTalkThread(rolled, into: t)
             }
-            cloudSendError = String(describing: error)
+            cloudSendError = cloudTapErrorMessage(error)
         }
     }
 
@@ -744,6 +744,10 @@ struct TurnDetailView: View {
     }
 
     private func shouldUseCloudTap(for tool: CloudTool) -> Bool {
+        if !FeatureFlags.showModelProviderSettings {
+            return true
+        }
+
         // Talk-it-through remains cloud-only for now.
         if tool == .talkItThrough { return true }
         switch providerSettings.choice {
@@ -752,12 +756,16 @@ struct TurnDetailView: View {
         case .auto:
             // Until Device Tap is wired, keep Auto on Cloud Tap.
             return true
-        case .deviceTapApple, .deviceTapLlama:
+        case .deviceTapApple:
             return false
         }
     }
 
     private func requiresClarityReflect(_ tool: CloudTool) -> Bool {
+        if FeatureFlags.paywallGeneratedReflectTools {
+            return true
+        }
+
         switch tool {
         case .reflect:
             return shouldUseCloudTap(for: tool)
@@ -830,8 +838,16 @@ struct TurnDetailView: View {
             // Scroll to show the latest outputs
             scrollOutputsToBottom()
         } catch {
-            cloudSendError = String(describing: error)
+            cloudSendError = cloudTapErrorMessage(error)
         }
+    }
+
+    private func cloudTapErrorMessage(_ error: Error) -> String {
+        if let cloudTapError = error as? CloudTapError {
+            return cloudTapError.userFacingMessage
+        }
+
+        return "Cloud Tap could not complete that request. Check your connection and try again."
     }
 
     private func sendCloudTapRequest() async {

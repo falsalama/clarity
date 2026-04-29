@@ -44,6 +44,14 @@ Payments are handled by Apple through the App Store.
 
 Clarity uses purchase entitlement state to unlock Clarity Reflect and optional support purchases. Clarity does not receive your full payment card details.
 
+## Account Deletion
+
+Clarity may create an anonymous cloud account to support Cloud Tap access and purchase entitlement checks.
+
+You can delete the current cloud account in the app from Privacy / Cloud Tap → Delete Cloud Account and Data.
+
+Deleting the cloud account removes the current anonymous cloud account and server entitlement record. Local reflections, audio recordings, Health data, and on-device history remain on your iPhone unless you delete the app or clear that data separately.
+
 ## Tracking and Advertising
 
 Clarity does not use third-party advertising.

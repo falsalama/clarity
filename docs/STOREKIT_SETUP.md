@@ -60,6 +60,7 @@ After the products exist in App Store Connect:
 
 - Use Sandbox Apple Accounts for development builds.
 - Use TestFlight for near-production purchase testing.
+- If the in-app plan cards still show placeholder prices, wait for App Store Connect propagation, force quit and reopen the app, then confirm the build contains the correct product IDs and StoreKit scheme file path.
 - Confirm monthly unlocks Clarity Reflect.
 - Confirm annual unlocks Clarity Reflect.
 - Confirm each support tier unlocks Clarity Reflect.
@@ -70,9 +71,14 @@ After the products exist in App Store Connect:
 
 Paid Cloud Tap functions are protected by `public.user_entitlements`. Apple purchases must sync to Supabase before paid model calls can run.
 
+Run this SQL once:
+
+- `supabase/sql/cloudtap_rate_limits.sql`
+
 Deploy this Edge Function:
 
 - `supabase/functions/verify-apple-entitlement/index.ts`
+- `supabase/functions/delete-account/index.ts`
 
 Set these Supabase Edge Function secrets:
 
@@ -81,10 +87,16 @@ Set these Supabase Edge Function secrets:
 - `APPLE_PRIVATE_KEY`
 - `APPLE_BUNDLE_ID` = `Krunch.Clarity`
 - `SUPABASE_SERVICE_ROLE_KEY`
+- `RATE_LIMIT_PER_HOUR` = `60` optional default
+- `RATE_LIMIT_PER_DAY` = `250` optional default
 
 The iOS app sends StoreKit's verified transaction JWS to `verify-apple-entitlement`. The function checks the transaction with Apple's App Store Server API, validates bundle ID/product/expiry, and upserts `public.user_entitlements`.
 
 For TestFlight and sandbox purchases, Apple transaction lookup uses the sandbox server when the transaction environment is Sandbox. Live purchases use production.
+
+The `delete-account` function validates the current Supabase user JWT, deletes the user's entitlement record, and deletes the anonymous Supabase auth user with the service role key. This supports Apple's in-app account deletion requirement.
+
+All paid Cloud Tap Edge Functions should authenticate the Supabase user, check `public.user_entitlements`, and consume the Cloud Tap rate limit before calling OpenAI. See `docs/CLOUDTAP_RATE_LIMITING.md`.
 
 ## App Code References
 

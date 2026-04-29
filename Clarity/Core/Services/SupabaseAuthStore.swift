@@ -4,6 +4,26 @@ import Supabase
 
 @MainActor
 final class SupabaseAuthStore: ObservableObject {
+    enum AccountDeletionError: LocalizedError {
+        case unavailable
+        case missingSession
+        case http(Int, String)
+        case network(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .unavailable:
+                return "Cloud account deletion is not configured."
+            case .missingSession:
+                return "No active cloud account session was found."
+            case .http(let status, let body):
+                return "Delete failed (\(status)): \(body)"
+            case .network(let message):
+                return message
+            }
+        }
+    }
+
     enum State: Equatable {
         case unavailable
         case idle
@@ -81,6 +101,58 @@ final class SupabaseAuthStore: ObservableObject {
         }
     }
 
+    func deleteCloudAccountAndData() async throws {
+        guard let client else {
+            clearCachedSession()
+            state = .unavailable
+            throw AccountDeletionError.unavailable
+        }
+
+        guard let accessToken = AppServices.supabaseAccessToken, !accessToken.isEmpty else {
+            throw AccountDeletionError.missingSession
+        }
+
+        guard case .available(let cfg) = CloudTapConfig.availability() else {
+            throw AccountDeletionError.unavailable
+        }
+
+        let url = resolveFunctionURL(base: cfg.baseURL, endpoint: "delete-account")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.timeoutInterval = 30
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+        req.setValue(cfg.supabaseAnonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+
+            guard (200..<300).contains(status) else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                throw AccountDeletionError.http(status, body)
+            }
+        } catch let error as AccountDeletionError {
+            throw error
+        } catch {
+            throw AccountDeletionError.network(String(describing: error))
+        }
+
+        try? await client.auth.signOut()
+        clearCachedSession()
+        state = .idle
+
+        do {
+            let session = try await client.auth.signInAnonymously()
+            applySession(session)
+        } catch {
+            // The current cloud account was deleted. If a replacement anonymous
+            // session cannot be created immediately, the next app launch will retry.
+            clearCachedSession()
+            state = .idle
+        }
+    }
+
     private func applySession(_ session: Session) {
         let userID = "\(session.user.id)"
         AppServices.supabaseAccessToken = session.accessToken
@@ -100,5 +172,13 @@ final class SupabaseAuthStore: ObservableObject {
     private func clearCachedSession() {
         AppServices.supabaseAccessToken = nil
         AppServices.supabaseUserID = nil
+    }
+
+    private func resolveFunctionURL(base: URL, endpoint: String) -> URL {
+        let last = base.lastPathComponent
+        if last.hasPrefix("cloudtap-") {
+            return base.deletingLastPathComponent().appendingPathComponent(endpoint)
+        }
+        return base.appendingPathComponent(endpoint)
     }
 }
