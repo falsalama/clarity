@@ -429,9 +429,16 @@ struct CaptureView: View {
         do { try modelContext.save() } catch { /* best-effort */ }
     }
 
-    private var dailyAnswerTurnIDToday: UUID? {
+    private var dailyAnswerTurnToday: TurnEntity? {
         if let dailyAnswerTurnIDOverride {
-            return dailyAnswerTurnIDOverride
+            if let turn = completedTurns.first(where: { $0.id == dailyAnswerTurnIDOverride }) {
+                return turn
+            }
+
+            let repo = TurnRepository(context: modelContext)
+            if let turn = try? repo.fetch(id: dailyAnswerTurnIDOverride) {
+                return turn
+            }
         }
 
         let cal = Calendar.current
@@ -441,7 +448,23 @@ struct CaptureView: View {
             cal.isDate(turn.recordedAt, inSameDayAs: now) &&
             turn.promptKindRaw == "daily_reflect" &&
             turn.promptDayKey == todayKey
-        })?.id
+        })
+    }
+
+    private var dailyAnswerTurnIDToday: UUID? {
+        dailyAnswerTurnToday?.id
+    }
+
+    private var dailyAnswerPreviewText: String {
+        let saved = dailyAnswerTurnToday?.transcriptRedactedActive
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if !saved.isEmpty {
+            return saved
+        }
+
+        guard coordinator.phase == .recording else { return "" }
+        return coordinator.liveTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func applyDailyPromptSnapshot(to turnID: UUID?) {
@@ -649,6 +672,11 @@ struct CaptureView: View {
                     showTypeButton: true,
                     onTypeTap: { showDailyAnswerSheet = true }
                 )
+
+                let answerPreview = dailyAnswerPreviewText
+                if !answerPreview.isEmpty {
+                    dailyAnswerPreviewCard(answerPreview)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -682,6 +710,28 @@ struct CaptureView: View {
         .overlay(
             RoundedRectangle(cornerRadius: Layout.sectionCorner, style: .continuous)
                 .stroke(.white.opacity(0.24), lineWidth: 1)
+        )
+    }
+
+    private func dailyAnswerPreviewCard(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Your answer")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(text)
+                .font(.callout)
+                .foregroundStyle(.primary.opacity(0.82))
+                .lineLimit(6)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(.white.opacity(0.26), lineWidth: 1)
         )
     }
 
