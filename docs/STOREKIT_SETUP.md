@@ -46,13 +46,33 @@ Create these as non-consumable in-app purchases:
 
 These support purchases are intended to restore across devices on the same Apple ID and unlock Clarity Reflect permanently for that Apple ID. They are not consumables and should not be described as charitable donations.
 
-## Local Testing
+## Real App Store Sandbox Testing
+
+Use the main Xcode scheme:
+
+- `Clarity`
+
+The main scheme does not attach a local StoreKit configuration file. Debug runs with this scheme request the real App Store Connect products through StoreKit, so sandbox purchases can be tested with a sandbox Apple Account.
+
+For real sandbox testing:
+
+- Run the `Clarity` scheme on a device or simulator.
+- Sign in with a sandbox Apple Account when Apple asks during purchase.
+- Confirm the plan cards show App Store prices rather than placeholder prices.
+- Purchase monthly, annual, or support.
+- Confirm Cloud Tap access unlocks.
+- Confirm Restore Purchases restores access after reinstall or clearing local state.
+
+If plan cards do not show products, check App Store Connect product status, banking/tax agreements, bundle ID, product IDs, network, and propagation time.
+
+## Local StoreKit Testing
 
 Local testing uses:
 
 - `Clarity.storekit`
+- `Clarity Local StoreKit` scheme
 
-The shared `Clarity` scheme points to this file for local StoreKit testing. This lets purchase UI, transaction state, restore behavior, and entitlement gating be tested without App Store Connect and without real money.
+Use `Clarity Local StoreKit` when you want fake StoreKit purchases without App Store Connect and without any sandbox Apple Account. Do not use this scheme when checking real App Store Connect products.
 
 ## App Store Connect Testing
 

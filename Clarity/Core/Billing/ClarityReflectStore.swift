@@ -6,9 +6,10 @@ import StoreKit
 final class ClarityReflectStore: ObservableObject {
     private enum Keys {
         static let reflectAccess = "clarity.reflect.access.enabled"
+        static let reflectProductID = "clarity.reflect.product.id"
         static let supportPurchased = "clarity.support.purchased"
         static let legacySupporterAccess = "supporter.access.enabled"
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
         static let debugReflectOverride = "clarity.reflect.debug.override"
 #endif
     }
@@ -28,8 +29,9 @@ final class ClarityReflectStore: ObservableObject {
     @Published private(set) var isLoadingProducts = false
     @Published private(set) var isRefreshingEntitlements = false
     @Published private(set) var isPurchasing = false
+    @Published private(set) var productLoadIssue: String?
     @Published var lastError: String?
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
     @Published private(set) var hasDebugReflectOverride: Bool
 #endif
 
@@ -43,19 +45,22 @@ final class ClarityReflectStore: ObservableObject {
     init() {
         let defaults = UserDefaults.standard
         let storedReflect = defaults.bool(forKey: Keys.reflectAccess)
+        let storedReflectProductID = Self.reflectProductIDs.contains(defaults.string(forKey: Keys.reflectProductID) ?? "")
+            ? defaults.string(forKey: Keys.reflectProductID)
+            : nil
         let storedSupport = defaults.bool(forKey: Keys.supportPurchased)
         self.hasSupportedClarity = storedSupport
         self.purchasedSupportProductIDs = []
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
         let debugOverride = defaults.bool(forKey: Keys.debugReflectOverride)
         self.hasDebugReflectOverride = debugOverride
         self.hasReflectAccess = storedReflect || storedSupport || debugOverride
         self.actualReflectEntitlement = storedReflect
 #else
-        self.hasReflectAccess = storedSupport
-        self.actualReflectEntitlement = false
+        self.hasReflectAccess = storedReflect || storedSupport
+        self.actualReflectEntitlement = storedReflect
 #endif
-        self.currentReflectProductID = nil
+        self.currentReflectProductID = storedReflect ? storedReflectProductID : nil
         self.updatesTask = Task { [weak self] in
             await self?.listenForTransactions()
         }
@@ -66,7 +71,23 @@ final class ClarityReflectStore: ObservableObject {
     }
 
     var reflectProducts: [Product] {
-        orderProducts(matching: [Self.monthlyProductID, Self.annualProductID])
+        orderProducts(matching: Self.reflectProductIDs)
+    }
+
+    static var reflectProductIDs: [String] {
+        [
+            Self.monthlyProductID,
+            Self.annualProductID
+        ]
+    }
+
+    static var allProductIDs: [String] {
+        Self.reflectProductIDs + [
+            Self.supportProductID,
+            Self.support100ProductID,
+            Self.support500ProductID,
+            Self.support1000ProductID
+        ]
     }
 
     static var supportProductIDs: [String] {
@@ -113,7 +134,7 @@ final class ClarityReflectStore: ObservableObject {
         }
     }
 
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
     func setDebugReflectOverride(_ enabled: Bool) {
         hasDebugReflectOverride = enabled
         UserDefaults.standard.set(enabled, forKey: Keys.debugReflectOverride)
@@ -124,6 +145,10 @@ final class ClarityReflectStore: ObservableObject {
     func prepare() async {
         await requestProducts()
         await refreshEntitlements()
+    }
+
+    func reloadProducts() async {
+        await requestProducts()
     }
 
     func purchase(_ product: Product) async {
@@ -178,20 +203,30 @@ final class ClarityReflectStore: ObservableObject {
 
     private func requestProducts() async {
         isLoadingProducts = true
+        productLoadIssue = nil
         defer { isLoadingProducts = false }
 
         do {
-            let loaded = try await Product.products(for: [
-                Self.monthlyProductID,
-                Self.annualProductID,
-                Self.supportProductID,
-                Self.support100ProductID,
-                Self.support500ProductID,
-                Self.support1000ProductID
-            ])
+            let loaded = try await Product.products(for: Self.allProductIDs)
             products = orderProducts(loaded)
+
+            if products.isEmpty {
+                productLoadIssue = "Plans could not be loaded. Check the connection and try again."
+            }
+#if DEBUG
+            if !products.isEmpty {
+                let loadedIDs = Set(loaded.map(\.id))
+                let missing = Self.allProductIDs.filter { !loadedIDs.contains($0) }
+                if !missing.isEmpty {
+                    productLoadIssue = "Loaded \(loaded.count) of \(Self.allProductIDs.count) StoreKit products. Missing: \(missing.joined(separator: ", "))."
+                }
+            }
+#endif
         } catch {
-            lastError = error.localizedDescription
+            productLoadIssue = "Plans could not be loaded. Check the connection and try again."
+#if DEBUG
+            productLoadIssue = "\(productLoadIssue ?? "") \(error.localizedDescription)"
+#endif
         }
     }
 
@@ -209,7 +244,7 @@ final class ClarityReflectStore: ObservableObject {
             guard case .verified(let transaction) = result else { continue }
 
             switch transaction.productID {
-            case Self.monthlyProductID, Self.annualProductID:
+            case let productID where Self.reflectProductIDs.contains(productID):
                 hasReflect = true
                 activeReflectProductID = transaction.productID
                 serverSyncTransactions.append(result.jwsRepresentation)
@@ -222,9 +257,10 @@ final class ClarityReflectStore: ObservableObject {
             }
         }
 
+        currentReflectProductID = activeReflectProductID
+        persistCurrentReflectProductID()
         purchasedSupportProductIDs = supportIDs
         applyReflectAccess(hasReflect)
-        currentReflectProductID = activeReflectProductID
         applySupportPurchased(hasSupport)
 
         for signedTransactionInfo in serverSyncTransactions {
@@ -240,8 +276,7 @@ final class ClarityReflectStore: ObservableObject {
                 applySupportPurchased(true)
             }
 
-            if transaction.productID == Self.monthlyProductID ||
-                transaction.productID == Self.annualProductID ||
+            if Self.reflectProductIDs.contains(transaction.productID) ||
                 Self.supportProductIDs.contains(transaction.productID) {
                 _ = await syncServerEntitlement(
                     signedTransactionInfo: result.jwsRepresentation
@@ -284,7 +319,7 @@ final class ClarityReflectStore: ObservableObject {
 
     private func updateEffectiveAccess() {
         let base = actualReflectEntitlement || hasSupportedClarity
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
         let effective = base || hasDebugReflectOverride
 #else
         let effective = base
@@ -292,6 +327,14 @@ final class ClarityReflectStore: ObservableObject {
         hasReflectAccess = effective
         UserDefaults.standard.set(actualReflectEntitlement, forKey: Keys.reflectAccess)
         UserDefaults.standard.set(base, forKey: Keys.legacySupporterAccess)
+    }
+
+    private func persistCurrentReflectProductID() {
+        if let currentReflectProductID {
+            UserDefaults.standard.set(currentReflectProductID, forKey: Keys.reflectProductID)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Keys.reflectProductID)
+        }
     }
 
     private func syncServerEntitlement(signedTransactionInfo: String) async -> Bool {

@@ -64,7 +64,8 @@ struct ClarityReflectView: View {
                             subtitle: monthlyDescription,
                             badge: nil,
                             price: plannedPrice(for: .monthly),
-                            buttonTitle: "Coming soon"
+                            buttonTitle: "Refresh plans",
+                            buttonAction: { Task { await reflectStore.reloadProducts() } }
                         )
 
                         placeholderPlanCard(
@@ -73,8 +74,11 @@ struct ClarityReflectView: View {
                             subtitle: annualDescription,
                             badge: nil,
                             price: plannedPrice(for: .annual),
-                            buttonTitle: "Coming soon"
+                            buttonTitle: "Refresh plans",
+                            buttonAction: { Task { await reflectStore.reloadProducts() } }
                         )
+
+                        planLoadIssueText
                     } else {
                         ForEach(reflectStore.reflectProducts, id: \.id) { product in
                             planRow(for: product)
@@ -86,7 +90,7 @@ struct ClarityReflectView: View {
                         .foregroundStyle(.secondary)
                 }
 
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
                 VStack(alignment: .leading, spacing: 12) {
                     sectionTitle("Developer testing")
 
@@ -235,7 +239,7 @@ struct ClarityReflectView: View {
                 Spacer(minLength: 12)
 
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(product.displayPrice)
+                    Text(priceText(for: product))
                         .font(.headline)
 
                     if let badge = badgeText(for: product) {
@@ -283,7 +287,8 @@ struct ClarityReflectView: View {
         subtitle: String,
         badge: String?,
         price: String,
-        buttonTitle: String
+        buttonTitle: String,
+        buttonAction: @escaping () -> Void
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
@@ -329,13 +334,30 @@ struct ClarityReflectView: View {
                 }
             }
 
-            Button(buttonTitle) {}
+            Button(buttonTitle) {
+                buttonAction()
+            }
                 .frame(maxWidth: .infinity)
                 .buttonStyle(.bordered)
                 .tint(cardAccent(for: kind))
-                .disabled(true)
+                .disabled(reflectStore.isLoadingProducts)
         }
         .accountCardStyle(kind: kind, accent: cardAccent(for: kind))
+    }
+
+    @ViewBuilder
+    private var planLoadIssueText: some View {
+        if let issue = reflectStore.productLoadIssue {
+            Text(issue)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
+        } else {
+            Text("If plans do not appear, check the connection and try again.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.top, 2)
+        }
     }
 
     private var supportCard: some View {
@@ -388,15 +410,18 @@ struct ClarityReflectView: View {
             }
 
             Button {
-                guard let product = selectedSupportProduct else { return }
-                Task { await reflectStore.purchase(product) }
+                if let product = selectedSupportProduct {
+                    Task { await reflectStore.purchase(product) }
+                } else {
+                    Task { await reflectStore.reloadProducts() }
+                }
             } label: {
-                Text(selectedSupportButtonTitle)
+                Text(selectedSupportProduct == nil ? "Refresh support options" : selectedSupportButtonTitle)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .tint(cardAccent(for: .support))
-            .disabled(reflectStore.isPurchasing || selectedSupportProduct == nil || isSelectedSupportProductPurchased)
+            .disabled(reflectStore.isPurchasing || reflectStore.isLoadingProducts || isSelectedSupportProductPurchased)
         }
         .accountCardStyle(kind: .support, accent: cardAccent(for: .support))
     }
@@ -409,6 +434,17 @@ struct ClarityReflectView: View {
             return "Annual"
         default:
             return product.displayName
+        }
+    }
+
+    private func priceText(for product: Product) -> String {
+        switch product.id {
+        case ClarityReflectStore.monthlyProductID:
+            return "\(product.displayPrice) / month"
+        case ClarityReflectStore.annualProductID:
+            return "\(product.displayPrice) / year"
+        default:
+            return product.displayPrice
         }
     }
 
@@ -491,7 +527,7 @@ struct ClarityReflectView: View {
     }
 
     private var currentPlanSubtitle: String {
-#if DEBUG
+#if DEBUG && CLARITY_REFLECT_DEBUG_OVERRIDE
         if reflectStore.hasDebugReflectOverride && !reflectStore.hasPaidTier {
             return "You are on the free plan. Clarity Reflect adds deeper Cloud Tap responses for practice reflection."
         }
