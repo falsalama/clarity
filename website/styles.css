@@ -219,7 +219,7 @@ h3 {
   inset: 0;
   background:
     linear-gradient(180deg, rgba(13, 39, 64, 0.05), rgba(13, 39, 64, 0.82)),
-    url("assets/open-ground.png") center / cover;
+    url("assets/placeholder26.png") center / cover;
   opacity: 0.72;
 }
 
@@ -263,6 +263,11 @@ h3 {
 
 .surface-card.tall {
   min-height: 460px;
+}
+
+.surface-card.tall img {
+  object-position: center top;
+  transform: none;
 }
 
 .surface-card img {
@@ -383,6 +388,10 @@ h3 {
 
 .media-practice::before {
   background-image: url("/assets/home-practice.png");
+  background-position: center top;
+  background-size: 96% auto;
+  background-repeat: no-repeat;
+  transform: none;
 }
 
 .media-loosen::before {

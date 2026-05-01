@@ -639,7 +639,7 @@ private struct PracticePanel: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(DorjePressStyle(size: dorjeSize, opacity: dorjeOpacity))
         .position(point)
     }
 
@@ -841,6 +841,27 @@ private struct LotusPressStyle: ButtonStyle {
             }
             .scaleEffect(configuration.isPressed ? 1.03 : 1.0)
             .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}
+
+private struct DorjePressStyle: ButtonStyle {
+    let size: CGFloat
+    let opacity: Double
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.0 : 1.0)
+            .overlay {
+                Image("dorje2glow")
+                    .resizable()
+                    .renderingMode(.original)
+                    .scaledToFit()
+                    .frame(width: size, height: size)
+                    .opacity(configuration.isPressed ? opacity : 0.0)
+                    .allowsHitTesting(false)
+            }
+            .scaleEffect(configuration.isPressed ? 1.035 : 1.0)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 
