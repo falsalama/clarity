@@ -332,6 +332,12 @@ h3 {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.explore-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
 .card {
   min-height: 250px;
   padding: 1.25rem;
@@ -393,6 +399,10 @@ h3 {
 
 .image-calendar::before {
   background-image: url("/assets/calendar-card.png");
+}
+
+.image-pilgrimage::before {
+  background-image: url("/assets/open-ground.png");
 }
 
 .image-offering::before {
@@ -575,6 +585,7 @@ h3 {
   .wide-panel,
   .capsule-panel,
   .surface-grid,
+  .explore-grid,
   .cards-four,
   .cards {
     grid-template-columns: 1fr;
