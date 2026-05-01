@@ -67,23 +67,25 @@ a {
 }
 
 .brand-copy {
-  display: grid;
-  gap: 0.02rem;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.72rem;
+  flex-wrap: wrap;
 }
 
 .brand-title {
-  font-family: "Snell Roundhand", "Apple Chancery", "Brush Script MT", Georgia, serif;
-  font-size: 1.48rem;
-  font-weight: 700;
-  line-height: 0.94;
-  letter-spacing: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.92rem;
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
 }
 
 .brand-subtitle {
   color: var(--muted);
-  font-size: 0.66rem;
+  font-size: 0.76rem;
   font-weight: 700;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.11em;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -380,6 +382,46 @@ h3 {
   color: var(--muted);
 }
 
+.capsule-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.78fr);
+  gap: 1.1rem;
+  align-items: stretch;
+  padding: 1.2rem;
+  border: 1px solid rgba(201, 154, 58, 0.24);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at top left, rgba(201, 154, 58, 0.22), transparent 22rem),
+    linear-gradient(135deg, rgba(255, 250, 240, 0.82), rgba(242, 231, 207, 0.76));
+  box-shadow: 0 22px 70px rgba(16, 32, 47, 0.09);
+}
+
+.capsule-panel > div:first-child {
+  padding: 1rem;
+}
+
+.capsule-panel p {
+  max-width: 650px;
+  color: #46545e;
+}
+
+.capsule-card {
+  padding: 1.4rem;
+  border: 1px solid rgba(255, 250, 240, 0.18);
+  border-radius: 26px;
+  background: linear-gradient(135deg, var(--blue), #254966);
+  color: #fffaf0;
+}
+
+.capsule-card p {
+  color: rgba(255, 250, 240, 0.78);
+}
+
+.dark-list {
+  margin-top: 1.2rem;
+  color: rgba(255, 250, 240, 0.82);
+}
+
 .wide-panel {
   display: grid;
   grid-template-columns: minmax(0, 0.86fr) minmax(260px, 0.54fr);
@@ -509,6 +551,7 @@ h3 {
 
   .hero-grid,
   .wide-panel,
+  .capsule-panel,
   .surface-grid,
   .cards-four,
   .cards {
