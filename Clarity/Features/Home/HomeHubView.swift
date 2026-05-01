@@ -310,91 +310,9 @@ private struct LiquidTouchOrb: View {
 
     var body: some View {
         ZStack {
-            // soft watery trail
-            Circle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.10)
-                .frame(width: size * 0.98, height: size * 0.98)
-                .blur(radius: 14)
-                .scaleEffect(1.02)
-                .offset(x: trailDX, y: trailDY)
-
-            // outer glow haze
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            Color.white.opacity(0.10),
-                            Color.white.opacity(0.05),
-                            Color.clear
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: size * 0.62
-                    )
-                )
-                .frame(width: size * 1.02, height: size * 1.02)
-                .blur(radius: 10)
-
-            // main orb
-            Circle()
-                .fill(.ultraThinMaterial)
-                .opacity(0.26)
-                .overlay(
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.white.opacity(0.34),
-                                    Color.white.opacity(0.16),
-                                    Color.clear
-                                ],
-                                center: .topLeading,
-                                startRadius: 2,
-                                endRadius: size * 0.52
-                            )
-                        )
-                        .blur(radius: 2.2)
-                )
-                .overlay(
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color.white.opacity(0.18),
-                                    Color.clear
-                                ],
-                                center: .bottomTrailing,
-                                startRadius: 0,
-                                endRadius: size * 0.42
-                            )
-                        )
-                        .blur(radius: 6)
-                )
-                .overlay(
-                    Ellipse()
-                        .fill(Color.white.opacity(0.28))
-                        .frame(width: size * 0.28, height: size * 0.11)
-                        .blur(radius: 1.4)
-                        .offset(x: -18, y: -28)
-                )
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.34), lineWidth: 1.0)
-                )
-                .overlay(
-                    Circle()
-                        .stroke(Color.white.opacity(0.12), lineWidth: 10)
-                        .blur(radius: 10)
-                        .padding(2)
-                )
-                .overlay(
-                    Circle()
-                        .stroke(Color.black.opacity(0.05), lineWidth: 1.0)
-                        .blur(radius: 1.0)
-                        .offset(y: 1)
-                )
-                .shadow(color: .black.opacity(0.05), radius: 14, y: 6)
+            wateryTrail
+            outerGlowHaze
+            mainOrb
         }
         .frame(width: size, height: size)
         .position(currentPoint == .zero ? point : currentPoint)
@@ -421,6 +339,113 @@ private struct LiquidTouchOrb: View {
                 lastPoint = newValue
             }
         }
+    }
+
+    private var wateryTrail: some View {
+        Circle()
+            .fill(.ultraThinMaterial)
+            .opacity(0.10)
+            .frame(width: size * 0.98, height: size * 0.98)
+            .blur(radius: 14)
+            .scaleEffect(1.02)
+            .offset(x: trailDX, y: trailDY)
+    }
+
+    private var outerGlowHaze: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(0.10),
+                        Color.white.opacity(0.05),
+                        Color.clear
+                    ],
+                    center: .center,
+                    startRadius: 0,
+                    endRadius: size * 0.62
+                )
+            )
+            .frame(width: size * 1.02, height: size * 1.02)
+            .blur(radius: 10)
+    }
+
+    private var mainOrb: some View {
+        ZStack {
+            orbMaterial
+            topHighlight
+            bottomHighlight
+            specularHighlight
+            innerRim
+            softOuterRim
+            shadowRim
+        }
+        .shadow(color: .black.opacity(0.05), radius: 14, y: 6)
+    }
+
+    private var orbMaterial: some View {
+        Circle()
+            .fill(.ultraThinMaterial)
+            .opacity(0.26)
+    }
+
+    private var topHighlight: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(0.34),
+                        Color.white.opacity(0.16),
+                        Color.clear
+                    ],
+                    center: .topLeading,
+                    startRadius: 2,
+                    endRadius: size * 0.52
+                )
+            )
+            .blur(radius: 2.2)
+    }
+
+    private var bottomHighlight: some View {
+        Circle()
+            .fill(
+                RadialGradient(
+                    colors: [
+                        Color.white.opacity(0.18),
+                        Color.clear
+                    ],
+                    center: .bottomTrailing,
+                    startRadius: 0,
+                    endRadius: size * 0.42
+                )
+            )
+            .blur(radius: 6)
+    }
+
+    private var specularHighlight: some View {
+        Ellipse()
+            .fill(Color.white.opacity(0.28))
+            .frame(width: size * 0.28, height: size * 0.11)
+            .blur(radius: 1.4)
+            .offset(x: -18, y: -28)
+    }
+
+    private var innerRim: some View {
+        Circle()
+            .stroke(Color.white.opacity(0.34), lineWidth: 1.0)
+    }
+
+    private var softOuterRim: some View {
+        Circle()
+            .stroke(Color.white.opacity(0.12), lineWidth: 10)
+            .blur(radius: 10)
+            .padding(2)
+    }
+
+    private var shadowRim: some View {
+        Circle()
+            .stroke(Color.black.opacity(0.05), lineWidth: 1.0)
+            .blur(radius: 1.0)
+            .offset(y: 1)
     }
 }
 // MARK: - Practice tab
