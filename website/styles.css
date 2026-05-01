@@ -19,6 +19,7 @@ html {
 }
 
 body {
+  position: relative;
   margin: 0;
   color: var(--ink);
   background:
@@ -29,6 +30,17 @@ body {
   line-height: 1.6;
 }
 
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url("/assets/clouds-bg.png") center top / min(88vw, 1120px) auto repeat-y;
+  mix-blend-mode: multiply;
+  opacity: 0.08;
+}
+
 a {
   color: inherit;
 }
@@ -36,10 +48,16 @@ a {
 .site-header {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 20;
   background: rgba(245, 241, 232, 0.82);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(18px);
+}
+
+main,
+.site-footer {
+  position: relative;
+  z-index: 1;
 }
 
 .nav {
@@ -254,6 +272,10 @@ h3 {
   height: 100%;
   object-fit: cover;
   transform: scale(1.02);
+}
+
+.surface-card img.meditation-shot {
+  object-position: center 42%;
 }
 
 .surface-card::after {
