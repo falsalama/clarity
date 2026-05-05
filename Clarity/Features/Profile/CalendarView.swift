@@ -283,30 +283,47 @@ struct ObservanceRow: View {
     let storageBase: String
 
     var body: some View {
-        HStack(spacing: 12) {
-            CachedRemoteImage(url: imageURL, contentMode: .fill, maxPixelSize: 256)
-                .frame(width: 56, height: 56)
-                .background(Color.primary.opacity(0.03))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                CachedRemoteImage(url: imageURL, contentMode: .fill, maxPixelSize: 256)
+                    .frame(width: 56, height: 56)
+                    .background(Color.primary.opacity(0.03))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.headline)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.title)
+                        .font(.headline)
 
-                if let subtitle = item.subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.subheadline)
+                    if let subtitle = item.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text("\(item.tradition_scope.uppercased()) · \(item.region_scope.uppercased())")
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("\(item.tradition_scope.uppercased()) · \(item.region_scope.uppercased())")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 0)
+            if let detailText {
+                Text(detailText)
+                    .font(.footnote)
+                    .lineSpacing(3)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .padding(12)
+        .background(Color.primary.opacity(0.035))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.06), lineWidth: 1)
+        )
     }
 
     private var imageURL: URL? {
@@ -327,5 +344,10 @@ struct ObservanceRow: View {
         var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
         comps?.queryItems = [URLQueryItem(name: "v", value: imageVersion)]
         return comps?.url
+    }
+
+    private var detailText: String? {
+        let trimmed = item.detail?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? nil : trimmed
     }
 }

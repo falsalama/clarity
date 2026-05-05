@@ -13,6 +13,7 @@ struct CalendarObservance: Decodable, Identifiable {
     let tradition_scope: String
     let region_scope: String
     let image_key: String?
+    let detail: String?
 }
 
 @MainActor
@@ -34,7 +35,7 @@ final class CalendarStore: ObservableObject {
         let raw =
             supabaseURL.absoluteString +
             "/rest/v1/calendar_observances" +
-            "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key" +
+            "?select=id,date,event_key,title,subtitle,category,importance,practice_angle,tradition_scope,region_scope,image_key,detail" +
             "&enabled=eq.true" +
             "&date=gte.2026-01-01" +
             "&date=lte.2026-12-31" +

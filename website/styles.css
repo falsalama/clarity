@@ -234,11 +234,7 @@ h3 {
   width: 96px;
   height: 96px;
   margin-bottom: 1.1rem;
-  border: 1px solid rgba(255, 250, 240, 0.22);
-  border-radius: 999px;
-  background: rgba(255, 250, 240, 0.72);
-  box-shadow: 0 16px 44px rgba(8, 22, 36, 0.28);
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .visual-section {
@@ -247,7 +243,7 @@ h3 {
 
 .surface-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 0.95fr) minmax(220px, 0.72fr) minmax(220px, 0.72fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 
@@ -259,15 +255,6 @@ h3 {
   border-radius: 34px;
   background: var(--blue);
   box-shadow: var(--shadow);
-}
-
-.surface-card.tall {
-  min-height: 460px;
-}
-
-.surface-card.tall img {
-  object-position: center top;
-  transform: none;
 }
 
 .surface-card img {
